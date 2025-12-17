@@ -11,16 +11,12 @@ import { AdminUser } from '@/types/admin';
 import {
   Search,
   Plus,
-  Edit,
-  Trash2,
   Shield,
   ShieldCheck,
   ShieldX,
   UserCheck,
   UserX,
   Key,
-  Mail,
-  Calendar,
   MoreVertical,
   User as UserIcon
 } from 'lucide-react';

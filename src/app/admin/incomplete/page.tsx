@@ -10,12 +10,8 @@ import { getIncompleteApplications } from '@/data/mockData';
 import { IncompleteApplication } from '@/types/admin';
 import {
   Search,
-  Filter,
   Mail,
   Clock,
-  User,
-  CheckCircle,
-  AlertCircle,
   Calendar,
   Phone,
   MapPin,

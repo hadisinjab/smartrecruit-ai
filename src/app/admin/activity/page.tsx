@@ -10,19 +10,15 @@ import { getActivityLog } from '@/data/mockData';
 import { ActivityLogEntry } from '@/types/admin';
 import {
   Search,
-  Filter,
   Download,
   User,
   Briefcase,
   FileText,
   Settings,
   Shield,
-  Calendar,
-  Clock,
   Globe,
   Monitor,
-  Eye,
-  ArrowUpDown
+  Eye
 } from 'lucide-react';
 import { DataTable, Column } from '@/components/admin/DataTable';
 
