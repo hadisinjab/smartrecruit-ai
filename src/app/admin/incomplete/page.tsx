@@ -18,7 +18,8 @@ import {
   Eye,
   MoreVertical
 } from 'lucide-react';
-import { DataTable, Column } from '@/components/admin/DataTable';
+import { DataTable } from '@/components/admin/DataTable';
+import type { Column } from '@/components/admin/DataTable';
 
 export default function IncompleteApplicationsPage() {
   const [searchTerm, setSearchTerm] = useState('');

@@ -20,7 +20,8 @@ import {
   MoreVertical,
   User as UserIcon
 } from 'lucide-react';
-import { DataTable, Column } from '@/components/admin/DataTable';
+import { DataTable } from '@/components/admin/DataTable';
+import type { Column } from '@/components/admin/DataTable';
 
 export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
