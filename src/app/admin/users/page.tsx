@@ -343,11 +343,6 @@ export default function UsersPage() {
             data={filteredUsers}
             columns={columns}
             emptyText="No users found"
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showQuickJumper: true
-            }}
           />
         </Card>
       </div>

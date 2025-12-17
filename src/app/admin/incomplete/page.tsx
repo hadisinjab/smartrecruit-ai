@@ -306,11 +306,6 @@ export default function IncompleteApplicationsPage() {
             data={filteredApplications}
             columns={columns}
             emptyText="No incomplete applications found"
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showQuickJumper: true
-            }}
           />
         </Card>
       </div>

@@ -408,11 +408,6 @@ export default function ActivityLogPage() {
             data={filteredActivities}
             columns={columns}
             emptyText="No activities found"
-            pagination={{
-              pageSize: 15,
-              showSizeChanger: true,
-              showQuickJumper: true
-            }}
           />
         </Card>
       </div>
