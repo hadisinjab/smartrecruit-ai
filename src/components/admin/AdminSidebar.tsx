@@ -1,0 +1,188 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import {
+  LayoutDashboard,
+  Users,
+  Briefcase,
+  FileText,
+  BarChart3,
+  Settings,
+  LogOut,
+  AlertCircle,
+  UserCog,
+  Activity,
+  Clock
+} from 'lucide-react';
+import { mockAdminUser } from '@/data/mockData';
+
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  isActive?: boolean;
+}
+
+const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }) => {
+  return (
+    <Link href={href}>
+      <div
+        className={cn(
+          'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+        )}
+      >
+        {icon}
+        <span>{label}</span>
+      </div>
+    </Link>
+  );
+};
+
+export const AdminSidebar: React.FC = () => {
+  const pathname = usePathname();
+  
+  // Get current user role (in a real app, this would come from auth context)
+  const currentUser = mockAdminUser;
+  const userRole = currentUser.role;
+
+  // Permission-based navigation items
+  const getNavigationItems = () => {
+    const allItems = [
+      {
+        icon: <LayoutDashboard className='w-5 h-5' />,
+        label: 'Dashboard',
+        href: '/admin/dashboard',
+        requiredRole: null // All roles can access
+      },
+      {
+        icon: <Users className='w-5 h-5' />,
+        label: 'Candidates',
+        href: '/admin/candidates',
+        requiredRole: null // All roles can access
+      },
+      {
+        icon: <Briefcase className='w-5 h-5' />,
+        label: 'Jobs',
+        href: '/admin/jobs',
+        requiredRole: null // All roles can access
+      },
+      {
+        icon: <Clock className='w-5 h-5' />,
+        label: 'Incomplete',
+        href: '/admin/incomplete',
+        requiredRole: null // All roles can access
+      },
+      {
+        icon: <FileText className='w-5 h-5' />,
+        label: 'Evaluations',
+        href: '/admin/evaluations',
+        requiredRole: null // All roles can access
+      },
+      {
+        icon: <UserCog className='w-5 h-5' />,
+        label: 'User Management',
+        href: '/admin/users',
+        requiredRole: 'super-admin' // Only super-admin can access
+      },
+      {
+        icon: <Activity className='w-5 h-5' />,
+        label: 'Activity Log',
+        href: '/admin/activity',
+        requiredRole: 'super-admin' // Only super-admin can access
+      },
+      {
+        icon: <BarChart3 className='w-5 h-5' />,
+        label: 'Reports',
+        href: '/admin/reports',
+        requiredRole: null // All roles can access
+      },
+      {
+        icon: <Settings className='w-5 h-5' />,
+        label: 'Settings',
+        href: '/admin/settings',
+        requiredRole: 'super-admin' // Only super-admin can access
+      }
+    ];
+
+    // Filter items based on user role
+    return allItems.filter(item => {
+      if (!item.requiredRole) return true; // Public items
+      return userRole === item.requiredRole;
+    });
+  };
+
+  const navigationItems = getNavigationItems();
+
+  // Get role display name
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'super-admin':
+        return 'Super Admin';
+      case 'admin':
+        return 'Admin';
+      case 'reviewer':
+        return 'Reviewer';
+      default:
+        return 'User';
+    }
+  };
+
+  return (
+    <div className='w-64 bg-white border-r border-gray-200 h-full flex flex-col'>
+      {/* Logo */}
+      <div className='p-6 border-b border-gray-200'>
+        <h1 className='text-xl font-bold text-gray-900'>SmartRecruit AI</h1>
+        <p className='text-sm text-gray-600'>Admin Panel</p>
+      </div>
+
+      {/* Navigation */}
+      <nav className='flex-1 p-4 space-y-1'>
+        {navigationItems.map((item) => (
+          <SidebarItem
+            key={item.href}
+            icon={item.icon}
+            label={item.label}
+            href={item.href}
+            isActive={pathname === item.href}
+          />
+        ))}
+      </nav>
+
+      {/* User Section */}
+      <div className='p-4 border-t border-gray-200'>
+        <div className='flex items-center space-x-3 mb-3'>
+          <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
+            <span className='text-white text-sm font-medium'>
+              {currentUser.name.split(' ').map(n => n[0]).join('')}
+            </span>
+          </div>
+          <div>
+            <p className='text-sm font-medium text-gray-900'>{currentUser.name}</p>
+            <p className='text-xs text-gray-600'>{getRoleDisplayName(userRole)}</p>
+          </div>
+        </div>
+        
+        {/* Role indicator for restricted access */}
+        {userRole === 'reviewer' && (
+          <div className='mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg'>
+            <div className='flex items-center space-x-2'>
+              <AlertCircle className='w-4 h-4 text-yellow-600' />
+              <span className='text-xs text-yellow-800'>Read-only access</span>
+            </div>
+          </div>
+        )}
+        
+        <button className='flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 w-full'>
+          <LogOut className='w-4 h-4' />
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </div>
+  );
+};
