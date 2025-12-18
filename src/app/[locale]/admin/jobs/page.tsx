@@ -11,6 +11,10 @@ import { Card } from '@/components/ui/admin-card';
 import { mockJobs } from '@/data/mockData';
 import { Job } from '@/types/admin';
 import { Plus, Search, MapPin, Calendar, Users } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
+import { exportToCSV } from '@/utils/exportUtils';
+import { useUser } from '@/context/UserContext';
+import { useSearch } from '@/context/SearchContext';
 
 export default function JobsPage() {
   const t = useTranslations('Jobs');
@@ -18,9 +22,11 @@ export default function JobsPage() {
   const tStatus = useTranslations('Status');
   const tCommon = useTranslations('Common');
   const format = useFormatter();
+  const { addToast } = useToast();
+  const { isReviewer } = useUser();
+  const { searchTerm } = useSearch();
 
   const [jobs] = useState<Job[]>(mockJobs);
-  const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
 
   const filteredJobs = jobs.filter(job =>
@@ -90,10 +96,10 @@ export default function JobsPage() {
         </span>
       )
     },
-    {
+    ...(!isReviewer ? [{
       key: 'salary',
       title: tTable('salaryRange'),
-      render: (salary) => (
+      render: (salary: any) => (
         <div>
           <p className='text-sm font-medium text-gray-900'>
             ${salary.min.toLocaleString()} - ${salary.max.toLocaleString()}
@@ -101,7 +107,7 @@ export default function JobsPage() {
           <p className='text-xs text-gray-500'>{salary.currency}</p>
         </div>
       )
-    },
+    }] : []),
     {
       key: 'applicantsCount',
       title: tTable('applicants'),
@@ -145,10 +151,19 @@ export default function JobsPage() {
       subtitle={t('subtitle')}
       actions={
         <div className='flex space-x-3'>
-          <Button variant='outline'>
+          <Button 
+            variant='outline'
+            onClick={() => {
+              exportToCSV(jobs, 'jobs-data');
+              addToast('success', 'Jobs data exported successfully');
+            }}
+          >
             {t('exportData')}
           </Button>
-          <Button className='flex items-center space-x-2'>
+          <Button 
+            className='flex items-center space-x-2'
+            onClick={() => router.push('/admin/jobs/new')}
+          >
             <Plus className='w-4 h-4' />
             <span>{t('createJob')}</span>
           </Button>
@@ -156,23 +171,6 @@ export default function JobsPage() {
       }
     >
       <div className='space-y-6'>
-        {/* Search and Stats */}
-        <div className='flex items-center justify-between'>
-          <div className='relative flex-1 max-w-md'>
-            <Search className='w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
-            <input
-              type='text'
-              placeholder={t('searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className='pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-            />
-          </div>
-          <div className='text-sm text-gray-600'>
-            {t('count', { count: filteredJobs.length, total: jobs.length })}
-          </div>
-        </div>
-
         {/* Stats Cards */}
         <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
           <Card className='p-4'>

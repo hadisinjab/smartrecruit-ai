@@ -12,6 +12,8 @@ import { mockCandidates } from '@/data/mockData';
 import { Candidate } from '@/types/admin';
 import { Filter, Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import { useToast } from '@/context/ToastContext';
+import { exportToCSV } from '@/utils/exportUtils';
 
 export default function CandidatesPage() {
   const t = useTranslations('Candidates');
@@ -19,6 +21,7 @@ export default function CandidatesPage() {
   const tTable = useTranslations('Table');
   const tStatus = useTranslations('Status');
   const format = useFormatter();
+  const { addToast } = useToast();
 
   const [candidates] = useState<Candidate[]>(mockCandidates);
   const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>(mockCandidates);
@@ -181,18 +184,22 @@ export default function CandidatesPage() {
         <div className='flex space-x-3'>
           <Button
             variant='outline'
+            onClick={() => {
+              exportToCSV(candidates, 'candidates-data');
+              addToast('success', 'Candidates data exported successfully');
+            }}
+            className='flex items-center space-x-2'
+          >
+            <span>{tCommon('export')}</span>
+          </Button>
+          <Button
+            variant='outline'
             onClick={() => setShowFilters(true)}
             className='flex items-center space-x-2'
           >
             <Filter className='w-4 h-4' />
             <span>{t('filters')}</span>
           </Button>
-          <Link href='/admin/candidates/new'>
-            <Button className='flex items-center space-x-2'>
-              <Plus className='w-4 h-4' />
-              <span>{t('addCandidate')}</span>
-            </Button>
-          </Link>
         </div>
       }
     >

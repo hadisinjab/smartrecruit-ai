@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
+import { useToast } from '@/context/ToastContext';
 
 export default function IncompleteApplicationsPage() {
   const t = useTranslations('Incomplete');
@@ -28,6 +29,7 @@ export default function IncompleteApplicationsPage() {
   const tTable = useTranslations('Table');
   const tProgress = useTranslations('Progress');
   const format = useFormatter();
+  const { addToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [jobFilter, setJobFilter] = useState('all');
@@ -189,6 +191,9 @@ export default function IncompleteApplicationsPage() {
             variant='outline'
             size='sm'
             className='flex items-center space-x-1'
+            onClick={() => {
+              addToast('success', `Reminder sent to ${record.firstName} ${record.lastName}`);
+            }}
           >
             <Mail className='w-3 h-3' />
             <span>{tTable('remind')}</span>

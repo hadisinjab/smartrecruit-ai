@@ -10,12 +10,14 @@ import { Column } from '@/components/admin/DataTable';
 import { mockEvaluations, getCandidateById } from '@/data/mockData';
 import { Evaluation } from '@/types/admin';
 import { Plus, Search, Star, MessageSquare, User, Calendar } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 export default function EvaluationsPage() {
   const t = useTranslations('Evaluations');
   const tTable = useTranslations('Table');
   const tCommon = useTranslations('Common');
   const format = useFormatter();
+  const { addToast } = useToast();
 
   const [evaluations] = useState<Evaluation[]>(mockEvaluations);
   const [searchTerm, setSearchTerm] = useState('');
@@ -150,7 +152,10 @@ export default function EvaluationsPage() {
           <Button variant='outline'>
             {t('exportReport')}
           </Button>
-          <Button className='flex items-center space-x-2'>
+          <Button 
+            className='flex items-center space-x-2'
+            onClick={() => addToast('info', 'New Evaluation form will be implemented in the next phase')}
+          >
             <Plus className='w-4 h-4' />
             <span>{t('newEvaluation')}</span>
           </Button>
