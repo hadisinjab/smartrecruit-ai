@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -24,6 +25,12 @@ import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
 
 export default function ActivityLogPage() {
+  const t = useTranslations('Activity');
+  const tTable = useTranslations('Table');
+  const tCommon = useTranslations('Common');
+  const tTarget = useTranslations('Target');
+  const format = useFormatter();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [userFilter, setUserFilter] = useState('all');
   const [actionFilter, setActionFilter] = useState('all');
@@ -155,7 +162,7 @@ export default function ActivityLogPage() {
   const columns: Column<ActivityLogEntry>[] = [
     {
       key: 'user',
-      title: 'User',
+      title: tTable('user'),
       render: (_, record) => (
         <div className='flex items-center space-x-3'>
           <div className='w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center'>
@@ -176,7 +183,7 @@ export default function ActivityLogPage() {
     },
     {
       key: 'action',
-      title: 'Action',
+      title: tTable('action'),
       render: (_, record) => (
         <div className='space-y-1'>
           <p className={`font-medium text-sm ${getActionColor(record.action)}`}>
@@ -185,7 +192,7 @@ export default function ActivityLogPage() {
           <div className='flex items-center space-x-2'>
             {getTargetTypeIcon(record.targetType)}
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getTargetTypeColor(record.targetType)}`}>
-              {record.targetType.charAt(0).toUpperCase() + record.targetType.slice(1)}
+              {tTarget(record.targetType)}
             </span>
           </div>
         </div>
@@ -193,7 +200,7 @@ export default function ActivityLogPage() {
     },
     {
       key: 'target',
-      title: 'Target',
+      title: tTable('target'),
       render: (_, record) => (
         <div>
           <p className='font-medium text-gray-900 text-sm'>{record.target}</p>
@@ -203,7 +210,7 @@ export default function ActivityLogPage() {
     },
     {
       key: 'timestamp',
-      title: 'Timestamp',
+      title: tTable('timestamp'),
       render: (timestamp) => {
         const date = new Date(timestamp);
         const now = new Date();
@@ -212,12 +219,12 @@ export default function ActivityLogPage() {
         let timeText = '';
         if (diffInHours < 1) {
           const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-          timeText = `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+          timeText = t('time.minutesAgo', { count: diffInMinutes });
         } else if (diffInHours < 24) {
-          timeText = `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+          timeText = t('time.hoursAgo', { count: diffInHours });
         } else {
           const diffInDays = Math.floor(diffInHours / 24);
-          timeText = `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+          timeText = t('time.daysAgo', { count: diffInDays });
         }
         
         return (
@@ -232,7 +239,7 @@ export default function ActivityLogPage() {
     },
     {
       key: 'location',
-      title: 'Location',
+      title: tTable('location'),
       render: (_, record) => (
         <div className='text-sm text-gray-600'>
           {record.ipAddress && (
@@ -254,7 +261,7 @@ export default function ActivityLogPage() {
     },
     {
       key: 'actions',
-      title: 'Actions',
+      title: tTable('actions'),
       render: (_, record) => (
         <div className='flex items-center space-x-2'>
           <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
@@ -283,12 +290,12 @@ export default function ActivityLogPage() {
 
   return (
     <AdminLayout
-      title="Activity Log"
-      subtitle={`${filteredActivities.length} activity${filteredActivities.length !== 1 ? 's' : ''} found`}
+      title={t('title')}
+      subtitle={t('count', { count: filteredActivities.length })}
       actions={
         <Button className='flex items-center space-x-2'>
           <Download className='w-4 h-4' />
-          <span>Export Log</span>
+          <span>{t('exportLog')}</span>
         </Button>
       }
     >
@@ -298,32 +305,32 @@ export default function ActivityLogPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-gray-900'>{stats.total}</p>
-              <p className='text-sm text-gray-600'>Total Activities</p>
+              <p className='text-sm text-gray-600'>{t('stats.total')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-blue-600'>{stats.today}</p>
-              <p className='text-sm text-gray-600'>Today</p>
+              <p className='text-sm text-gray-600'>{t('stats.today')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.thisWeek}</p>
-              <p className='text-sm text-gray-600'>This Week</p>
+              <p className='text-sm text-gray-600'>{t('stats.thisWeek')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-purple-600'>{stats.uniqueUsers}</p>
-              <p className='text-sm text-gray-600'>Active Users</p>
+              <p className='text-sm text-gray-600'>{t('stats.activeUsers')}</p>
             </div>
           </Card>
         </div>
 
         {/* Quick Actions Summary */}
         <Card className='p-6'>
-          <h3 className='text-lg font-semibold text-gray-900 mb-4'>Recent Actions</h3>
+          <h3 className='text-lg font-semibold text-gray-900 mb-4'>{t('recentActions')}</h3>
           <div className='flex flex-wrap gap-2'>
             {recentActions.map((action) => (
               <span
@@ -343,7 +350,7 @@ export default function ActivityLogPage() {
               <div className='relative'>
                 <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
                 <Input
-                  placeholder="Search activities..."
+                  placeholder={t('searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className='pl-10'
@@ -353,10 +360,10 @@ export default function ActivityLogPage() {
             
             <Select value={userFilter} onValueChange={setUserFilter}>
               <SelectTrigger className='w-full sm:w-[180px]'>
-                <SelectValue placeholder="Filter by user" />
+                <SelectValue placeholder={t('filters.user')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Users</SelectItem>
+                <SelectItem value="all">{t('filters.allUsers')}</SelectItem>
                 {getUniqueUsers().map(user => (
                   <SelectItem key={user} value={user}>{user}</SelectItem>
                 ))}
@@ -365,10 +372,10 @@ export default function ActivityLogPage() {
             
             <Select value={actionFilter} onValueChange={setActionFilter}>
               <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder="Filter by action" />
+                <SelectValue placeholder={t('filters.action')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Actions</SelectItem>
+                <SelectItem value="all">{t('filters.allActions')}</SelectItem>
                 {getUniqueActions().map(action => (
                   <SelectItem key={action} value={action}>{action}</SelectItem>
                 ))}
@@ -377,10 +384,10 @@ export default function ActivityLogPage() {
             
             <Select value={targetFilter} onValueChange={setTargetFilter}>
               <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder={t('filters.type')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="all">{t('filters.allTypes')}</SelectItem>
                 {getUniqueTargetTypes().map(type => (
                   <SelectItem key={type} value={type}>
                     {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -391,13 +398,13 @@ export default function ActivityLogPage() {
             
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder="Date range" />
+                <SelectValue placeholder={t('filters.date')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Past Week</SelectItem>
-                <SelectItem value="month">Past Month</SelectItem>
+                <SelectItem value="all">{t('filters.allTime')}</SelectItem>
+                <SelectItem value="today">{t('filters.today')}</SelectItem>
+                <SelectItem value="week">{t('filters.week')}</SelectItem>
+                <SelectItem value="month">{t('filters.month')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -408,7 +415,7 @@ export default function ActivityLogPage() {
           <DataTable
             data={filteredActivities}
             columns={columns}
-            emptyText="No activities found"
+            emptyText={t('empty')}
           />
         </Card>
       </div>

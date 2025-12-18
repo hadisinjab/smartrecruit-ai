@@ -16,9 +16,15 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '@/components/admin/DataTable';
 import { Candidate } from '@/types/admin';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
+import { useFormatter, useTranslations } from 'next-intl';
 
 export default function AdminDashboard() {
+  const format = useFormatter();
+  const t = useTranslations('Dashboard');
+  const tCommon = useTranslations('Common');
+  const tTable = useTranslations('Table');
+  const tStatus = useTranslations('Status');
   const stats = mockDashboardStats;
 
   const getStatusColor = (status: string) => {
@@ -36,7 +42,7 @@ export default function AdminDashboard() {
   const recentCandidatesColumns: Column<Candidate>[] = [
     {
       key: 'name',
-      title: 'Candidate',
+      title: tTable('candidate'),
       render: (_, record) => (
         <div className='flex items-center space-x-3'>
           <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
@@ -55,21 +61,25 @@ export default function AdminDashboard() {
     },
     {
       key: 'status',
-      title: 'Status',
+      title: tTable('status'),
       render: (status) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
-          {status.charAt(0).toUpperCase() + status.slice(1)}
+          {tStatus(status as any)}
         </span>
       )
     },
     {
       key: 'appliedDate',
-      title: 'Applied',
-      render: (date) => new Date(date).toLocaleDateString()
+      title: tTable('applied'),
+      render: (date) => format.dateTime(new Date(date), {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      })
     },
     {
       key: 'rating',
-      title: 'Rating',
+      title: tTable('rating'),
       render: (rating) => (
         <div className='flex items-center space-x-1'>
           {[...Array(5)].map((_, i) => (
@@ -84,29 +94,29 @@ export default function AdminDashboard() {
 
   const quickActions = [
     {
-      title: 'Review Applications',
-      description: 'Review new candidate applications',
+      title: t('reviewApplications'),
+      description: t('reviewApplicationsDesc'),
       icon: FileText,
       href: '/admin/candidates',
       color: 'blue' as const
     },
     {
-      title: 'Manage Jobs',
-      description: 'Create and manage job postings',
+      title: t('manageJobs'),
+      description: t('manageJobsDesc'),
       icon: Briefcase,
       href: '/admin/jobs',
       color: 'green' as const
     },
     {
-      title: 'Schedule Interviews',
-      description: 'Schedule upcoming interviews',
+      title: t('scheduleInterviews'),
+      description: t('scheduleInterviewsDesc'),
       icon: Clock,
       href: '/admin/evaluations',
       color: 'purple' as const
     },
     {
-      title: 'View Reports',
-      description: 'Analyze hiring metrics',
+      title: t('viewReports'),
+      description: t('viewReportsDesc'),
       icon: TrendingUp,
       href: '/admin/reports',
       color: 'yellow' as const
@@ -115,45 +125,45 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout
-      title="Dashboard"
-      subtitle="Overview of your hiring pipeline"
+      title={t('title')}
+      subtitle={t('subtitle')}
     >
       <div className='space-y-6'>
         {/* Stats Grid */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'>
           <StatsCard
-            title="Total Candidates"
+            title={t('totalCandidates')}
             value={stats.totalCandidates}
-            change={{ value: 12, type: 'increase' }}
             icon={Users}
-            color="blue"
+            trend={{ value: 12, label: t('fromLastMonth'), isPositive: true }}
+            color='blue'
           />
           <StatsCard
-            title="Active Jobs"
+            title={t('activeJobs')}
             value={stats.activeJobs}
-            change={{ value: 8, type: 'increase' }}
             icon={Briefcase}
-            color="green"
+            trend={{ value: 8, label: t('fromLastMonth'), isPositive: true }}
+            color='green'
           />
           <StatsCard
-            title="New Applications"
+            title={t('newApplications')}
             value={stats.newApplications}
-            change={{ value: 15, type: 'increase' }}
             icon={FileText}
-            color="purple"
+            trend={{ value: 15, label: t('fromLastMonth'), isPositive: true }}
+            color='purple'
           />
           <StatsCard
-            title="Interviews Scheduled"
+            title={t('interviewsScheduled')}
             value={stats.interviewsScheduled}
-            change={{ value: 5, type: 'increase' }}
             icon={Clock}
-            color="yellow"
+            trend={{ value: 5, label: t('fromLastMonth'), isPositive: true }}
+            color='yellow'
           />
         </div>
 
         {/* Quick Actions */}
         <div>
-          <h2 className='text-lg font-semibold text-gray-900 mb-4'>Quick Actions</h2>
+          <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('quickActions')}</h2>
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
             {quickActions.map((action) => (
               <Link key={action.title} href={action.href}>
@@ -179,59 +189,56 @@ export default function AdminDashboard() {
         </div>
 
         {/* Recent Activity & Metrics */}
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-          {/* Recent Candidates */}
-          <Card className='p-6'>
-            <div className='flex items-center justify-between mb-4'>
-              <h2 className='text-lg font-semibold text-gray-900'>Recent Candidates</h2>
-              <Link href='/admin/candidates' className='text-sm text-blue-600 hover:text-blue-700'>
-                View all
-              </Link>
-            </div>
-            <DataTable
-              data={mockCandidates.slice(0, 5)}
-              columns={recentCandidatesColumns}
-              emptyText="No recent candidates"
-            />
-          </Card>
-
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Key Metrics */}
           <Card className='p-6'>
-            <h2 className='text-lg font-semibold text-gray-900 mb-4'>Key Metrics</h2>
-            <div className='space-y-4'>
-              <div className='flex items-center justify-between p-4 bg-gray-50 rounded-lg'>
-                <div className='flex items-center space-x-3'>
-                  <CheckCircle className='w-5 h-5 text-green-600' />
-                  <span className='font-medium text-gray-900'>Offers Made</span>
+            <h3 className='text-lg font-semibold text-gray-900 mb-4'>{t('keyMetrics')}</h3>
+            <div className='space-y-6'>
+              <div>
+                <div className='flex items-center justify-between mb-2'>
+                  <span className='text-sm font-medium text-gray-600'>{t('offersMade')}</span>
+                  <span className='text-lg font-bold text-gray-900'>{stats.offersMade}</span>
                 </div>
-                <span className='text-2xl font-bold text-gray-900'>{stats.offersMade}</span>
+                <div className='w-full bg-gray-100 rounded-full h-2'>
+                  <div className='bg-green-500 h-2 rounded-full' style={{ width: '75%' }}></div>
+                </div>
               </div>
-              
-              <div className='flex items-center justify-between p-4 bg-gray-50 rounded-lg'>
-                <div className='flex items-center space-x-3'>
-                  <Users className='w-5 h-5 text-blue-600' />
-                  <span className='font-medium text-gray-900'>Successful Hires</span>
+              <div>
+                <div className='flex items-center justify-between mb-2'>
+                  <span className='text-sm font-medium text-gray-600'>{t('successfulHires')}</span>
+                  <span className='text-lg font-bold text-gray-900'>{stats.hires}</span>
                 </div>
-                <span className='text-2xl font-bold text-gray-900'>{stats.hires}</span>
+                <div className='w-full bg-gray-100 rounded-full h-2'>
+                  <div className='bg-blue-500 h-2 rounded-full' style={{ width: '60%' }}></div>
+                </div>
               </div>
-              
-              <div className='flex items-center justify-between p-4 bg-gray-50 rounded-lg'>
-                <div className='flex items-center space-x-3'>
-                  <XCircle className='w-5 h-5 text-red-600' />
-                  <span className='font-medium text-gray-900'>Rejection Rate</span>
+              <div>
+                <div className='flex items-center justify-between mb-2'>
+                  <span className='text-sm font-medium text-gray-600'>{t('rejectionRate')}</span>
+                  <span className='text-lg font-bold text-gray-900'>12%</span>
                 </div>
-                <span className='text-2xl font-bold text-gray-900'>{stats.rejectionRate}%</span>
-              </div>
-              
-              <div className='flex items-center justify-between p-4 bg-gray-50 rounded-lg'>
-                <div className='flex items-center space-x-3'>
-                  <Clock className='w-5 h-5 text-purple-600' />
-                  <span className='font-medium text-gray-900'>Avg. Time to Hire</span>
+                <div className='w-full bg-gray-100 rounded-full h-2'>
+                  <div className='bg-red-500 h-2 rounded-full' style={{ width: '12%' }}></div>
                 </div>
-                <span className='text-2xl font-bold text-gray-900'>{stats.averageTimeToHire} days</span>
               </div>
             </div>
           </Card>
+
+          {/* Recent Candidates Table */}
+          <div className='lg:col-span-2'>
+            <div className='bg-white rounded-lg shadow-sm border border-gray-200'>
+              <div className='p-6 border-b border-gray-200 flex items-center justify-between'>
+                <h3 className='text-lg font-semibold text-gray-900'>{t('recentCandidates')}</h3>
+                <Link href='/admin/candidates' className='text-sm text-blue-600 hover:text-blue-700 font-medium'>
+                  {tCommon('viewAll')}
+                </Link>
+              </div>
+              <DataTable
+                data={mockCandidates.slice(0, 5)}
+                columns={recentCandidatesColumns}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </AdminLayout>

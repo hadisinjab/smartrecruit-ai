@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { Card } from '@/components/ui/admin-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

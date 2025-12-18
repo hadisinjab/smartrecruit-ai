@@ -18,10 +18,10 @@ export const TextQuestion: React.FC<QuestionComponentProps> = ({
   error
 }) => {
   return (
-    <div className={`space-y-2 ${rtl ? 'text-right' : 'text-left'}`}>
+    <div className='space-y-2 text-start'>
       <Label htmlFor={field.id}>
         {field.label}
-        {field.required && <span className='text-red-500 ml-1'>*</span>}
+        {field.required && <span className='text-red-500 ms-1'>*</span>}
       </Label>
       <Input
         id={field.id}
@@ -47,10 +47,10 @@ export const NumberQuestion: React.FC<QuestionComponentProps> = ({
   error
 }) => {
   return (
-    <div className={`space-y-2 ${rtl ? 'text-right' : 'text-left'}`}>
+    <div className='space-y-2 text-start'>
       <Label htmlFor={field.id}>
         {field.label}
-        {field.required && <span className='text-red-500 ml-1'>*</span>}
+        {field.required && <span className='text-red-500 ms-1'>*</span>}
       </Label>
       <Input
         id={field.id}
@@ -260,10 +260,10 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
   };
 
   return (
-    <div className={`space-y-2 ${rtl ? 'text-right' : 'text-left'}`}>
+    <div className='space-y-2 text-start'>
       <Label>
         {field.label}
-        {field.required && <span className='text-red-500 ml-1'>*</span>}
+        {field.required && <span className='text-red-500 ms-1'>*</span>}
       </Label>
       
       {!fileName ? (
@@ -310,7 +310,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
         <Card className='border-green-200 bg-green-50'>
           <CardContent className='p-4'>
             <div className='flex items-center justify-between'>
-              <div className='flex items-center space-x-3'>
+              <div className='flex items-center gap-3'>
                 <div className='w-10 h-10 bg-green-500 rounded-full flex items-center justify-center'>
                   <Upload className='w-5 h-5 text-white' />
                 </div>
@@ -319,7 +319,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
                   <p className='text-sm text-green-600'>{fileSize} MB</p>
                 </div>
               </div>
-              <div className='flex space-x-2'>
+              <div className='flex gap-2'>
                 <Button
                   type='button'
                   variant='outline'
@@ -436,10 +436,10 @@ export const SelectQuestion: React.FC<QuestionComponentProps> = ({
   error
 }) => {
   return (
-    <div className={`space-y-2 ${rtl ? 'text-right' : 'text-left'}`}>
+    <div className='space-y-2 text-start'>
       <Label>
         {field.label}
-        {field.required && <span className='text-red-500 ml-1'>*</span>}
+        {field.required && <span className='text-red-500 ms-1'>*</span>}
       </Label>
       <Select
         value={value as string || ''}

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
+import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { FilterPanel } from '@/components/admin/FilterPanel';
@@ -10,9 +11,15 @@ import { Card } from '@/components/ui/admin-card';
 import { mockCandidates } from '@/data/mockData';
 import { Candidate } from '@/types/admin';
 import { Filter, Plus, Search } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 
 export default function CandidatesPage() {
+  const t = useTranslations('Candidates');
+  const tCommon = useTranslations('Common');
+  const tTable = useTranslations('Table');
+  const tStatus = useTranslations('Status');
+  const format = useFormatter();
+
   const [candidates] = useState<Candidate[]>(mockCandidates);
   const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>(mockCandidates);
   const [showFilters, setShowFilters] = useState(false);
@@ -88,7 +95,7 @@ export default function CandidatesPage() {
   const candidateColumns: Column<Candidate>[] = [
     {
       key: 'name',
-      title: 'Candidate',
+      title: tTable('candidate'),
       render: (_, record) => (
         <div className='flex items-center space-x-3'>
           <div className='w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center'>
@@ -107,26 +114,26 @@ export default function CandidatesPage() {
     },
     {
       key: 'position',
-      title: 'Position',
+      title: tTable('position'),
       render: (position) => (
         <div>
           <p className='font-medium text-gray-900'>{position}</p>
-          <p className='text-sm text-gray-500'>{candidates.find(c => c.position === position)?.experience} years exp.</p>
+          <p className='text-sm text-gray-500'>{candidates.find(c => c.position === position)?.experience} {tTable('yearsExp')}</p>
         </div>
       )
     },
     {
       key: 'status',
-      title: 'Status',
+      title: tTable('status'),
       render: (status) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
-          {status.charAt(0).toUpperCase() + status.slice(1)}
+          {tStatus(status)}
         </span>
       )
     },
     {
       key: 'priority',
-      title: 'Priority',
+      title: tTable('priority'),
       render: (_, record) => (
         <span className={`text-sm font-medium ${getPriorityColor(record.hrFields.priority)}`}>
           {record.hrFields.priority.charAt(0).toUpperCase() + record.hrFields.priority.slice(1)}
@@ -135,13 +142,13 @@ export default function CandidatesPage() {
     },
     {
       key: 'appliedDate',
-      title: 'Applied',
+      title: tTable('applied'),
       render: (date) => new Date(date).toLocaleDateString(),
       sortable: true
     },
     {
       key: 'rating',
-      title: 'Rating',
+      title: tTable('rating'),
       render: (rating) => (
         <div className='flex items-center space-x-1'>
           {[...Array(5)].map((_, i) => (
@@ -154,7 +161,7 @@ export default function CandidatesPage() {
     },
     {
       key: 'nextAction',
-      title: 'Next Action',
+      title: tTable('nextAction'),
       render: (_, record) => (
         <div>
           <p className='text-sm font-medium text-gray-900'>{record.hrFields.nextAction}</p>
@@ -168,8 +175,8 @@ export default function CandidatesPage() {
 
   return (
     <AdminLayout
-      title="Candidates"
-      subtitle="Manage and review candidate applications"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className='flex space-x-3'>
           <Button
@@ -178,12 +185,12 @@ export default function CandidatesPage() {
             className='flex items-center space-x-2'
           >
             <Filter className='w-4 h-4' />
-            <span>Filters</span>
+            <span>{t('filters')}</span>
           </Button>
           <Link href='/admin/candidates/new'>
             <Button className='flex items-center space-x-2'>
               <Plus className='w-4 h-4' />
-              <span>Add Candidate</span>
+              <span>{t('addCandidate')}</span>
             </Button>
           </Link>
         </div>
@@ -196,14 +203,14 @@ export default function CandidatesPage() {
             <Search className='w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
             <input
               type='text'
-              placeholder='Search candidates...'
+              placeholder={t('searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
               className='pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
             />
           </div>
           <div className='text-sm text-gray-600'>
-            {filteredCandidates.length} of {candidates.length} candidates
+            {t('count', { count: filteredCandidates.length })}
           </div>
         </div>
 
@@ -214,7 +221,7 @@ export default function CandidatesPage() {
               <p className='text-2xl font-bold text-blue-600'>
                 {candidates.filter(c => c.status === 'applied').length}
               </p>
-              <p className='text-sm text-gray-600'>New Applications</p>
+              <p className='text-sm text-gray-600'>{t('stats.newApplications')}</p>
             </div>
           </Card>
           <Card className='p-4'>
@@ -222,7 +229,7 @@ export default function CandidatesPage() {
               <p className='text-2xl font-bold text-yellow-600'>
                 {candidates.filter(c => c.status === 'screening').length}
               </p>
-              <p className='text-sm text-gray-600'>In Screening</p>
+              <p className='text-sm text-gray-600'>{t('stats.inScreening')}</p>
             </div>
           </Card>
           <Card className='p-4'>
@@ -230,7 +237,7 @@ export default function CandidatesPage() {
               <p className='text-2xl font-bold text-purple-600'>
                 {candidates.filter(c => c.status === 'interview').length}
               </p>
-              <p className='text-sm text-gray-600'>In Interview</p>
+              <p className='text-sm text-gray-600'>{t('stats.inInterview')}</p>
             </div>
           </Card>
           <Card className='p-4'>
@@ -238,7 +245,7 @@ export default function CandidatesPage() {
               <p className='text-2xl font-bold text-green-600'>
                 {candidates.filter(c => c.status === 'offer').length}
               </p>
-              <p className='text-sm text-gray-600'>Offers Made</p>
+              <p className='text-sm text-gray-600'>{t('stats.offersMade')}</p>
             </div>
           </Card>
         </div>
@@ -248,7 +255,7 @@ export default function CandidatesPage() {
           data={filteredCandidates}
           columns={candidateColumns}
           onRowClick={(candidate) => router.push(`/admin/candidates/${candidate.id}`)}
-          emptyText="No candidates found"
+          emptyText={tCommon('search')}
         />
 
         {/* Filter Panel */}

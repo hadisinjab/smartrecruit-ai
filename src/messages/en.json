@@ -1,0 +1,290 @@
+{
+  "HomePage": {
+    "title": "Welcome to SmartRecruit AI",
+    "description": "The best AI powered recruiting platform"
+  },
+  "Common": {
+    "search": "Search...",
+    "searchCandidates": "Search candidates...",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "profile": "Profile",
+    "logout": "Sign Out",
+    "adminPanel": "Admin Panel",
+    "viewAll": "View all",
+    "status": "Status",
+    "actions": "Actions",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "filter": "Filter",
+    "export": "Export",
+    "last": "Last",
+    "min": "min"
+  },
+  "Sidebar": {
+    "dashboard": "Dashboard",
+    "candidates": "Candidates",
+    "jobs": "Jobs",
+    "incomplete": "Incomplete",
+    "evaluations": "Evaluations",
+    "userManagement": "User Management",
+    "activityLog": "Activity Log",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "Dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your hiring pipeline",
+    "interviewsScheduled": "Interviews Scheduled",
+    "newApplications": "New Applications",
+    "activeJobs": "Active Jobs",
+    "totalCandidates": "Total Candidates",
+    "fromLastMonth": "from last month",
+    "quickActions": "Quick Actions",
+    "viewReports": "View Reports",
+    "viewReportsDesc": "Analyze hiring metrics",
+    "scheduleInterviews": "Schedule Interviews",
+    "scheduleInterviewsDesc": "Schedule upcoming interviews",
+    "manageJobs": "Manage Jobs",
+    "manageJobsDesc": "Create and manage job postings",
+    "reviewApplications": "Review Applications",
+    "reviewApplicationsDesc": "Review new candidate applications",
+    "keyMetrics": "Key Metrics",
+    "recentCandidates": "Recent Candidates",
+    "offersMade": "Offers Made",
+    "successfulHires": "Successful Hires",
+    "rejectionRate": "Rejection Rate",
+    "avgTime": "Avg. Time to Hire"
+  },
+  "Candidates": {
+    "title": "Candidates",
+    "subtitle": "Manage and review candidate applications",
+    "addCandidate": "Add Candidate",
+    "filters": "Filters",
+    "searchPlaceholder": "Search candidates...",
+    "count": "{count} candidates",
+    "stats": {
+      "totalCandidates": "Total Candidates",
+      "offersMade": "Offers Made",
+      "inInterview": "In Interview",
+      "inScreening": "In Screening",
+      "newApplications": "New Applications"
+    }
+  },
+  "Jobs": {
+    "title": "Jobs",
+    "subtitle": "Manage job postings and track applications",
+    "exportData": "Export Data",
+    "createJob": "Create Job",
+    "searchPlaceholder": "Search jobs...",
+    "count": "{count} of {total} jobs",
+    "stats": {
+      "totalJobs": "Total Jobs",
+      "activeJobs": "Active Jobs",
+      "totalApplicants": "Total Applicants",
+      "avgApplicants": "Avg. Applicants/Job"
+    }
+  },
+  "Incomplete": {
+    "title": "Incomplete Applications",
+    "subtitle": "Review and manage drop-off applications",
+    "searchPlaceholder": "Search incomplete applications...",
+    "sendReminders": "Send Reminders",
+    "count": "{count} incomplete applications found",
+    "stats": {
+      "total": "Total Incomplete",
+      "low": "Low Progress (<50%)",
+      "medium": "Medium Progress (50-80%)",
+      "high": "High Progress (80%+)"
+    },
+    "filters": {
+      "job": "Filter by job",
+      "allJobs": "All Jobs",
+      "date": "Date range",
+      "allTime": "All Time",
+      "today": "Today",
+      "week": "Past Week",
+      "progress": "Progress",
+      "allProgress": "All Progress"
+    },
+    "empty": "No incomplete applications found"
+  },
+  "Evaluations": {
+    "title": "Evaluations",
+    "subtitle": "Track and manage candidate assessments",
+    "searchPlaceholder": "Search evaluations...",
+    "exportReport": "Export Report",
+    "newEvaluation": "New Evaluation",
+    "count": "{count} of {total} evaluations",
+    "stats": {
+      "total": "Total Evaluations",
+      "thisWeek": "This Week",
+      "avgScore": "Average Score",
+      "hireRecs": "Hire Recommendations"
+    },
+    "recentHighScores": "Recent High Scores",
+    "actionItems": "Action Items",
+    "actions": {
+      "pending": "Follow up on pending evaluations",
+      "pendingDesc": "{count} evaluations awaiting review",
+      "missing": "Schedule missing interviews",
+      "missingDesc": "{count} candidates need final interviews",
+      "strong": "Strong candidates identified",
+      "strongDesc": "{count} candidates with high scores"
+    },
+    "interview": "interview",
+    "empty": "No evaluations found"
+  },
+  "Users": {
+    "title": "User Management",
+    "subtitle": "Manage admin users and permissions",
+    "addUser": "Add User",
+    "searchPlaceholder": "Search users...",
+    "count": "{count} users found",
+    "stats": {
+      "total": "Total Users",
+      "active": "Active",
+      "superAdmins": "Super Admins",
+      "admins": "Admins",
+      "reviewers": "Reviewers"
+    },
+    "permissions": {
+      "title": "Permission Levels",
+      "superAdminDesc": "Full access to all features including user management",
+      "adminDesc": "Access to candidates, jobs, and evaluations",
+      "reviewerDesc": "Read-only access to candidates and evaluations"
+    },
+    "filters": {
+      "role": "Filter by role",
+      "allRoles": "All Roles",
+      "status": "Filter by status",
+      "allStatus": "All Status",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "actions": {
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "reset": "Reset"
+    },
+    "empty": "No users found",
+    "time": {
+      "justNow": "Just now",
+      "hoursAgo": "{count} hours ago",
+      "daysAgo": "{count} days ago"
+    }
+  },
+  "Activity": {
+    "title": "Activity Log",
+    "subtitle": "Track system activities and user actions",
+    "searchPlaceholder": "Search activity log...",
+    "exportLog": "Export Log",
+    "count": "{count} activities found",
+    "stats": {
+      "total": "Total Activities",
+      "today": "Today",
+      "thisWeek": "This Week",
+      "activeUsers": "Active Users"
+    },
+    "recentActions": "Recent Actions",
+    "filters": {
+      "user": "Filter by user",
+      "allUsers": "All Users",
+      "action": "Filter by action",
+      "allActions": "All Actions",
+      "type": "Filter by type",
+      "allTypes": "All Types",
+      "date": "Date range",
+      "allTime": "All Time",
+      "today": "Today",
+      "week": "Past Week",
+      "month": "Past Month"
+    },
+    "empty": "No activities found",
+    "time": {
+      "minutesAgo": "{count} minutes ago",
+      "hoursAgo": "{count} hours ago",
+      "daysAgo": "{count} days ago"
+    }
+  },
+  "Table": {
+    "candidate": "Candidate",
+    "position": "Position",
+    "applied": "Applied",
+    "rating": "Rating",
+    "status": "Status",
+    "priority": "Priority",
+    "nextAction": "Next Action",
+    "yearsExp": "years exp.",
+    "jobTitle": "Job Title",
+    "location": "Location",
+    "type": "Type",
+    "salaryRange": "Salary Range",
+    "applicants": "Applicants",
+    "posted": "Posted",
+    "contact": "Contact",
+    "progress": "Progress",
+    "timeSpent": "Time Spent",
+    "remind": "Remind",
+    "overallScore": "Overall Score",
+    "evaluator": "Evaluator",
+    "recommendation": "Recommendation",
+    "date": "Date",
+    "user": "User",
+    "role": "Role",
+    "lastLogin": "Last Login",
+    "action": "Action",
+    "target": "Target",
+    "description": "Description",
+    "timestamp": "Timestamp",
+    "joined": "Joined"
+  },
+  "Status": {
+    "applied": "Applied",
+    "screening": "Screening",
+    "interview": "Interview",
+    "offer": "Offer",
+    "hired": "Hired",
+    "rejected": "Rejected",
+    "active": "Active",
+    "paused": "Paused",
+    "closed": "Closed",
+    "inactive": "Inactive"
+  },
+  "Progress": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "personal": "Personal",
+    "experience": "Experience",
+    "documents": "Documents",
+    "questionnaire": "Questionnaire"
+  },
+  "Recommendation": {
+    "strong-hire": "Strong Hire",
+    "hire": "Hire",
+    "no-hire": "No Hire",
+    "strong-no-hire": "Strong No Hire"
+  },
+  "Type": {
+    "technical": "Technical",
+    "behavioral": "Behavioral",
+    "cultural": "Cultural",
+    "final": "Final"
+  },
+  "Role": {
+    "super-admin": "Super Admin",
+    "admin": "Admin",
+    "reviewer": "Reviewer"
+  },
+  "Target": {
+    "candidate": "Candidate",
+    "job": "Job",
+    "evaluation": "Evaluation",
+    "user": "User",
+    "system": "System"
+  }
+}

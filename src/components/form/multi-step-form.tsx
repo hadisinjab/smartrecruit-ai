@@ -165,9 +165,9 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
         {/* Navigation */}
         <div className='flex justify-between items-center max-w-2xl mx-auto'>
           {/* Previous button removed */}
-          <div className={rtl ? 'order-2' : 'order-1 w-24'} />
+          <div className='w-24' />
 
-          <div className='flex space-x-2'>
+          <div className='flex gap-2'>
             {steps.map((_, index) => (
               <div
                 key={index}
@@ -184,10 +184,9 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
           <Button
             onClick={handleNext}
-            className={rtl ? 'order-1' : 'order-3'}
           >
             {isLastStep ? 'Submit Application' : 'Next'}
-            <ChevronRight className='w-4 h-4 ml-2' />
+            <ChevronRight className='w-4 h-4 ms-2 rtl:rotate-180' />
           </Button>
         </div>
 

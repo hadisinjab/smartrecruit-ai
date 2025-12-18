@@ -20,14 +20,25 @@ import {
   EyeOff,
   AlertTriangle,
   CheckCircle,
-  Info
+  Info,
+  Globe
 } from 'lucide-react';
+import { useLocale } from 'next-intl';
+import { usePathname, useRouter } from '@/i18n/navigation';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>(mockSystemSettings);
-  const [activeSection, setActiveSection] = useState('email');
+  const [activeSection, setActiveSection] = useState('general');
   const [showPasswords, setShowPasswords] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleLanguageChange = (newLocale: string) => {
+    router.replace(pathname, { locale: newLocale });
+  };
 
   const handleSettingChange = (section: keyof SystemSettings, field: string, value: any) => {
     setSettings(prev => ({
@@ -67,6 +78,12 @@ export default function SettingsPage() {
 
   const sections = [
     {
+      id: 'general',
+      title: 'General Settings',
+      icon: Globe,
+      description: 'Configure language and regional preferences'
+    },
+    {
       id: 'email',
       title: 'Email Settings',
       icon: Mail,
@@ -91,6 +108,32 @@ export default function SettingsPage() {
       description: 'Set default export formats and data handling'
     }
   ];
+
+  const renderGeneralSettings = () => (
+    <div className='space-y-6'>
+      <div>
+        <h3 className='text-lg font-semibold text-gray-900 mb-4'>Language & Region</h3>
+        <div className='max-w-md'>
+          <Label htmlFor='language'>Display Language</Label>
+          <Select
+            value={locale}
+            onValueChange={handleLanguageChange}
+          >
+            <SelectTrigger id='language' className='mt-1.5'>
+              <SelectValue placeholder='Select language' />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='en'>English (US)</SelectItem>
+              <SelectItem value='ar'>العربية (Arabic)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className='text-sm text-gray-500 mt-2'>
+            Select the language you want to use for the admin interface.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderEmailSettings = () => (
     <div className='space-y-6'>
@@ -339,6 +382,8 @@ export default function SettingsPage() {
 
   const renderActiveSection = () => {
     switch (activeSection) {
+      case 'general':
+        return renderGeneralSettings();
       case 'email':
         return renderEmailSettings();
       case 'ai':

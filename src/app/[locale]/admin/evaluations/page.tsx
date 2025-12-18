@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -11,6 +12,11 @@ import { Evaluation } from '@/types/admin';
 import { Plus, Search, Star, MessageSquare, User, Calendar } from 'lucide-react';
 
 export default function EvaluationsPage() {
+  const t = useTranslations('Evaluations');
+  const tTable = useTranslations('Table');
+  const tCommon = useTranslations('Common');
+  const format = useFormatter();
+
   const [evaluations] = useState<Evaluation[]>(mockEvaluations);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -49,7 +55,7 @@ export default function EvaluationsPage() {
   const evaluationColumns: Column<Evaluation>[] = [
     {
       key: 'candidate',
-      title: 'Candidate',
+      title: tTable('candidate'),
       render: (_, record) => {
         const candidate = getCandidateById(record.candidateId);
         if (!candidate) return <span className='text-gray-500'>Unknown</span>;
@@ -73,7 +79,7 @@ export default function EvaluationsPage() {
     },
     {
       key: 'type',
-      title: 'Type',
+      title: tTable('type'),
       render: (type) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(type)}`}>
           {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -82,7 +88,7 @@ export default function EvaluationsPage() {
     },
     {
       key: 'scores',
-      title: 'Overall Score',
+      title: tTable('overallScore'),
       render: (scores) => (
         <div className='flex items-center space-x-1'>
           <Star className='w-4 h-4 text-yellow-400 fill-current' />
@@ -92,7 +98,7 @@ export default function EvaluationsPage() {
     },
     {
       key: 'evaluatorName',
-      title: 'Evaluator',
+      title: tTable('evaluator'),
       render: (name) => (
         <div className='flex items-center space-x-2'>
           <User className='w-4 h-4 text-gray-400' />
@@ -102,7 +108,7 @@ export default function EvaluationsPage() {
     },
     {
       key: 'recommendation',
-      title: 'Recommendation',
+      title: tTable('recommendation'),
       render: (recommendation) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRecommendationColor(recommendation)}`}>
           {recommendation.replace('-', ' ').toUpperCase()}
@@ -111,7 +117,7 @@ export default function EvaluationsPage() {
     },
     {
       key: 'createdAt',
-      title: 'Date',
+      title: tTable('date'),
       render: (date) => (
         <div className='flex items-center space-x-1'>
           <Calendar className='w-4 h-4 text-gray-400' />
@@ -137,16 +143,16 @@ export default function EvaluationsPage() {
 
   return (
     <AdminLayout
-      title="Evaluations"
-      subtitle="Review and manage candidate evaluations"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className='flex space-x-3'>
           <Button variant='outline'>
-            Export Report
+            {t('exportReport')}
           </Button>
           <Button className='flex items-center space-x-2'>
             <Plus className='w-4 h-4' />
-            <span>New Evaluation</span>
+            <span>{t('newEvaluation')}</span>
           </Button>
         </div>
       }
@@ -158,14 +164,14 @@ export default function EvaluationsPage() {
             <Search className='w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
             <input
               type='text'
-              placeholder='Search evaluations...'
+              placeholder={t('searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className='pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
             />
           </div>
           <div className='text-sm text-gray-600'>
-            {filteredEvaluations.length} of {evaluations.length} evaluations
+            {t('count', { count: filteredEvaluations.length, total: evaluations.length })}
           </div>
         </div>
 
@@ -174,25 +180,25 @@ export default function EvaluationsPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-blue-600'>{stats.totalEvaluations}</p>
-              <p className='text-sm text-gray-600'>Total Evaluations</p>
+              <p className='text-sm text-gray-600'>{t('stats.total')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.thisWeek}</p>
-              <p className='text-sm text-gray-600'>This Week</p>
+              <p className='text-sm text-gray-600'>{t('stats.thisWeek')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-purple-600'>{stats.averageScore}</p>
-              <p className='text-sm text-gray-600'>Average Score</p>
+              <p className='text-sm text-gray-600'>{t('stats.avgScore')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-yellow-600'>{stats.hireRecommendations}</p>
-              <p className='text-sm text-gray-600'>Hire Recommendations</p>
+              <p className='text-sm text-gray-600'>{t('stats.hireRecs')}</p>
             </div>
           </Card>
         </div>
@@ -201,14 +207,14 @@ export default function EvaluationsPage() {
         <DataTable
           data={filteredEvaluations}
           columns={evaluationColumns}
-          emptyText="No evaluations found"
+          emptyText={t('empty')}
         />
 
         {/* Evaluation Details */}
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
           {/* Recent High Scores */}
           <Card className='p-6'>
-            <h2 className='text-lg font-semibold text-gray-900 mb-4'>Recent High Scores</h2>
+            <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('recentHighScores')}</h2>
             <div className='space-y-3'>
               {evaluations
                 .filter(e => e.scores.overall >= 4)
@@ -229,7 +235,7 @@ export default function EvaluationsPage() {
                           <p className='font-medium text-gray-900'>
                             {candidate.firstName} {candidate.lastName}
                           </p>
-                          <p className='text-sm text-gray-500'>{evaluation.type} interview</p>
+                          <p className='text-sm text-gray-500'>{evaluation.type} {t('interview')}</p>
                         </div>
                       </div>
                       <div className='flex items-center space-x-1'>
@@ -244,14 +250,14 @@ export default function EvaluationsPage() {
 
           {/* Action Items */}
           <Card className='p-6'>
-            <h2 className='text-lg font-semibold text-gray-900 mb-4'>Action Items</h2>
+            <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('actionItems')}</h2>
             <div className='space-y-3'>
               <div className='p-3 bg-yellow-50 border border-yellow-200 rounded-lg'>
                 <div className='flex items-start space-x-3'>
                   <MessageSquare className='w-5 h-5 text-yellow-600 mt-0.5' />
                   <div>
-                    <p className='font-medium text-yellow-800'>Follow up on pending evaluations</p>
-                    <p className='text-sm text-yellow-700'>3 evaluations awaiting review</p>
+                    <p className='font-medium text-yellow-800'>{t('actions.pending')}</p>
+                    <p className='text-sm text-yellow-700'>{t('actions.pendingDesc', { count: 3 })}</p>
                   </div>
                 </div>
               </div>
@@ -260,8 +266,8 @@ export default function EvaluationsPage() {
                 <div className='flex items-start space-x-3'>
                   <User className='w-5 h-5 text-blue-600 mt-0.5' />
                   <div>
-                    <p className='font-medium text-blue-800'>Schedule missing interviews</p>
-                    <p className='text-sm text-blue-700'>2 candidates need final interviews</p>
+                    <p className='font-medium text-blue-800'>{t('actions.missing')}</p>
+                    <p className='text-sm text-blue-700'>{t('actions.missingDesc', { count: 2 })}</p>
                   </div>
                 </div>
               </div>
@@ -270,8 +276,8 @@ export default function EvaluationsPage() {
                 <div className='flex items-start space-x-3'>
                   <Star className='w-5 h-5 text-green-600 mt-0.5' />
                   <div>
-                    <p className='font-medium text-green-800'>Strong candidates identified</p>
-                    <p className='text-sm text-green-700'>4 candidates with high scores</p>
+                    <p className='font-medium text-green-800'>{t('actions.strong')}</p>
+                    <p className='text-sm text-green-700'>{t('actions.strongDesc', { count: 4 })}</p>
                   </div>
                 </div>
               </div>

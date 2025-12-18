@@ -87,7 +87,7 @@ export function DataTable<T extends Record<string, any>>({
                 <th
                   key={column.key as string}
                   className={cn(
-                    'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
+                    'px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase tracking-wider',
                     column.sortable && 'cursor-pointer hover:bg-gray-100',
                     column.width && `w-${column.width}`
                   )}

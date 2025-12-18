@@ -8,9 +8,10 @@ import { Card } from '@/components/ui/admin-card';
 interface StatsCardProps {
   title: string;
   value: string | number;
-  change?: {
+  trend?: {
     value: number;
-    type: 'increase' | 'decrease';
+    label: string;
+    isPositive: boolean;
   };
   icon: LucideIcon;
   color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple';
@@ -27,7 +28,7 @@ const colorClasses = {
 export const StatsCard: React.FC<StatsCardProps> = ({
   title,
   value,
-  change,
+  trend,
   icon: Icon,
   color = 'blue'
 }) => {
@@ -39,16 +40,16 @@ export const StatsCard: React.FC<StatsCardProps> = ({
         <div>
           <p className='text-sm font-medium text-gray-600'>{title}</p>
           <p className='text-2xl font-bold text-gray-900 mt-2'>{value}</p>
-          {change && (
+          {trend && (
             <div className='flex items-center mt-2'>
               <span
                 className={`text-xs font-medium ${
-                  change.type === 'increase' ? 'text-green-600' : 'text-red-600'
+                  trend.isPositive ? 'text-green-600' : 'text-red-600'
                 }`}
               >
-                {change.type === 'increase' ? '+' : '-'}{Math.abs(change.value)}%
+                {trend.isPositive ? '+' : '-'}{Math.abs(trend.value)}%
               </span>
-              <span className='text-xs text-gray-500 ml-1'>from last month</span>
+              <span className='text-xs text-gray-500 ms-1'>{trend.label}</span>
             </div>
           )}
         </div>

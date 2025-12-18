@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
+import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/admin/DataTable';
@@ -12,6 +13,12 @@ import { Job } from '@/types/admin';
 import { Plus, Search, MapPin, Calendar, Users } from 'lucide-react';
 
 export default function JobsPage() {
+  const t = useTranslations('Jobs');
+  const tTable = useTranslations('Table');
+  const tStatus = useTranslations('Status');
+  const tCommon = useTranslations('Common');
+  const format = useFormatter();
+
   const [jobs] = useState<Job[]>(mockJobs);
   const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
@@ -44,7 +51,7 @@ export default function JobsPage() {
   const jobColumns: Column<Job>[] = [
     {
       key: 'title',
-      title: 'Job Title',
+      title: tTable('jobTitle'),
       render: (title, record) => (
         <div>
           <p className='font-medium text-gray-900'>{title}</p>
@@ -54,7 +61,7 @@ export default function JobsPage() {
     },
     {
       key: 'location',
-      title: 'Location',
+      title: tTable('location'),
       render: (location) => (
         <div className='flex items-center space-x-1'>
           <MapPin className='w-4 h-4 text-gray-400' />
@@ -64,7 +71,7 @@ export default function JobsPage() {
     },
     {
       key: 'type',
-      title: 'Type',
+      title: tTable('type'),
       render: (value) => {
         const type = value as string;
         return (
@@ -76,16 +83,16 @@ export default function JobsPage() {
     },
     {
       key: 'status',
-      title: 'Status',
+      title: tTable('status'),
       render: (status) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
-          {status.charAt(0).toUpperCase() + status.slice(1)}
+          {tStatus(status as any)}
         </span>
       )
     },
     {
       key: 'salary',
-      title: 'Salary Range',
+      title: tTable('salaryRange'),
       render: (salary) => (
         <div>
           <p className='text-sm font-medium text-gray-900'>
@@ -97,7 +104,7 @@ export default function JobsPage() {
     },
     {
       key: 'applicantsCount',
-      title: 'Applicants',
+      title: tTable('applicants'),
       render: (count) => (
         <div className='flex items-center space-x-1'>
           <Users className='w-4 h-4 text-gray-400' />
@@ -107,11 +114,17 @@ export default function JobsPage() {
     },
     {
       key: 'postedDate',
-      title: 'Posted',
+      title: tTable('posted'),
       render: (date) => (
         <div className='flex items-center space-x-1'>
           <Calendar className='w-4 h-4 text-gray-400' />
-          <span className='text-sm text-gray-700'>{new Date(date).toLocaleDateString()}</span>
+          <span className='text-sm text-gray-700'>
+            {format.dateTime(new Date(date), {
+              year: 'numeric',
+              month: 'numeric',
+              day: 'numeric'
+            })}
+          </span>
         </div>
       ),
       sortable: true
@@ -128,16 +141,16 @@ export default function JobsPage() {
 
   return (
     <AdminLayout
-      title="Jobs"
-      subtitle="Manage job postings and track applications"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div className='flex space-x-3'>
           <Button variant='outline'>
-            Export Data
+            {t('exportData')}
           </Button>
           <Button className='flex items-center space-x-2'>
             <Plus className='w-4 h-4' />
-            <span>Create Job</span>
+            <span>{t('createJob')}</span>
           </Button>
         </div>
       }
@@ -149,14 +162,14 @@ export default function JobsPage() {
             <Search className='w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
             <input
               type='text'
-              placeholder='Search jobs...'
+              placeholder={t('searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className='pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
             />
           </div>
           <div className='text-sm text-gray-600'>
-            {filteredJobs.length} of {jobs.length} jobs
+            {t('count', { count: filteredJobs.length, total: jobs.length })}
           </div>
         </div>
 
@@ -165,25 +178,25 @@ export default function JobsPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-blue-600'>{stats.totalJobs}</p>
-              <p className='text-sm text-gray-600'>Total Jobs</p>
+              <p className='text-sm text-gray-600'>{t('stats.totalJobs')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.activeJobs}</p>
-              <p className='text-sm text-gray-600'>Active Jobs</p>
+              <p className='text-sm text-gray-600'>{t('stats.activeJobs')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-purple-600'>{stats.totalApplicants}</p>
-              <p className='text-sm text-gray-600'>Total Applicants</p>
+              <p className='text-sm text-gray-600'>{t('stats.totalApplicants')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-yellow-600'>{stats.avgApplicantsPerJob}</p>
-              <p className='text-sm text-gray-600'>Avg. Applicants/Job</p>
+              <p className='text-sm text-gray-600'>{t('stats.avgApplicants')}</p>
             </div>
           </Card>
         </div>

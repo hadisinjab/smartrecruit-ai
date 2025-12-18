@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -24,6 +25,12 @@ import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
 
 export default function UsersPage() {
+  const t = useTranslations('Users');
+  const tTable = useTranslations('Table');
+  const tCommon = useTranslations('Common');
+  const tRole = useTranslations('Role');
+  const format = useFormatter();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -79,7 +86,7 @@ export default function UsersPage() {
   const columns: Column<AdminUser>[] = [
     {
       key: 'user',
-      title: 'User',
+      title: tTable('user'),
       render: (_, record) => (
         <div className='flex items-center space-x-3'>
           <div className='w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center'>
@@ -98,32 +105,30 @@ export default function UsersPage() {
     },
     {
       key: 'role',
-      title: 'Role',
+      title: tTable('role'),
       render: (_, record) => (
         <div className='flex items-center space-x-2'>
           {getRoleIcon(record.role)}
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(record.role)}`}>
-            {record.role.split('-').map(word => 
-              word.charAt(0).toUpperCase() + word.slice(1)
-            ).join(' ')}
+            {tRole(record.role)}
           </span>
         </div>
       )
     },
     {
       key: 'status',
-      title: 'Status',
+      title: tTable('status'),
       render: (_, record) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(record.isActive)}`}>
           {record.isActive ? (
             <>
               <UserCheck className="w-3 h-3 mr-1" />
-              Active
+              {t('filters.active')}
             </>
           ) : (
             <>
               <UserX className="w-3 h-3 mr-1" />
-              Inactive
+              {t('filters.inactive')}
             </>
           )}
         </span>
@@ -131,7 +136,7 @@ export default function UsersPage() {
     },
     {
       key: 'lastLogin',
-      title: 'Last Login',
+      title: tTable('lastLogin'),
       render: (lastLogin) => {
         const loginDate = new Date(lastLogin);
         const now = new Date();
@@ -139,12 +144,12 @@ export default function UsersPage() {
         
         let timeText = '';
         if (diffInHours < 1) {
-          timeText = 'Just now';
+          timeText = t('time.justNow');
         } else if (diffInHours < 24) {
-          timeText = `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+          timeText = t('time.hoursAgo', { count: diffInHours });
         } else {
           const diffInDays = Math.floor(diffInHours / 24);
-          timeText = `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+          timeText = t('time.daysAgo', { count: diffInDays });
         }
         
         return (
@@ -157,7 +162,7 @@ export default function UsersPage() {
     },
     {
       key: 'createdAt',
-      title: 'Joined',
+      title: tTable('joined'),
       render: (createdAt) => (
         <div className='text-sm text-gray-600'>
           {new Date(createdAt).toLocaleDateString()}
@@ -166,7 +171,7 @@ export default function UsersPage() {
     },
     {
       key: 'actions',
-      title: 'Actions',
+      title: tTable('actions'),
       render: (_, record) => (
         <div className='flex items-center space-x-2'>
           <Select
@@ -180,9 +185,9 @@ export default function UsersPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="super-admin">Super Admin</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="reviewer">Reviewer</SelectItem>
+              <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
+              <SelectItem value="admin">{tRole('admin')}</SelectItem>
+              <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
             </SelectContent>
           </Select>
           
@@ -198,12 +203,12 @@ export default function UsersPage() {
             {record.isActive ? (
               <>
                 <UserX className="w-3 h-3 mr-1" />
-                Deactivate
+                {t('actions.deactivate')}
               </>
             ) : (
               <>
                 <UserCheck className="w-3 h-3 mr-1" />
-                Activate
+                {t('actions.activate')}
               </>
             )}
           </Button>
@@ -218,7 +223,7 @@ export default function UsersPage() {
             className='h-8'
           >
             <Key className="w-3 h-3 mr-1" />
-            Reset
+            {t('actions.reset')}
           </Button>
           
           <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
@@ -239,12 +244,12 @@ export default function UsersPage() {
 
   return (
     <AdminLayout
-      title="User Management"
-      subtitle={`${filteredUsers.length} user${filteredUsers.length !== 1 ? 's' : ''} found`}
+      title={t('title')}
+      subtitle={t('count', { count: filteredUsers.length })}
       actions={
         <Button className='flex items-center space-x-2'>
           <Plus className='w-4 h-4' />
-          <span>Add User</span>
+          <span>{t('addUser')}</span>
         </Button>
       }
     >
@@ -254,31 +259,31 @@ export default function UsersPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-gray-900'>{stats.total}</p>
-              <p className='text-sm text-gray-600'>Total Users</p>
+              <p className='text-sm text-gray-600'>{t('stats.total')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.active}</p>
-              <p className='text-sm text-gray-600'>Active</p>
+              <p className='text-sm text-gray-600'>{t('stats.active')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-purple-600'>{stats.superAdmins}</p>
-              <p className='text-sm text-gray-600'>Super Admins</p>
+              <p className='text-sm text-gray-600'>{t('stats.superAdmins')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-blue-600'>{stats.admins}</p>
-              <p className='text-sm text-gray-600'>Admins</p>
+              <p className='text-sm text-gray-600'>{t('stats.admins')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.reviewers}</p>
-              <p className='text-sm text-gray-600'>Reviewers</p>
+              <p className='text-sm text-gray-600'>{t('stats.reviewers')}</p>
             </div>
           </Card>
         </div>
@@ -288,11 +293,11 @@ export default function UsersPage() {
           <div className='flex items-start space-x-3'>
             <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5" />
             <div>
-              <h3 className='text-sm font-medium text-blue-900'>Permission Levels</h3>
+              <h3 className='text-sm font-medium text-blue-900'>{t('permissions.title')}</h3>
               <div className='mt-2 text-sm text-blue-800'>
-                <p><strong>Super Admin:</strong> Full access to all features including user management</p>
-                <p><strong>Admin:</strong> Access to candidates, jobs, and evaluations</p>
-                <p><strong>Reviewer:</strong> Read-only access to candidates and evaluations</p>
+                <p><strong>{tRole('super-admin')}:</strong> {t('permissions.superAdminDesc')}</p>
+                <p><strong>{tRole('admin')}:</strong> {t('permissions.adminDesc')}</p>
+                <p><strong>{tRole('reviewer')}:</strong> {t('permissions.reviewerDesc')}</p>
               </div>
             </div>
           </div>
@@ -305,7 +310,7 @@ export default function UsersPage() {
               <div className='relative'>
                 <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
                 <Input
-                  placeholder="Search users..."
+                  placeholder={t('searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className='pl-10'
@@ -315,24 +320,24 @@ export default function UsersPage() {
             
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder="Filter by role" />
+                <SelectValue placeholder={t('filters.role')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="super-admin">Super Admin</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="reviewer">Reviewer</SelectItem>
+                <SelectItem value="all">{t('filters.allRoles')}</SelectItem>
+                <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
+                <SelectItem value="admin">{tRole('admin')}</SelectItem>
+                <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
               </SelectContent>
             </Select>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('filters.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="all">{t('filters.allStatus')}</SelectItem>
+                <SelectItem value="active">{t('filters.active')}</SelectItem>
+                <SelectItem value="inactive">{t('filters.inactive')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -343,7 +348,7 @@ export default function UsersPage() {
           <DataTable
             data={filteredUsers}
             columns={columns}
-            emptyText="No users found"
+            emptyText={t('empty')}
           />
         </Card>
       </div>

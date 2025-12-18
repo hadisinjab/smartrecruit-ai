@@ -51,7 +51,7 @@ export const FormStepComponent: React.FC<FormStepComponentProps> = ({
 
   return (
     <Card className='w-full max-w-2xl mx-auto'>
-      <CardHeader className={rtl ? 'text-right' : 'text-left'}>
+      <CardHeader className='text-start'>
         <CardTitle>{step.title}</CardTitle>
         {step.description && (
           <CardDescription>{step.description}</CardDescription>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -22,6 +23,12 @@ import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
 
 export default function IncompleteApplicationsPage() {
+  const t = useTranslations('Incomplete');
+  const tCommon = useTranslations('Common');
+  const tTable = useTranslations('Table');
+  const tProgress = useTranslations('Progress');
+  const format = useFormatter();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [jobFilter, setJobFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
@@ -79,7 +86,7 @@ export default function IncompleteApplicationsPage() {
   const columns: Column<IncompleteApplication>[] = [
     {
       key: 'candidate',
-      title: 'Candidate',
+      title: tTable('candidate'),
       render: (_, record) => (
         <div className='flex items-center space-x-3'>
           <div className='w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center'>
@@ -102,7 +109,7 @@ export default function IncompleteApplicationsPage() {
     },
     {
       key: 'contact',
-      title: 'Contact',
+      title: tTable('contact'),
       render: (_, record) => (
         <div className='space-y-1'>
           <div className='flex items-center space-x-1'>
@@ -112,7 +119,7 @@ export default function IncompleteApplicationsPage() {
           <div className='flex items-center space-x-1'>
             <Calendar className='w-3 h-3 text-gray-400' />
             <span className='text-sm text-gray-600'>
-              Applied {new Date(record.appliedDate).toLocaleDateString()}
+              {tTable('applied')} {new Date(record.appliedDate).toLocaleDateString()}
             </span>
           </div>
         </div>
@@ -120,7 +127,7 @@ export default function IncompleteApplicationsPage() {
     },
     {
       key: 'progress',
-      title: 'Progress',
+      title: tTable('progress'),
       render: (_, record) => (
         <div className='space-y-2'>
           <div className='flex items-center justify-between'>
@@ -128,8 +135,8 @@ export default function IncompleteApplicationsPage() {
               {record.completionPercentage}%
             </span>
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getProgressBadgeColor(record.completionPercentage)}`}>
-              {record.completionPercentage < 50 ? 'Low' : 
-               record.completionPercentage < 80 ? 'Medium' : 'High'}
+              {record.completionPercentage < 50 ? tProgress('low') : 
+               record.completionPercentage < 80 ? tProgress('medium') : tProgress('high')}
             </span>
           </div>
           <div className='w-full bg-gray-200 rounded-full h-2'>
@@ -143,16 +150,16 @@ export default function IncompleteApplicationsPage() {
           </div>
           <div className='flex space-x-2 text-xs text-gray-500'>
             <span className={record.progress.personalInfo ? 'text-green-600' : 'text-gray-400'}>
-              Personal
+              {tProgress('personal')}
             </span>
             <span className={record.progress.experience ? 'text-green-600' : 'text-gray-400'}>
-              Experience
+              {tProgress('experience')}
             </span>
             <span className={record.progress.documents ? 'text-green-600' : 'text-gray-400'}>
-              Documents
+              {tProgress('documents')}
             </span>
             <span className={record.progress.questionnaire ? 'text-green-600' : 'text-gray-400'}>
-              Questionnaire
+              {tProgress('questionnaire')}
             </span>
           </div>
         </div>
@@ -160,22 +167,22 @@ export default function IncompleteApplicationsPage() {
     },
     {
       key: 'timeSpent',
-      title: 'Time Spent',
+      title: tTable('timeSpent'),
       render: (_, record) => (
         <div className='text-center'>
           <div className='flex items-center justify-center space-x-1 text-gray-600'>
             <Clock className='w-4 h-4' />
-            <span className='text-sm'>{record.timeSpent}min</span>
+            <span className='text-sm'>{record.timeSpent}{tCommon('min')}</span>
           </div>
           <p className='text-xs text-gray-500 mt-1'>
-            Last: {new Date(record.lastActivity).toLocaleDateString()}
+            {tCommon('last')}: {new Date(record.lastActivity).toLocaleDateString()}
           </p>
         </div>
       )
     },
     {
       key: 'actions',
-      title: 'Actions',
+      title: tTable('actions'),
       render: (_, record) => (
         <div className='flex items-center space-x-2'>
           <Button
@@ -184,7 +191,7 @@ export default function IncompleteApplicationsPage() {
             className='flex items-center space-x-1'
           >
             <Mail className='w-3 h-3' />
-            <span>Remind</span>
+            <span>{tTable('remind')}</span>
           </Button>
           <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
             <Eye className='w-4 h-4' />
@@ -211,12 +218,12 @@ export default function IncompleteApplicationsPage() {
 
   return (
     <AdminLayout
-      title="Incomplete Applications"
-      subtitle={`${filteredApplications.length} incomplete application${filteredApplications.length !== 1 ? 's' : ''} found`}
+      title={t('title')}
+      subtitle={t('count', { count: filteredApplications.length })}
       actions={
         <Button className='flex items-center space-x-2'>
           <Mail className='w-4 h-4' />
-          <span>Send Reminders</span>
+          <span>{t('sendReminders')}</span>
         </Button>
       }
     >
@@ -226,25 +233,25 @@ export default function IncompleteApplicationsPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-gray-900'>{stats.total}</p>
-              <p className='text-sm text-gray-600'>Total Incomplete</p>
+              <p className='text-sm text-gray-600'>{t('stats.total')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-red-600'>{stats.lowProgress}</p>
-              <p className='text-sm text-gray-600'>Low Progress (&lt;50%)</p>
+              <p className='text-sm text-gray-600'>{t('stats.low')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-yellow-600'>{stats.mediumProgress}</p>
-              <p className='text-sm text-gray-600'>Medium Progress (50-80%)</p>
+              <p className='text-sm text-gray-600'>{t('stats.medium')}</p>
             </div>
           </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.highProgress}</p>
-              <p className='text-sm text-gray-600'>High Progress (80%+)</p>
+              <p className='text-sm text-gray-600'>{t('stats.high')}</p>
             </div>
           </Card>
         </div>
@@ -256,7 +263,7 @@ export default function IncompleteApplicationsPage() {
               <div className='relative'>
                 <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
                 <Input
-                  placeholder="Search incomplete applications..."
+                  placeholder={t('searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className='pl-10'
@@ -266,10 +273,10 @@ export default function IncompleteApplicationsPage() {
             
             <Select value={jobFilter} onValueChange={setJobFilter}>
               <SelectTrigger className='w-full sm:w-[180px]'>
-                <SelectValue placeholder="Filter by job" />
+                <SelectValue placeholder={t('filters.job')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Jobs</SelectItem>
+                <SelectItem value="all">{t('filters.allJobs')}</SelectItem>
                 {getUniqueJobs().map(job => (
                   <SelectItem key={job} value={job}>{job}</SelectItem>
                 ))}
@@ -278,24 +285,24 @@ export default function IncompleteApplicationsPage() {
             
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder="Date range" />
+                <SelectValue placeholder={t('filters.date')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Past Week</SelectItem>
+                <SelectItem value="all">{t('filters.allTime')}</SelectItem>
+                <SelectItem value="today">{t('filters.today')}</SelectItem>
+                <SelectItem value="week">{t('filters.week')}</SelectItem>
               </SelectContent>
             </Select>
             
             <Select value={progressFilter} onValueChange={setProgressFilter}>
               <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder="Progress" />
+                <SelectValue placeholder={t('filters.progress')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Progress</SelectItem>
-                <SelectItem value="low">Low (&lt;50%)</SelectItem>
-                <SelectItem value="medium">Medium (50-80%)</SelectItem>
-                <SelectItem value="high">High (80%+)</SelectItem>
+                <SelectItem value="all">{t('filters.allProgress')}</SelectItem>
+                <SelectItem value="low">{t('stats.low')}</SelectItem>
+                <SelectItem value="medium">{t('stats.medium')}</SelectItem>
+                <SelectItem value="high">{t('stats.high')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -306,7 +313,7 @@ export default function IncompleteApplicationsPage() {
           <DataTable
             data={filteredApplications}
             columns={columns}
-            emptyText="No incomplete applications found"
+            emptyText={t('empty')}
           />
         </Card>
       </div>

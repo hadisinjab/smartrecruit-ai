@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Link } from '@/i18n/navigation';
 import { MultiStepForm } from '@/components/form/multi-step-form';
 import { FormStep } from '@/types/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -269,7 +270,6 @@ export default function Home() {
       <MultiStepForm
         steps={sampleFormSteps}
         onComplete={handleFormComplete}
-        rtl={rtl}
       />
     </div>
   );

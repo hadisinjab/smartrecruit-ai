@@ -1,0 +1,289 @@
+{
+  "HomePage": {
+    "title": "مرحباً بكم في SmartRecruit AI",
+    "description": "أفضل منصة توظيف مدعومة بالذكاء الاصطناعي"
+  },
+  "Common": {
+    "search": "بحث...",
+    "searchCandidates": "بحث عن مرشحين...",
+    "notifications": "الإشعارات",
+    "settings": "الإعدادات",
+    "profile": "الملف الشخصي",
+    "logout": "تسجيل الخروج",
+    "adminPanel": "لوحة التحكم",
+    "viewAll": "عرض الكل",
+    "status": "الحالة",
+    "actions": "إجراءات",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "add": "إضافة",
+    "filter": "تصفية",
+    "export": "تصدير",
+    "last": "آخر نشاط",
+    "min": "دقيقة"
+  },
+  "Sidebar": {
+    "dashboard": "لوحة القيادة",
+    "candidates": "المرشحون",
+    "jobs": "الوظائف",
+    "incomplete": "طلبات غير مكتملة",
+    "evaluations": "التقييمات",
+    "userManagement": "إدارة المستخدمين",
+    "activityLog": "سجل النشاطات",
+    "reports": "التقارير",
+    "settings": "الإعدادات"
+  },
+  "Dashboard": {
+    "title": "لوحة القيادة",
+    "subtitle": "نظرة عامة على عمليات التوظيف",
+    "interviewsScheduled": "مقابلات مجدولة",
+    "newApplications": "طلبات جديدة",
+    "activeJobs": "وظائف نشطة",
+    "totalCandidates": "إجمالي المرشحين",
+    "fromLastMonth": "من الشهر الماضي",
+    "quickActions": "إجراءات سريعة",
+    "viewReports": "عرض التقارير",
+    "viewReportsDesc": "تحليل مقاييس التوظيف",
+    "scheduleInterviews": "جدولة المقابلات",
+    "scheduleInterviewsDesc": "جدولة المقابلات القادمة",
+    "manageJobs": "إدارة الوظائف",
+    "manageJobsDesc": "إنشاء وإدارة إعلانات الوظائف",
+    "reviewApplications": "مراجعة الطلبات",
+    "reviewApplicationsDesc": "مراجعة طلبات المرشحين الجديدة",
+    "keyMetrics": "المؤشرات الرئيسية",
+    "recentCandidates": "المرشحون الجدد",
+    "offersMade": "عروض مقدمة",
+    "successfulHires": "تعيينات ناجحة",
+    "rejectionRate": "معدل الرفض",
+    "avgTime": "متوسط وقت التوظيف"
+  },
+  "Candidates": {
+    "title": "المرشحون",
+    "subtitle": "إدارة ومراجعة طلبات المرشحين",
+    "addCandidate": "إضافة مرشح",
+    "filters": "تصفية",
+    "searchPlaceholder": "بحث عن مرشحين...",
+    "count": "تم العثور على {count} مرشح",
+    "stats": {
+      "offersMade": "عروض مقدمة",
+      "inInterview": "في المقابلة",
+      "inScreening": "قيد الفرز",
+      "newApplications": "طلبات جديدة"
+    }
+  },
+  "Jobs": {
+    "title": "الوظائف",
+    "subtitle": "إدارة إعلانات الوظائف وتتبع الطلبات",
+    "exportData": "تصدير البيانات",
+    "createJob": "إنشاء وظيفة",
+    "searchPlaceholder": "بحث عن وظائف...",
+    "count": "{count} من {total} وظيفة",
+    "stats": {
+      "totalJobs": "إجمالي الوظائف",
+      "activeJobs": "وظائف نشطة",
+      "totalApplicants": "إجمالي المتقدمين",
+      "avgApplicants": "متوسط المتقدمين/وظيفة"
+    }
+  },
+  "Incomplete": {
+    "title": "طلبات غير مكتملة",
+    "subtitle": "مراجعة وإدارة الطلبات المنسحبة",
+    "searchPlaceholder": "البحث في الطلبات غير المكتملة...",
+    "sendReminders": "إرسال تذكيرات",
+    "count": "تم العثور على {count} طلبات غير مكتملة",
+    "stats": {
+      "total": "إجمالي غير المكتمل",
+      "low": "تقدم منخفض (<50%)",
+      "medium": "تقدم متوسط (50-80%)",
+      "high": "تقدم مرتفع (80%+)"
+    },
+    "filters": {
+      "job": "تصفية حسب الوظيفة",
+      "allJobs": "جميع الوظائف",
+      "date": "نطاق التاريخ",
+      "allTime": "كل الأوقات",
+      "today": "اليوم",
+      "week": "الأسبوع الماضي",
+      "progress": "التقدم",
+      "allProgress": "كل التقدم"
+    },
+    "empty": "لم يتم العثور على طلبات غير مكتملة"
+  },
+  "Evaluations": {
+    "title": "التقييمات",
+    "subtitle": "تتبع وإدارة تقييمات المرشحين",
+    "searchPlaceholder": "بحث في التقييمات...",
+    "exportReport": "تصدير التقرير",
+    "newEvaluation": "تقييم جديد",
+    "count": "{count} من {total} تقييم",
+    "stats": {
+      "total": "إجمالي التقييمات",
+      "thisWeek": "هذا الأسبوع",
+      "avgScore": "متوسط الدرجات",
+      "hireRecs": "توصيات التوظيف"
+    },
+    "recentHighScores": "أعلى الدرجات مؤخراً",
+    "actionItems": "عناصر العمل",
+    "actions": {
+      "pending": "متابعة التقييمات المعلقة",
+      "pendingDesc": "{count} تقييمات بانتظار المراجعة",
+      "missing": "جدولة المقابلات المفقودة",
+      "missingDesc": "{count} مرشحين يحتاجون لمقابلات نهائية",
+      "strong": "تحديد مرشحين أقوياء",
+      "strongDesc": "{count} مرشحين بدرجات عالية"
+    },
+    "interview": "مقابلة",
+    "empty": "لم يتم العثور على تقييمات"
+  },
+  "Users": {
+    "title": "إدارة المستخدمين",
+    "subtitle": "إدارة المستخدمين والصلاحيات",
+    "addUser": "إضافة مستخدم",
+    "searchPlaceholder": "بحث عن مستخدمين...",
+    "count": "تم العثور على {count} مستخدم",
+    "stats": {
+      "total": "إجمالي المستخدمين",
+      "active": "نشط",
+      "superAdmins": "مشرفون عامون",
+      "admins": "مشرفون",
+      "reviewers": "مقيمون"
+    },
+    "permissions": {
+      "title": "مستويات الصلاحية",
+      "superAdminDesc": "وصول كامل لجميع الميزات بما في ذلك إدارة المستخدمين",
+      "adminDesc": "وصول إلى المرشحين والوظائف والتقييمات",
+      "reviewerDesc": "وصول للقراءة فقط للمرشحين والتقييمات"
+    },
+    "filters": {
+      "role": "تصفية حسب الدور",
+      "allRoles": "كل الأدوار",
+      "status": "تصفية حسب الحالة",
+      "allStatus": "كل الحالات",
+      "active": "نشط",
+      "inactive": "غير نشط"
+    },
+    "actions": {
+      "activate": "تفعيل",
+      "deactivate": "تعطيل",
+      "reset": "إعادة تعيين"
+    },
+    "empty": "لم يتم العثور على مستخدمين",
+    "time": {
+      "justNow": "الآن",
+      "hoursAgo": "منذ {count} ساعة",
+      "daysAgo": "منذ {count} يوم"
+    }
+  },
+  "Activity": {
+    "title": "سجل النشاطات",
+    "subtitle": "تتبع نشاطات النظام وإجراءات المستخدمين",
+    "searchPlaceholder": "بحث في السجل...",
+    "exportLog": "تصدير السجل",
+    "count": "تم العثور على {count} نشاط",
+    "stats": {
+      "total": "إجمالي النشاطات",
+      "today": "اليوم",
+      "thisWeek": "هذا الأسبوع",
+      "activeUsers": "المستخدمون النشطون"
+    },
+    "recentActions": "الإجراءات الأخيرة",
+    "filters": {
+      "user": "تصفية حسب المستخدم",
+      "allUsers": "كل المستخدمين",
+      "action": "تصفية حسب الإجراء",
+      "allActions": "كل الإجراءات",
+      "type": "تصفية حسب النوع",
+      "allTypes": "كل الأنواع",
+      "date": "نطاق التاريخ",
+      "allTime": "كل الأوقات",
+      "today": "اليوم",
+      "week": "الأسبوع الماضي",
+      "month": "الشهر الماضي"
+    },
+    "empty": "لم يتم العثور على نشاطات",
+    "time": {
+      "minutesAgo": "منذ {count} دقيقة",
+      "hoursAgo": "منذ {count} ساعة",
+      "daysAgo": "منذ {count} يوم"
+    }
+  },
+  "Table": {
+    "candidate": "المرشح",
+    "position": "المنصب",
+    "applied": "تاريخ التقديم",
+    "rating": "التقييم",
+    "status": "الحالة",
+    "priority": "الأولوية",
+    "nextAction": "الإجراء التالي",
+    "yearsExp": "سنوات خبرة",
+    "jobTitle": "المسمى الوظيفي",
+    "location": "الموقع",
+    "type": "النوع",
+    "salaryRange": "نطاق الراتب",
+    "applicants": "المتقدمون",
+    "posted": "تاريخ النشر",
+    "contact": "اتصال",
+    "progress": "التقدم",
+    "timeSpent": "الوقت المستغرق",
+    "remind": "تذكير",
+    "overallScore": "الدرجة الكلية",
+    "evaluator": "المقيم",
+    "recommendation": "التوصية",
+    "date": "التاريخ",
+    "user": "المستخدم",
+    "role": "الدور",
+    "lastLogin": "آخر دخول",
+    "action": "الإجراء",
+    "target": "الهدف",
+    "description": "الوصف",
+    "timestamp": "الوقت",
+    "joined": "انضم"
+  },
+  "Status": {
+    "applied": "تم التقديم",
+    "screening": "فرز",
+    "interview": "مقابلة",
+    "offer": "عرض عمل",
+    "hired": "تم التعيين",
+    "rejected": "مرفوض",
+    "active": "نشط",
+    "paused": "متوقف",
+    "closed": "مغلق",
+    "inactive": "غير نشط"
+  },
+  "Progress": {
+    "low": "منخفض",
+    "medium": "متوسط",
+    "high": "مرتفع",
+    "personal": "شخصي",
+    "experience": "خبرة",
+    "documents": "مستندات",
+    "questionnaire": "استبيان"
+  },
+  "Recommendation": {
+    "strong-hire": "توظيف قوي",
+    "hire": "توظيف",
+    "no-hire": "عدم توظيف",
+    "strong-no-hire": "رفض قاطع"
+  },
+  "Type": {
+    "technical": "تقني",
+    "behavioral": "سلوكي",
+    "cultural": "ثقافي",
+    "final": "نهائي"
+  },
+  "Role": {
+    "super-admin": "مشرف عام",
+    "admin": "مشرف",
+    "reviewer": "مقيم"
+  },
+  "Target": {
+    "candidate": "مرشح",
+    "job": "وظيفة",
+    "evaluation": "تقييم",
+    "user": "مستخدم",
+    "system": "نظام"
+  }
+}
