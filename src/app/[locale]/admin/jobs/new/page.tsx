@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { createJob } from '@/actions/jobs';
 
 export default function CreateJobPage() {
   const t = useTranslations('Jobs');
@@ -125,21 +126,42 @@ export default function CreateJobPage() {
     }
 
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Job Data:', jobData);
-    console.log('Form Structure:', formSteps);
-    setLoading(false);
-    
-    addToast('success', 'Job created successfully!');
-    
-    // Clear saved data
-    clearJobData();
-    clearFormSteps();
+    try {
+      const formData = {
+        title: jobData.title,
+        department: jobData.department,
+        location: jobData.location,
+        type: jobData.type,
+        status: jobData.status,
+        salary_min: parseInt(jobData.salary.min) || 0,
+        salary_max: parseInt(jobData.salary.max) || 0,
+        salary_currency: jobData.salary.currency,
+        description: jobData.description,
+        requirements: jobData.requirements.filter(r => r.trim() !== ''),
+        benefits: jobData.benefits.filter(b => b.trim() !== ''),
+        deadline: jobData.deadline || null,
+        hiring_manager_name: jobData.hiringManager,
+        // Also save the form builder structure if you want to use it later
+        // For now, we are storing it in 'evaluation_criteria' or a new column if needed
+        evaluation_criteria: formSteps
+      };
 
-    setTimeout(() => {
+      await createJob(formData);
+      
+      addToast('success', 'Job created successfully!');
+      
+      // Clear saved data
+      clearJobData();
+      clearFormSteps();
+
       router.push('/admin/jobs');
-    }, 1000);
+      router.refresh();
+    } catch (error) {
+      console.error('Error creating job:', error);
+      addToast('error', 'Failed to create job. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getQuestionIcon = (type: string) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/admin/DataTable';
 import { Column } from '@/components/admin/DataTable';
 import { Card } from '@/components/ui/admin-card';
-import { mockJobs } from '@/data/mockData';
+import { getJobs } from '@/actions/jobs';
 import { Job } from '@/types/admin';
-import { Plus, Search, MapPin, Calendar, Users } from 'lucide-react';
+import { Plus, Search, MapPin, Calendar, Users, Loader2 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { exportToCSV } from '@/utils/exportUtils';
 import { useUser } from '@/context/UserContext';
@@ -26,8 +26,45 @@ export default function JobsPage() {
   const { isReviewer } = useUser();
   const { searchTerm } = useSearch();
 
-  const [jobs] = useState<Job[]>(mockJobs);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    async function loadJobs() {
+      try {
+        const data = await getJobs();
+        const formattedJobs: Job[] = data.map((job: any) => ({
+          id: job.id,
+          title: job.title,
+          department: job.department || 'General',
+          location: job.location || 'Remote',
+          type: job.type || 'full-time',
+          status: job.status,
+          salary: {
+            min: job.salary_min || 0,
+            max: job.salary_max || 0,
+            currency: job.salary_currency || 'USD'
+          },
+          description: job.description || '',
+          requirements: job.requirements || [],
+          benefits: job.benefits || [],
+          postedDate: job.created_at, // Use created_at if posted_date is null
+          deadline: job.deadline || '',
+          applicantsCount: 0, // Need to implement count logic separately
+          hiringManager: job.hiring_manager_name || 'Admin'
+        }));
+        setJobs(formattedJobs);
+      } catch (error) {
+        console.error('Failed to load jobs:', error);
+        addToast('error', 'Failed to load jobs');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadJobs();
+  }, [addToast]);
 
   const filteredJobs = jobs.filter(job =>
     job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -200,12 +237,18 @@ export default function JobsPage() {
         </div>
 
         {/* Jobs Table */}
-        <DataTable
-          data={filteredJobs}
-          columns={jobColumns}
-          onRowClick={(job) => router.push(`/admin/jobs/${job.id}`)}
-          emptyText="No jobs found"
-        />
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : (
+          <DataTable
+            data={filteredJobs}
+            columns={jobColumns}
+            onRowClick={(job) => router.push(`/admin/jobs/${job.id}`)}
+            emptyText="No jobs found"
+          />
+        )}
       </div>
     </AdminLayout>
   );
