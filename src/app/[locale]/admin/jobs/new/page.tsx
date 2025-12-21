@@ -120,8 +120,26 @@ export default function CreateJobPage() {
 
   const handleSubmit = async () => {
     // Validate required fields
-    if (!jobData.title || !jobData.department || !jobData.location) {
-      addToast('error', 'Please fill in all required fields (Title, Department, Location)');
+    const missingFields = [];
+    if (!jobData.title) missingFields.push('Title');
+    if (!jobData.department) missingFields.push('Department');
+    if (!jobData.location) missingFields.push('Location');
+    if (!jobData.type) missingFields.push('Type');
+    if (!jobData.description) missingFields.push('Description');
+    if (!jobData.salary.min) missingFields.push('Salary Min');
+    if (!jobData.salary.max) missingFields.push('Salary Max');
+    if (!jobData.deadline) missingFields.push('Deadline');
+    if (!jobData.hiringManager) missingFields.push('Hiring Manager');
+    
+    // Check if at least one requirement and benefit is added and not empty
+    const hasRequirements = jobData.requirements.some(r => r.trim() !== '');
+    if (!hasRequirements) missingFields.push('Requirements');
+
+    const hasBenefits = jobData.benefits.some(b => b.trim() !== '');
+    if (!hasBenefits) missingFields.push('Benefits');
+
+    if (missingFields.length > 0) {
+      addToast('error', `Please fill in all required fields: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -146,7 +164,11 @@ export default function CreateJobPage() {
         evaluation_criteria: formSteps
       };
 
-      await createJob(formData);
+      const result = await createJob(formData);
+      
+      if (result?.error) {
+        throw new Error(result.error);
+      }
       
       addToast('success', 'Job created successfully!');
       
@@ -156,9 +178,9 @@ export default function CreateJobPage() {
 
       router.push('/admin/jobs');
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating job:', error);
-      addToast('error', 'Failed to create job. Please try again.');
+      addToast('error', `Failed to create job: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }

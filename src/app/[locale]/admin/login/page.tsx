@@ -22,47 +22,58 @@ export default function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    console.log('Attempting login for:', email);
 
     try {
       // 1. Sign in with Supabase Auth
+      console.log('Step 1: Calling signInWithPassword...');
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (authError) {
-        throw new Error('Invalid email or password');
+        console.error('Step 1 Error:', authError);
+        throw new Error(authError.message || 'Invalid email or password');
       }
+      console.log('Step 1 Success:', authData);
 
       if (!authData.user) {
         throw new Error('No user returned from authentication');
       }
 
       // 2. Check if user exists in public.users and has appropriate role
+      console.log('Step 2: Checking public.users table...');
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('role')
         .eq('id', authData.user.id)
         .single();
+      
+      console.log('Step 2 Result:', { userData, userError });
 
       if (userError || !userData) {
+        console.error('Step 2 Error or No User Data:', userError);
         // If user not found in public table, sign them out immediately
         await supabase.auth.signOut();
         throw new Error('Access denied: User record not found.');
       }
 
       // 3. Verify Role
+      console.log('Step 3: Verifying role:', userData.role);
       const allowedRoles = ['super-admin', 'admin', 'reviewer'];
       if (!allowedRoles.includes(userData.role)) {
+        console.error('Step 3 Failed: Invalid role');
         await supabase.auth.signOut();
         throw new Error('Access denied: Unauthorized role.');
       }
 
       // 4. Redirect to Dashboard
+      console.log('Step 4: Redirecting to dashboard...');
       router.push('/admin/dashboard');
       router.refresh(); // Ensure server components re-fetch data
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('Login error caught:', err);
       setError(err.message || 'An error occurred during login');
     } finally {
       setIsLoading(false);

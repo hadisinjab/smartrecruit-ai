@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockSystemSettings } from '@/data/mockData';
+import { getSystemSettings, updateSystemSettings } from '@/actions/settings';
 import { SystemSettings } from '@/types/admin';
+import { useToast } from '@/context/ToastContext';
 import {
   Mail,
   Brain,
@@ -27,53 +28,112 @@ import { useLocale } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SystemSettings>(mockSystemSettings);
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('general');
   const [showPasswords, setShowPasswords] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const { addToast } = useToast();
   
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSettings() {
+      try {
+        const data = await getSystemSettings();
+        if (isMounted) {
+          setSettings(data);
+        }
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+        if (isMounted) {
+          addToast('error', 'Failed to load settings');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+    loadSettings();
+    return () => {
+      isMounted = false;
+    };
+  }, [addToast]);
 
   const handleLanguageChange = (newLocale: string) => {
     router.replace(pathname, { locale: newLocale });
   };
 
   const handleSettingChange = (section: keyof SystemSettings, field: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: value
-      }
-    }));
+    if (!settings) return;
+    setSettings(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: value
+        }
+      };
+    });
     setHasUnsavedChanges(true);
   };
 
   const handleNestedSettingChange = (section: keyof SystemSettings, subsection: string, field: string, value: any) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [subsection]: {
-          ...(prev[section] as any)[subsection],
-          [field]: value
+    if (!settings) return;
+    setSettings(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [subsection]: {
+            ...(prev[section] as any)[subsection],
+            [field]: value
+          }
         }
-      }
-    }));
+      };
+    });
     setHasUnsavedChanges(true);
   };
 
-  const handleSave = () => {
-    console.log('Saving settings:', settings);
-    setHasUnsavedChanges(false);
-    // In a real app, this would call an API
+  const handleSave = async () => {
+    if (!settings) return;
+    
+    setLoading(true);
+    try {
+      const result = await updateSystemSettings(settings);
+      if (result.success) {
+        addToast('success', 'Settings saved successfully');
+        setHasUnsavedChanges(false);
+      } else {
+        addToast('error', result.error || 'Failed to save settings');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      addToast('error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReset = () => {
-    setSettings(mockSystemSettings);
-    setHasUnsavedChanges(false);
+  const handleReset = async () => {
+    setLoading(true);
+    try {
+      const data = await getSystemSettings();
+      setSettings(data);
+      setHasUnsavedChanges(false);
+      addToast('info', 'Changes discarded');
+    } catch (error) {
+      console.error('Error resetting settings:', error);
+      addToast('error', 'Failed to reset settings');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sections = [
@@ -144,9 +204,8 @@ export default function SettingsPage() {
             <Label htmlFor='smtpHost'>SMTP Host</Label>
             <Input
               id='smtpHost'
-              value={settings.email.smtpHost}
-              onChange={(e) => handleNestedSettingChange('email', 'smtpHost', '', e.target.value)}
-              onChangeCapture={(e) => handleNestedSettingChange('email', 'smtpHost', 'host', (e.target as HTMLInputElement).value)}
+              value={settings?.email.smtpHost || ''}
+              onChange={(e) => handleSettingChange('email', 'smtpHost', e.target.value)}
             />
           </div>
           <div>
@@ -154,16 +213,16 @@ export default function SettingsPage() {
             <Input
               id='smtpPort'
               type='number'
-              value={settings.email.smtpPort}
-              onChange={(e) => handleNestedSettingChange('email', 'smtpPort', 'port', parseInt(e.target.value))}
+              value={settings?.email.smtpPort || ''}
+              onChange={(e) => handleSettingChange('email', 'smtpPort', parseInt(e.target.value))}
             />
           </div>
           <div>
             <Label htmlFor='smtpUsername'>Username</Label>
             <Input
               id='smtpUsername'
-              value={settings.email.smtpUsername}
-              onChange={(e) => handleNestedSettingChange('email', 'smtpUsername', 'username', e.target.value)}
+              value={settings?.email.smtpUsername || ''}
+              onChange={(e) => handleSettingChange('email', 'smtpUsername', e.target.value)}
             />
           </div>
           <div>
@@ -172,8 +231,8 @@ export default function SettingsPage() {
               <Input
                 id='smtpPassword'
                 type={showPasswords ? 'text' : 'password'}
-                value={settings.email.smtpPassword}
-                onChange={(e) => handleNestedSettingChange('email', 'smtpPassword', 'password', e.target.value)}
+                value={settings?.email.smtpPassword || ''}
+                onChange={(e) => handleSettingChange('email', 'smtpPassword', e.target.value)}
               />
               <Button
                 type='button'
@@ -190,8 +249,8 @@ export default function SettingsPage() {
             <Label htmlFor='fromName'>From Name</Label>
             <Input
               id='fromName'
-              value={settings.email.fromName}
-              onChange={(e) => handleNestedSettingChange('email', 'fromName', 'fromName', e.target.value)}
+              value={settings?.email.fromName || ''}
+              onChange={(e) => handleSettingChange('email', 'fromName', e.target.value)}
             />
           </div>
           <div>
@@ -199,8 +258,8 @@ export default function SettingsPage() {
             <Input
               id='fromEmail'
               type='email'
-              value={settings.email.fromEmail}
-              onChange={(e) => handleNestedSettingChange('email', 'fromEmail', 'fromEmail', e.target.value)}
+              value={settings?.email.fromEmail || ''}
+              onChange={(e) => handleSettingChange('email', 'fromEmail', e.target.value)}
             />
           </div>
         </div>
@@ -213,11 +272,11 @@ export default function SettingsPage() {
             <p className='text-sm text-gray-500'>Send automatic notifications for application updates</p>
           </div>
           <Button
-            variant={settings.email.enableNotifications ? 'default' : 'outline'}
-            onClick={() => handleNestedSettingChange('email', 'enableNotifications', 'enableNotifications', !settings.email.enableNotifications)}
+            variant={settings?.email.enableNotifications ? 'default' : 'outline'}
+            onClick={() => handleSettingChange('email', 'enableNotifications', !settings?.email.enableNotifications)}
             className='min-w-[80px]'
           >
-            {settings.email.enableNotifications ? 'Enabled' : 'Disabled'}
+            {settings?.email.enableNotifications ? 'Enabled' : 'Disabled'}
           </Button>
         </div>
       </div>
@@ -274,7 +333,7 @@ export default function SettingsPage() {
             <Input
               id='minLength'
               type='number'
-              value={settings.security.passwordPolicy.minLength}
+              value={settings?.security.passwordPolicy.minLength || 8}
               onChange={(e) => handleNestedSettingChange('security', 'passwordPolicy', 'minLength', parseInt(e.target.value))}
               readOnly
             />
@@ -304,8 +363,8 @@ export default function SettingsPage() {
             <Input
               id='sessionTimeout'
               type='number'
-              value={settings.security.sessionTimeout}
-              onChange={(e) => handleNestedSettingChange('security', 'sessionTimeout', 'sessionTimeout', parseInt(e.target.value))}
+              value={settings?.security.sessionTimeout || 30}
+              onChange={(e) => handleSettingChange('security', 'sessionTimeout', parseInt(e.target.value))}
               readOnly
             />
             <p className='text-xs text-gray-500 mt-1'>Read-only in demo mode</p>
@@ -327,8 +386,8 @@ export default function SettingsPage() {
       <div>
         <h3 className='text-lg font-semibold text-gray-900 mb-4'>Default Export Format</h3>
         <Select
-          value={settings.export.defaultFormat}
-          onValueChange={(value) => handleNestedSettingChange('export', 'defaultFormat', 'defaultFormat', value)}
+          value={settings?.export.defaultFormat || 'csv'}
+          onValueChange={(value) => handleSettingChange('export', 'defaultFormat', value)}
         >
           <SelectTrigger className='w-[200px]'>
             <SelectValue />
@@ -348,11 +407,11 @@ export default function SettingsPage() {
             <p className='text-sm text-gray-500'>Include sensitive personal information in exports</p>
           </div>
           <Button
-            variant={settings.export.includePersonalData ? 'default' : 'outline'}
-            onClick={() => handleNestedSettingChange('export', 'includePersonalData', 'includePersonalData', !settings.export.includePersonalData)}
+            variant={settings?.export.includePersonalData ? 'default' : 'outline'}
+            onClick={() => handleSettingChange('export', 'includePersonalData', !settings?.export.includePersonalData)}
             className='min-w-[80px]'
           >
-            {settings.export.includePersonalData ? 'Enabled' : 'Disabled'}
+            {settings?.export.includePersonalData ? 'Enabled' : 'Disabled'}
           </Button>
         </div>
 
@@ -397,88 +456,105 @@ export default function SettingsPage() {
     }
   };
 
-  return (
-    <AdminLayout
-      title="Settings"
-      subtitle="Manage system configuration and preferences"
-    >
-      <div className='space-y-6'>
-        {/* Permission Notice */}
-        <Card className='p-4 bg-orange-50 border border-orange-200'>
-          <div className='flex items-start space-x-3'>
-            <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5" />
-            <div>
-              <h3 className='text-sm font-medium text-orange-900'>Demo Mode</h3>
-              <p className='text-sm text-orange-800 mt-1'>
-                Settings are read-only in demo mode. Changes will not be persisted. 
-                Contact your administrator to modify system settings.
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
-          {/* Settings Navigation */}
-          <div className='lg:col-span-1'>
-            <Card className='p-4'>
-              <h3 className='text-sm font-semibold text-gray-900 mb-4'>Settings Categories</h3>
-              <nav className='space-y-1'>
-                {sections.map((section) => {
-                  const Icon = section.icon;
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg text-left transition-colors ${
-                        activeSection === section.id
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                    >
-                      <Icon className='w-4 h-4' />
-                      <div>
-                        <div className='font-medium'>{section.title}</div>
-                        <div className='text-xs text-gray-500'>{section.description}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </nav>
-            </Card>
-          </div>
-
-          {/* Settings Content */}
-          <div className='lg:col-span-3'>
-            <Card className='p-6'>
-              <div className='flex items-center justify-between mb-6'>
-                <div className='flex items-center space-x-3'>
-                  {(() => {
-                    const section = sections.find(s => s.id === activeSection);
-                    const Icon = section?.icon || Settings;
-                    return <Icon className='w-5 h-5 text-gray-600' />;
-                  })()}
-                  <h2 className='text-xl font-semibold text-gray-900'>
-                    {sections.find(s => s.id === activeSection)?.title}
-                  </h2>
-                </div>
-                {hasUnsavedChanges && (
-                  <div className='flex items-center space-x-2'>
-                    <Button variant='outline' onClick={handleReset}>
-                      Reset
-                    </Button>
-                    <Button onClick={handleSave}>
-                      <Save className='w-4 h-4 mr-2' />
-                      Save Changes
-                    </Button>
-                  </div>
-                )}
-              </div>
-              
-              {renderActiveSection()}
-            </Card>
-          </div>
+  if (loading && !settings) {
+    return (
+      <AdminLayout
+        title="Settings"
+        subtitle="Manage system configuration and preferences"
+      >
+        <div className="flex items-center justify-center h-96">
+           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
-      </div>
-    </AdminLayout>
-  );
+      </AdminLayout>
+    );
+ }
+
+ if (!settings) {
+   return (
+       <AdminLayout
+        title="Settings"
+        subtitle="Manage system configuration and preferences"
+      >
+        <div className="flex flex-col items-center justify-center h-96">
+           <p className="text-red-500 mb-4">Failed to load settings</p>
+           <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </AdminLayout>
+   )
+ }
+
+ return (
+   <AdminLayout
+     title="Settings"
+     subtitle="Manage system configuration and preferences"
+   >
+     <div className='space-y-6'>
+       <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
+         {/* Settings Navigation */}
+         <div className='lg:col-span-1'>
+           <Card className='p-4'>
+             <h3 className='text-sm font-semibold text-gray-900 mb-4'>Settings Categories</h3>
+             <nav className='space-y-1'>
+               {sections.map((section) => {
+                 const Icon = section.icon;
+                 return (
+                   <button
+                     key={section.id}
+                     onClick={() => setActiveSection(section.id)}
+                     className={`w-full flex items-center space-x-3 px-3 py-2 text-sm rounded-lg text-left transition-colors ${
+                       activeSection === section.id
+                         ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                     }`}
+                   >
+                     <Icon className='w-4 h-4' />
+                     <div>
+                       <div className='font-medium'>{section.title}</div>
+                       <div className='text-xs text-gray-500'>{section.description}</div>
+                     </div>
+                   </button>
+                 );
+               })}
+             </nav>
+           </Card>
+         </div>
+
+         {/* Settings Content */}
+         <div className='lg:col-span-3'>
+           <Card className='p-6'>
+             <div className='flex items-center justify-between mb-6'>
+               <div className='flex items-center space-x-3'>
+                 {(() => {
+                   const section = sections.find(s => s.id === activeSection);
+                   const Icon = section?.icon || Settings;
+                   return <Icon className='w-5 h-5 text-gray-600' />;
+                 })()}
+                 <h2 className='text-xl font-semibold text-gray-900'>
+                   {sections.find(s => s.id === activeSection)?.title}
+                 </h2>
+               </div>
+               {hasUnsavedChanges && (
+                 <div className='flex items-center space-x-2'>
+                   <Button variant='outline' onClick={handleReset} disabled={loading}>
+                     Reset
+                   </Button>
+                   <Button onClick={handleSave} disabled={loading}>
+                     {loading ? (
+                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                     ) : (
+                       <Save className='w-4 h-4 mr-2' />
+                     )}
+                     Save Changes
+                   </Button>
+                 </div>
+               )}
+             </div>
+             
+             {renderActiveSection()}
+           </Card>
+         </div>
+       </div>
+     </div>
+   </AdminLayout>
+ );
 }

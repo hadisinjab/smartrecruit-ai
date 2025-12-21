@@ -22,7 +22,8 @@
     "filter": "تصفية",
     "export": "تصدير",
     "last": "آخر نشاط",
-    "min": "دقيقة"
+    "min": "دقيقة",
+    "loading": "جاري التحميل..."
   },
   "Sidebar": {
     "dashboard": "لوحة القيادة",
@@ -71,6 +72,25 @@
       "inInterview": "في المقابلة",
       "inScreening": "قيد الفرز",
       "newApplications": "طلبات جديدة"
+    },
+    "details": {
+      "backToCandidates": "العودة إلى المرشحين",
+      "editCandidate": "تعديل المرشح",
+      "experience": "الخبرة",
+      "yearsOfExperience": "{years} سنوات خبرة",
+      "skillsAndTags": "المهارات والوسوم",
+      "hrFields": "حقول الموارد البشرية",
+      "priority": "الأولوية",
+      "nextAction": "الإجراء التالي",
+      "nextActionDate": "تاريخ الإجراء التالي",
+      "hrNotes": "ملاحظات الموارد البشرية",
+      "documents": "المستندات",
+      "quickActions": "إجراءات سريعة",
+      "sendEmail": "إرسال بريد إلكتروني",
+      "scheduleInterview": "جدولة مقابلة",
+      "setReminder": "تعيين تذكير",
+      "contactInfo": "معلومات الاتصال",
+      "appliedDate": "تاريخ التقديم {date}"
     }
   },
   "Jobs": {
@@ -176,7 +196,16 @@
       "strongDesc": "{count} مرشحين بدرجات عالية"
     },
     "interview": "مقابلة",
-    "empty": "لم يتم العثور على تقييمات"
+    "empty": "لم يتم العثور على تقييمات",
+    "aiEvaluation": "تقييم الذكاء الاصطناعي (تلقائي)",
+    "aiDisclaimer": "تم إنشاء هذا التقييم بواسطة الذكاء الاصطناعي بناءً على السيرة الذاتية وبيانات الطلب. لا يمكن تعديله يدوياً.",
+    "matchScore": "نسبة المطابقة",
+    "hrEvaluation": "تقييم الموارد البشرية",
+    "hrScore": "درجة الموارد البشرية (0-100)",
+    "decision": "القرار",
+    "notes": "ملاحظات",
+    "enterNotes": "أدخل ملاحظات الموارد البشرية...",
+    "pending": "قيد الانتظار"
   },
   "Users": {
     "title": "إدارة المستخدمين",

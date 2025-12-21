@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getAdminUsers } from '@/data/mockData';
+import { getUsers, toggleUserStatus, updateUserRole } from '@/actions/users';
 import { AdminUser } from '@/types/admin';
+import { useToast } from '@/context/ToastContext';
 import {
   Search,
   Plus,
@@ -30,12 +31,62 @@ export default function UsersPage() {
   const tCommon = useTranslations('Common');
   const tRole = useTranslations('Role');
   const format = useFormatter();
+  const { addToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const users = getAdminUsers();
+  const loadUsers = async () => {
+    try {
+      const data = await getUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      addToast('error', 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  if (loading) {
+    return (
+      <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center text-gray-500">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
+            <p>{tCommon('loading') || 'Loading...'}</p>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  const handleStatusToggle = async (userId: string, currentStatus: boolean) => {
+    try {
+      await toggleUserStatus(userId, currentStatus);
+      addToast('success', 'User status updated successfully');
+      loadUsers(); // Refresh list
+    } catch (error) {
+      addToast('error', 'Failed to update status');
+    }
+  };
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      await updateUserRole(userId, newRole);
+      addToast('success', 'User role updated successfully');
+      loadUsers(); // Refresh list
+    } catch (error) {
+      addToast('error', 'Failed to update role');
+    }
+  };
 
   // Filter users based on search and filters
   const filteredUsers = users.filter(user => {
@@ -176,10 +227,7 @@ export default function UsersPage() {
         <div className='flex items-center space-x-2'>
           <Select
             value={record.role}
-            onValueChange={(value) => {
-              console.log('Change role to:', value, 'for user:', record.id);
-              // In a real app, this would call an API
-            }}
+            onValueChange={(value) => handleRoleChange(record.id, value)}
           >
             <SelectTrigger className="w-[130px] h-8">
               <SelectValue />
@@ -194,10 +242,7 @@ export default function UsersPage() {
           <Button
             variant={record.isActive ? 'outline' : 'default'}
             size='sm'
-            onClick={() => {
-              console.log(record.isActive ? 'Deactivate' : 'Activate', 'user:', record.id);
-              // In a real app, this would call an API
-            }}
+            onClick={() => handleStatusToggle(record.id, record.isActive)}
             className='h-8'
           >
             {record.isActive ? (
@@ -247,7 +292,10 @@ export default function UsersPage() {
       title={t('title')}
       subtitle={t('count', { count: filteredUsers.length })}
       actions={
-        <Button className='flex items-center space-x-2'>
+        <Button 
+          className='flex items-center space-x-2'
+          onClick={() => addToast('info', 'Add User feature will be implemented in the next phase')}
+        >
           <Plus className='w-4 h-4' />
           <span>{t('addUser')}</span>
         </Button>

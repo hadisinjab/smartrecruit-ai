@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getIncompleteApplications } from '@/data/mockData';
+import { getIncompleteApplications } from '@/actions/incomplete';
 import { IncompleteApplication } from '@/types/admin';
 import {
   Search,
@@ -35,8 +35,23 @@ export default function IncompleteApplicationsPage() {
   const [jobFilter, setJobFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [progressFilter, setProgressFilter] = useState('all');
+  const [incompleteApps, setIncompleteApps] = useState<IncompleteApplication[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const incompleteApps = getIncompleteApplications();
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getIncompleteApplications();
+        setIncompleteApps(data);
+      } catch (error) {
+        console.error('Failed to load incomplete applications:', error);
+        addToast('error', 'Failed to load incomplete applications');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   // Filter applications based on search and filters
   const filteredApplications = incompleteApps.filter(app => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { FilterPanel } from '@/components/admin/FilterPanel';
 import { DataTable, Column } from '@/components/admin/DataTable';
 import { Card } from '@/components/ui/admin-card';
-import { mockCandidates } from '@/data/mockData';
+import { getCandidates } from '@/actions/candidates';
 import { Candidate } from '@/types/admin';
 import { Filter, Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
@@ -23,8 +23,9 @@ export default function CandidatesPage() {
   const format = useFormatter();
   const { addToast } = useToast();
 
-  const [candidates] = useState<Candidate[]>(mockCandidates);
-  const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>(mockCandidates);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -34,6 +35,22 @@ export default function CandidatesPage() {
     experience: { min: 0, max: 20 }
   });
   const router = useRouter();
+
+  useEffect(() => {
+    async function loadCandidates() {
+      try {
+        const data = await getCandidates();
+        setCandidates(data as unknown as Candidate[]);
+        setFilteredCandidates(data as unknown as Candidate[]);
+      } catch (error) {
+        console.error('Failed to load candidates:', error);
+        addToast('error', 'Failed to load candidates');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCandidates();
+  }, []);
 
   const handleFiltersChange = (newFilters: any) => {
     setFilters(newFilters);
@@ -76,6 +93,7 @@ export default function CandidatesPage() {
 
   const getStatusColor = (status: string) => {
     const colors = {
+      new: 'bg-blue-100 text-blue-800',
       applied: 'bg-blue-100 text-blue-800',
       screening: 'bg-yellow-100 text-yellow-800',
       interview: 'bg-purple-100 text-purple-800',

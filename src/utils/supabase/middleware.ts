@@ -19,9 +19,13 @@ export async function updateSession(request: NextRequest, response?: NextRespons
           cookiesToSet.forEach(({ name, value, options }) =>
             request.cookies.set(name, value)
           )
-          supabaseResponse = NextResponse.next({
-            request,
-          })
+          
+          // We don't want to create a new response here because it would overwrite 
+          // the response from next-intl middleware passed as argument.
+          // supabaseResponse = NextResponse.next({
+          //   request,
+          // })
+          
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )

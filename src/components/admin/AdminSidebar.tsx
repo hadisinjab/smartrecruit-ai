@@ -17,7 +17,7 @@ import {
   Activity,
   Clock
 } from 'lucide-react';
-import { mockAdminUser } from '@/data/mockData';
+import { AdminUser } from '@/types/admin';
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -44,14 +44,14 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }
   );
 };
 
-export const AdminSidebar: React.FC = () => {
+export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => {
   const pathname = usePathname();
   const t = useTranslations('Sidebar');
   const tCommon = useTranslations('Common');
   
-  // Get current user role (in a real app, this would come from auth context)
-  const currentUser = mockAdminUser;
-  const userRole = currentUser.role;
+  // Get current user role
+  const userRole = user?.role || 'viewer';
+  const currentUser = user || { name: 'Guest', role: 'viewer' } as any;
 
   // Permission-based navigation items
   const getNavigationItems = () => {
@@ -161,7 +161,7 @@ export const AdminSidebar: React.FC = () => {
         <div className='flex items-center space-x-3 mb-3'>
           <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
             <span className='text-white text-sm font-medium'>
-              {currentUser.name.split(' ').map(n => n[0]).join('')}
+              {(currentUser?.name || 'Guest').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
             </span>
           </div>
           <div>
