@@ -3,8 +3,10 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { AdminUser } from '@/types/admin'
+import { requireSuperAdmin } from '@/utils/authz'
 
 export async function getUsers(): Promise<AdminUser[]> {
+  await requireSuperAdmin()
   const supabase = createClient()
   
   const { data: users, error } = await supabase
@@ -30,6 +32,7 @@ export async function getUsers(): Promise<AdminUser[]> {
 }
 
 export async function toggleUserStatus(userId: string, currentStatus: boolean) {
+  await requireSuperAdmin()
   const supabase = createClient()
   
   const { error } = await supabase
@@ -46,6 +49,7 @@ export async function toggleUserStatus(userId: string, currentStatus: boolean) {
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
+  await requireSuperAdmin()
   const supabase = createClient()
   
   const { error } = await supabase

@@ -5,14 +5,31 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 import { Job } from '@/types/admin';
+import { requireAdminOrSuper, requireJobOwnerOrSuper } from '@/utils/authz'
 
 export async function getJobs(): Promise<Job[]> {
   const supabase = createClient()
-  
-  const { data, error } = await supabase
+  const role = await requireAdminOrSuper()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Unauthorized')
+  }
+
+  let query = supabase
     .from('job_forms')
     .select('*')
     .order('created_at', { ascending: false })
+
+  // Admin يرى وظائفه فقط؛ Super Admin يرى كل الوظائف
+  if (role === 'admin') {
+    query = query.eq('created_by', user.id)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching jobs:', error)
@@ -56,6 +73,14 @@ export async function getJobs(): Promise<Job[]> {
 
 export async function getJobById(id: string): Promise<Job | null> {
   const supabase = createClient()
+  const role = await requireAdminOrSuper()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Unauthorized')
+  }
   
   // Get job details
   const { data: jobData, error: jobError } = await supabase
@@ -67,6 +92,10 @@ export async function getJobById(id: string): Promise<Job | null> {
   if (jobError || !jobData) {
     console.error('Error fetching job:', jobError)
     return null
+  }
+
+  if (role === 'admin' && jobData.created_by !== user.id) {
+    throw new Error('Access denied')
   }
 
   // Get applicants count
@@ -104,11 +133,23 @@ export async function getJobById(id: string): Promise<Job | null> {
 
 export async function createJob(formData: any) {
   const supabase = createClient()
+  await requireAdminOrSuper()
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     throw new Error('Unauthorized')
+  }
+
+  // Fetch organization of current user to auto-link job
+  const { data: userRow, error: userError } = await supabase
+    .from('users')
+    .select('organization_id')
+    .eq('id', user.id)
+    .single()
+
+  if (userError || !userRow?.organization_id) {
+    throw new Error('Missing organization for current user')
   }
 
   const { data, error } = await supabase
@@ -129,7 +170,7 @@ export async function createJob(formData: any) {
       hiring_manager_name: formData.hiring_manager_name,
       created_by: user.id,
       evaluation_criteria: formData.evaluation_criteria || {},
-      organization_id: formData.organization_id || null
+      organization_id: userRow.organization_id
     })
     .select()
     .single()
@@ -146,6 +187,7 @@ export async function createJob(formData: any) {
 
 export async function updateJob(id: string, formData: any) {
   const supabase = createClient()
+  await requireJobOwnerOrSuper(id)
 
   const { data, error } = await supabase
     .from('job_forms')
@@ -182,6 +224,7 @@ export async function updateJob(id: string, formData: any) {
 
 export async function deleteJob(id: string) {
   const supabase = createClient()
+  await requireJobOwnerOrSuper(id)
 
   const { error } = await supabase
     .from('job_forms')

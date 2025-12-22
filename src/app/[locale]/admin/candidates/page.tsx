@@ -194,6 +194,20 @@ export default function CandidatesPage() {
     }
   ];
 
+  // إظهار أعمدة الشركة/مالك الوظيفة فقط إن توفرت (سوبر أدمن)
+  if (filteredCandidates.some(c => c.organizationName || c.jobOwnerName)) {
+    candidateColumns.splice(1, 0, {
+      key: 'organization',
+      title: tTable('organization'),
+      render: (_, record) => (
+        <div className='text-sm text-gray-800'>
+          <p className='font-medium'>{record.organizationName || '—'}</p>
+          <p className='text-xs text-gray-500'>{record.jobOwnerName || ''}</p>
+        </div>
+      )
+    });
+  }
+
   return (
     <AdminLayout
       title={t('title')}

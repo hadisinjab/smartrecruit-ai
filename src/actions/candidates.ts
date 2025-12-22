@@ -2,21 +2,43 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireStaff } from '@/utils/authz'
 
 export async function getCandidates() {
   const supabase = createClient()
-  
+  const role = await requireStaff()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
+
   // Fetch applications with job details
-  const { data: applications, error } = await supabase
+  let query = supabase
     .from('applications')
     .select(`
       *,
-      job_form:job_forms(title),
+      job_form:job_forms(
+        title,
+        created_by,
+        organization_id,
+        organizations(name),
+        creator:users(full_name)
+      ),
       resumes(*),
       external_profiles(*),
       hr_evaluations(*)
     `)
     .order('created_at', { ascending: false })
+
+  if (role === 'admin') {
+    query = query.eq('job_forms.created_by', user.id)
+  }
+  // Reviewers: no ownership restriction, قراءة فقط
+  // Super Admin: يرى كل المرشحين
+
+  const { data: applications, error } = await query
 
   if (error) {
     console.error('Error fetching candidates:', error)
@@ -28,7 +50,7 @@ export async function getCandidates() {
     // Get latest HR evaluation if exists
     const latestHrEval = app.hr_evaluations?.[0] || {};
     
-    return {
+    const base = {
       id: app.id,
       firstName: app.candidate_name?.split(' ')[0] || 'Unknown',
       lastName: app.candidate_name?.split(' ').slice(1).join(' ') || '',
@@ -51,7 +73,14 @@ export async function getCandidates() {
         nextAction: latestHrEval.hr_decision || 'Review',
         nextActionDate: new Date().toISOString() // Placeholder
       }
-    };
+    } as any;
+
+    if (role === 'super-admin') {
+      base.organizationName = app.job_form?.organizations?.name;
+      base.jobOwnerName = app.job_form?.creator?.full_name;
+    }
+
+    return base;
   });
 
   return candidates;
@@ -59,12 +88,25 @@ export async function getCandidates() {
 
 export async function getCandidateById(id: string) {
   const supabase = createClient()
+  const role = await requireStaff()
   
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
+
   const { data: app, error } = await supabase
     .from('applications')
     .select(`
       *,
-      job_form:job_forms(title),
+      job_form:job_forms(
+        title,
+        created_by,
+        organization_id,
+        organizations(name),
+        creator:users(full_name)
+      ),
       resumes(*),
       external_profiles(*),
       hr_evaluations(*),
@@ -78,10 +120,16 @@ export async function getCandidateById(id: string) {
     return null
   }
 
+  // Admins can only view candidates tied to their own job forms
+  if (role === 'admin' && app.job_form?.created_by !== user.id) {
+    throw new Error('Access denied')
+  }
+  // Reviewer: allowed to view; salary fields are not exposed in this mapper
+
   // Get latest HR evaluation if exists
   const latestHrEval = app.hr_evaluations?.[0] || {};
 
-  return {
+  const base = {
     id: app.id,
     firstName: app.candidate_name?.split(' ')[0] || 'Unknown',
     lastName: app.candidate_name?.split(' ').slice(1).join(' ') || '',
@@ -104,5 +152,12 @@ export async function getCandidateById(id: string) {
       nextAction: latestHrEval.hr_decision || 'Review',
       nextActionDate: new Date().toISOString()
     }
-  };
+  } as any;
+
+  if (role === 'super-admin') {
+    base.organizationName = app.job_form?.organizations?.name;
+    base.jobOwnerName = app.job_form?.creator?.full_name;
+  }
+
+  return base;
 }

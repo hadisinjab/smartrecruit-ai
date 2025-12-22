@@ -3,6 +3,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireReviewerOrAdmin } from '@/utils/authz'
 
 export async function addHrEvaluation(
   applicationId: string, 
@@ -13,6 +14,26 @@ export async function addHrEvaluation(
   }
 ) {
   const supabase = createClient()
+  const role = await requireReviewerOrAdmin()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
+
+  // Admins can only evaluate applications for their own job forms
+  if (role === 'admin') {
+    const { data: appOwner, error: appOwnerError } = await supabase
+      .from('applications')
+      .select('job_forms!inner(created_by)')
+      .eq('id', applicationId)
+      .single()
+
+    if (appOwnerError || appOwner?.job_forms?.created_by !== user.id) {
+      throw new Error('Access denied')
+    }
+  }
   
   // Check if evaluation already exists for this application
   const { data: existing } = await supabase
@@ -52,6 +73,7 @@ export async function addHrEvaluation(
 
 export async function getHrEvaluation(applicationId: string) {
   const supabase = createClient()
+  await requireReviewerOrAdmin()
   
   const { data, error } = await supabase
     .from('hr_evaluations')
