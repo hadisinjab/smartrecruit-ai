@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { FilterPanel } from '@/components/admin/FilterPanel';
 import { DataTable, Column } from '@/components/admin/DataTable';
 import { Card } from '@/components/ui/admin-card';
-import { mockCandidates } from '@/data/mockData';
+import { getCandidates } from '@/actions/candidates';
 import { Candidate } from '@/types/admin';
 import { Filter, Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import { useToast } from '@/context/ToastContext';
+import { exportToCSV } from '@/utils/exportUtils';
 
 export default function CandidatesPage() {
   const t = useTranslations('Candidates');
@@ -19,9 +21,11 @@ export default function CandidatesPage() {
   const tTable = useTranslations('Table');
   const tStatus = useTranslations('Status');
   const format = useFormatter();
+  const { addToast } = useToast();
 
-  const [candidates] = useState<Candidate[]>(mockCandidates);
-  const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>(mockCandidates);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -31,6 +35,22 @@ export default function CandidatesPage() {
     experience: { min: 0, max: 20 }
   });
   const router = useRouter();
+
+  useEffect(() => {
+    async function loadCandidates() {
+      try {
+        const data = await getCandidates();
+        setCandidates(data as unknown as Candidate[]);
+        setFilteredCandidates(data as unknown as Candidate[]);
+      } catch (error) {
+        console.error('Failed to load candidates:', error);
+        addToast('error', 'Failed to load candidates');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCandidates();
+  }, []);
 
   const handleFiltersChange = (newFilters: any) => {
     setFilters(newFilters);
@@ -73,6 +93,7 @@ export default function CandidatesPage() {
 
   const getStatusColor = (status: string) => {
     const colors = {
+      new: 'bg-blue-100 text-blue-800',
       applied: 'bg-blue-100 text-blue-800',
       screening: 'bg-yellow-100 text-yellow-800',
       interview: 'bg-purple-100 text-purple-800',
@@ -173,6 +194,20 @@ export default function CandidatesPage() {
     }
   ];
 
+  // إظهار أعمدة الشركة/مالك الوظيفة فقط إن توفرت (سوبر أدمن)
+  if (filteredCandidates.some(c => c.organizationName || c.jobOwnerName)) {
+    candidateColumns.splice(1, 0, {
+      key: 'organization',
+      title: tTable('organization'),
+      render: (_, record) => (
+        <div className='text-sm text-gray-800'>
+          <p className='font-medium'>{record.organizationName || '—'}</p>
+          <p className='text-xs text-gray-500'>{record.jobOwnerName || ''}</p>
+        </div>
+      )
+    });
+  }
+
   return (
     <AdminLayout
       title={t('title')}
@@ -181,18 +216,22 @@ export default function CandidatesPage() {
         <div className='flex space-x-3'>
           <Button
             variant='outline'
+            onClick={() => {
+              exportToCSV(candidates, 'candidates-data');
+              addToast('success', 'Candidates data exported successfully');
+            }}
+            className='flex items-center space-x-2'
+          >
+            <span>{tCommon('export')}</span>
+          </Button>
+          <Button
+            variant='outline'
             onClick={() => setShowFilters(true)}
             className='flex items-center space-x-2'
           >
             <Filter className='w-4 h-4' />
             <span>{t('filters')}</span>
           </Button>
-          <Link href='/admin/candidates/new'>
-            <Button className='flex items-center space-x-2'>
-              <Plus className='w-4 h-4' />
-              <span>{t('addCandidate')}</span>
-            </Button>
-          </Link>
         </div>
       }
     >

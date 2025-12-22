@@ -1,9 +1,15 @@
 import {NextIntlClientProvider} from 'next-intl';
 import {getMessages} from 'next-intl/server';
-import {Inter} from 'next/font/google';
+import {Cairo} from 'next/font/google';
 import '../globals.css';
+import { ToastProvider } from '@/context/ToastContext';
+import { UserProvider } from '@/context/UserContext';
+import { SearchProvider } from '@/context/SearchContext';
 
-const inter = Inter({subsets: ['latin']});
+const cairo = Cairo({
+  subsets: ['latin', 'arabic'],
+  display: 'swap',
+});
 
 export const metadata = {
   title: 'SmartRecruit AI - Job Application',
@@ -17,15 +23,23 @@ export default async function LocaleLayout({
   children: React.ReactNode;
   params: {locale: string};
 }) {
-  const messages = await getMessages();
+  // Providing all messages to the client
+  // side is the easiest way to get started
+  const messages = await getMessages({locale});
 
   return (
     <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
-      <body className={inter.className}>
+      <body className={cairo.className}>
         <NextIntlClientProvider messages={messages} locale={locale}>
-          <main className="min-h-screen">
-            {children}
-          </main>
+          <UserProvider>
+            <SearchProvider>
+              <ToastProvider>
+                <main className="min-h-screen">
+                  {children}
+                </main>
+              </ToastProvider>
+            </SearchProvider>
+          </UserProvider>
         </NextIntlClientProvider>
       </body>
     </html>

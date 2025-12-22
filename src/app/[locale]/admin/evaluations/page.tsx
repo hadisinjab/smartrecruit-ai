@@ -1,32 +1,48 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from '@/i18n/navigation';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
 import { DataTable } from '@/components/admin/DataTable';
 import { Column } from '@/components/admin/DataTable';
-import { mockEvaluations, getCandidateById } from '@/data/mockData';
+import { getEvaluations } from '@/actions/evaluations';
 import { Evaluation } from '@/types/admin';
 import { Plus, Search, Star, MessageSquare, User, Calendar } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 export default function EvaluationsPage() {
   const t = useTranslations('Evaluations');
   const tTable = useTranslations('Table');
   const tCommon = useTranslations('Common');
   const format = useFormatter();
+  const router = useRouter();
+  const { addToast } = useToast();
 
-  const [evaluations] = useState<Evaluation[]>(mockEvaluations);
+  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getEvaluations();
+        setEvaluations(data);
+      } catch (error) {
+        console.error('Failed to load evaluations:', error);
+        addToast('error', 'Failed to load evaluations');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
   const filteredEvaluations = evaluations.filter(evaluation => {
-    const candidate = getCandidateById(evaluation.candidateId);
-    if (!candidate) return false;
-    
     return (
-      candidate.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      evaluation.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evaluation.evaluatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       evaluation.type.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -57,21 +73,21 @@ export default function EvaluationsPage() {
       key: 'candidate',
       title: tTable('candidate'),
       render: (_, record) => {
-        const candidate = getCandidateById(record.candidateId);
-        if (!candidate) return <span className='text-gray-500'>Unknown</span>;
+        const firstName = record.candidateName.split(' ')[0] || 'Unknown';
+        const lastName = record.candidateName.split(' ').slice(1).join(' ') || '';
         
         return (
           <div className='flex items-center space-x-3'>
             <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
               <span className='text-white text-xs font-medium'>
-                {candidate.firstName[0]}{candidate.lastName[0]}
+                {firstName[0]}{lastName[0]}
               </span>
             </div>
             <div>
               <p className='font-medium text-gray-900'>
-                {candidate.firstName} {candidate.lastName}
+                {record.candidateName}
               </p>
-              <p className='text-sm text-gray-500'>{candidate.position}</p>
+              <p className='text-sm text-gray-500'>{record.candidatePosition}</p>
             </div>
           </div>
         );
@@ -150,7 +166,14 @@ export default function EvaluationsPage() {
           <Button variant='outline'>
             {t('exportReport')}
           </Button>
-          <Button className='flex items-center space-x-2'>
+          <Button 
+            className='flex items-center space-x-2'
+            onClick={() => {
+              // Redirect to candidates list to start a new evaluation flow
+              router.push('/admin/candidates');
+              addToast('info', 'Please select a candidate to evaluate');
+            }}
+          >
             <Plus className='w-4 h-4' />
             <span>{t('newEvaluation')}</span>
           </Button>
@@ -220,20 +243,20 @@ export default function EvaluationsPage() {
                 .filter(e => e.scores.overall >= 4)
                 .slice(0, 5)
                 .map((evaluation) => {
-                  const candidate = getCandidateById(evaluation.candidateId);
-                  if (!candidate) return null;
+                  const firstName = evaluation.candidateName.split(' ')[0] || 'Unknown';
+                  const lastName = evaluation.candidateName.split(' ').slice(1).join(' ') || '';
                   
                   return (
                     <div key={evaluation.id} className='flex items-center justify-between p-3 bg-gray-50 rounded-lg'>
                       <div className='flex items-center space-x-3'>
                         <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
                           <span className='text-white text-xs font-medium'>
-                            {candidate.firstName[0]}{candidate.lastName[0]}
+                            {firstName[0]}{lastName[0]}
                           </span>
                         </div>
                         <div>
                           <p className='font-medium text-gray-900'>
-                            {candidate.firstName} {candidate.lastName}
+                            {evaluation.candidateName}
                           </p>
                           <p className='text-sm text-gray-500'>{evaluation.type} {t('interview')}</p>
                         </div>

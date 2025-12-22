@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { StatsCard } from '@/components/admin/StatsCard';
 import { Card } from '@/components/ui/admin-card';
-import { mockDashboardStats, mockCandidates } from '@/data/mockData';
+import { getDashboardStats, getRecentCandidates } from '@/actions/dashboard';
+import { DashboardStats, Candidate } from '@/types/admin';
 import {
   Users,
   Briefcase,
@@ -15,7 +16,6 @@ import {
   XCircle
 } from 'lucide-react';
 import { DataTable, Column } from '@/components/admin/DataTable';
-import { Candidate } from '@/types/admin';
 import { Link } from '@/i18n/navigation';
 import { useFormatter, useTranslations } from 'next-intl';
 
@@ -25,7 +25,38 @@ export default function AdminDashboard() {
   const tCommon = useTranslations('Common');
   const tTable = useTranslations('Table');
   const tStatus = useTranslations('Status');
-  const stats = mockDashboardStats;
+  
+  const [stats, setStats] = useState<DashboardStats>({
+    totalJobs: 0,
+    activeJobs: 0,
+    totalCandidates: 0,
+    newApplications: 0,
+    interviewsScheduled: 0,
+    offersMade: 0,
+    hires: 0,
+    rejectionRate: 0,
+    averageTimeToHire: 0
+  });
+  const [recentCandidates, setRecentCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [statsData, candidatesData] = await Promise.all([
+          getDashboardStats(),
+          getRecentCandidates()
+        ]);
+        setStats(statsData);
+        setRecentCandidates(candidatesData);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -176,10 +207,10 @@ export default function AdminDashboard() {
                       'bg-yellow-50 text-yellow-600'
                     }`}>
                       <action.icon className='w-5 h-5' />
-                    </div>
-                    <div>
-                      <h3 className='font-medium text-gray-900'>{action.title}</h3>
-                      <p className='text-sm text-gray-500'>{action.description}</p>
+                      <div>
+                        <h3 className='font-medium text-gray-900'>{action.title}</h3>
+                        <p className='text-sm text-gray-500'>{action.description}</p>
+                      </div>
                     </div>
                   </div>
                 </Card>
@@ -215,10 +246,10 @@ export default function AdminDashboard() {
               <div>
                 <div className='flex items-center justify-between mb-2'>
                   <span className='text-sm font-medium text-gray-600'>{t('rejectionRate')}</span>
-                  <span className='text-lg font-bold text-gray-900'>12%</span>
+                  <span className='text-lg font-bold text-gray-900'>{stats.rejectionRate}%</span>
                 </div>
                 <div className='w-full bg-gray-100 rounded-full h-2'>
-                  <div className='bg-red-500 h-2 rounded-full' style={{ width: '12%' }}></div>
+                  <div className='bg-red-500 h-2 rounded-full' style={{ width: `${stats.rejectionRate}%` }}></div>
                 </div>
               </div>
             </div>
@@ -234,8 +265,9 @@ export default function AdminDashboard() {
                 </Link>
               </div>
               <DataTable
-                data={mockCandidates.slice(0, 5)}
+                data={recentCandidates}
                 columns={recentCandidatesColumns}
+                loading={loading}
               />
             </div>
           </div>

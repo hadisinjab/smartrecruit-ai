@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
-import { mockJobs, getJobById } from '@/data/mockData';
+import { getJobById } from '@/actions/jobs';
 import {
   ArrowLeft,
   Edit3,
@@ -20,11 +20,53 @@ import {
   CheckCircle
 } from 'lucide-react';
 
+import { Job } from '@/types/admin';
+
 export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
-  const job = getJobById(jobId);
+  const [job, setJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadJob() {
+      try {
+        setLoading(true);
+        const jobData = await getJobById(jobId);
+        if (isMounted) {
+          setJob(jobData);
+        }
+      } catch (error) {
+        console.error('Failed to load job:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (jobId) {
+      loadJob();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [jobId]);
+
+  if (loading) {
+    return (
+      <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
+          <p className='text-gray-600'>Loading job details...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!job) {
     return (
@@ -39,6 +81,12 @@ export default function JobDetailsPage() {
       </div>
     );
   }
+
+  // Helper functions for safe rendering
+  const getJobStatus = (status: string | undefined) => status || 'draft';
+  const getJobType = (type: string | undefined) => type || 'full-time';
+  const getSafeDate = (date: string | undefined) => date ? new Date(date).toLocaleDateString() : 'N/A';
+  const getInitials = (name: string | undefined) => (name || 'Unknown').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -59,10 +107,13 @@ export default function JobDetailsPage() {
     return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
+  const status = getJobStatus(job.status);
+  const type = getJobType(job.type);
+
   return (
     <AdminLayout
-      title={job.title}
-      subtitle={job.department}
+      title={job.title || 'Untitled Job'}
+      subtitle={job.department || 'General'}
       actions={
         <div className='flex space-x-3'>
           <Button variant='outline'>
@@ -99,11 +150,11 @@ export default function JobDetailsPage() {
                   <p className='text-lg text-gray-600'>{job.department}</p>
                 </div>
                 <div className='flex space-x-2'>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(job.status)}`}>
-                    {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
                   </span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(job.type)}`}>
-                    {job.type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(type)}`}>
+                    {type.split('-').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                   </span>
                 </div>
               </div>
@@ -112,19 +163,19 @@ export default function JobDetailsPage() {
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-6'>
                 <div className='flex items-center space-x-3'>
                   <MapPin className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>{job.location}</span>
+                  <span className='text-gray-700'>{job.location || 'Remote'}</span>
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Clock className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>Posted {new Date(job.postedDate).toLocaleDateString()}</span>
+                  <span className='text-gray-700'>Posted {getSafeDate(job.postedDate)}</span>
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Calendar className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>Deadline {new Date(job.deadline).toLocaleDateString()}</span>
+                  <span className='text-gray-700'>Deadline {getSafeDate(job.deadline)}</span>
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Users className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>{job.applicantsCount} applicants</span>
+                  <span className='text-gray-700'>{job.applicantsCount || 0} applicants</span>
                 </div>
               </div>
 
@@ -133,7 +184,7 @@ export default function JobDetailsPage() {
                 <div className='flex items-center space-x-3 mb-2'>
                   <DollarSign className='w-5 h-5 text-gray-400' />
                   <span className='text-lg font-semibold text-gray-900'>
-                    ${job.salary.min.toLocaleString()} - ${job.salary.max.toLocaleString()} {job.salary.currency}
+                    ${(job.salary?.min || 0).toLocaleString()} - ${(job.salary?.max || 0).toLocaleString()} {job.salary?.currency || 'USD'}
                   </span>
                 </div>
               </div>
@@ -141,7 +192,7 @@ export default function JobDetailsPage() {
               {/* Description */}
               <div className='border-t border-gray-200 pt-4'>
                 <h3 className='text-lg font-semibold text-gray-900 mb-3'>Job Description</h3>
-                <p className='text-gray-700 leading-relaxed'>{job.description}</p>
+                <p className='text-gray-700 leading-relaxed'>{job.description || 'No description provided.'}</p>
               </div>
             </Card>
 
@@ -149,12 +200,15 @@ export default function JobDetailsPage() {
             <Card className='p-6'>
               <h3 className='text-lg font-semibold text-gray-900 mb-4'>Requirements</h3>
               <ul className='space-y-2'>
-                {job.requirements.map((requirement, index) => (
+                {(job.requirements || []).map((requirement: string, index: number) => (
                   <li key={index} className='flex items-start space-x-3'>
                     <CheckCircle className='w-5 h-5 text-green-600 mt-0.5 flex-shrink-0' />
                     <span className='text-gray-700'>{requirement}</span>
                   </li>
                 ))}
+                {(!job.requirements || job.requirements.length === 0) && (
+                  <li className='text-gray-500 italic'>No requirements listed.</li>
+                )}
               </ul>
             </Card>
 
@@ -162,12 +216,15 @@ export default function JobDetailsPage() {
             <Card className='p-6'>
               <h3 className='text-lg font-semibold text-gray-900 mb-4'>Benefits & Perks</h3>
               <ul className='space-y-2'>
-                {job.benefits.map((benefit, index) => (
+                {(job.benefits || []).map((benefit: string, index: number) => (
                   <li key={index} className='flex items-start space-x-3'>
                     <Award className='w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0' />
                     <span className='text-gray-700'>{benefit}</span>
                   </li>
                 ))}
+                {(!job.benefits || job.benefits.length === 0) && (
+                  <li className='text-gray-500 italic'>No benefits listed.</li>
+                )}
               </ul>
             </Card>
           </div>
@@ -183,7 +240,7 @@ export default function JobDetailsPage() {
                     <Users className='w-4 h-4 text-gray-600' />
                     <span className='text-sm font-medium text-gray-700'>Total Applicants</span>
                   </div>
-                  <span className='text-lg font-bold text-gray-900'>{job.applicantsCount}</span>
+                  <span className='text-lg font-bold text-gray-900'>{job.applicantsCount || 0}</span>
                 </div>
                 
                 <div className='flex items-center justify-between p-3 bg-gray-50 rounded-lg'>
@@ -192,7 +249,7 @@ export default function JobDetailsPage() {
                     <span className='text-sm font-medium text-gray-700'>Days Since Posted</span>
                   </div>
                   <span className='text-lg font-bold text-gray-900'>
-                    {Math.floor((new Date().getTime() - new Date(job.postedDate).getTime()) / (1000 * 60 * 60 * 24))}
+                    {job.postedDate ? Math.floor((new Date().getTime() - new Date(job.postedDate).getTime()) / (1000 * 60 * 60 * 24)) : 0}
                   </span>
                 </div>
                 
@@ -202,7 +259,7 @@ export default function JobDetailsPage() {
                     <span className='text-sm font-medium text-gray-700'>Days Until Deadline</span>
                   </div>
                   <span className='text-lg font-bold text-gray-900'>
-                    {Math.ceil((new Date(job.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}
+                    {job.deadline ? Math.ceil((new Date(job.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0}
                   </span>
                 </div>
               </div>
@@ -214,11 +271,11 @@ export default function JobDetailsPage() {
               <div className='flex items-center space-x-3'>
                 <div className='w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center'>
                   <span className='text-white font-medium'>
-                    {job.hiringManager.split(' ').map(name => name[0]).join('')}
+                    {getInitials(job.hiringManager)}
                   </span>
                 </div>
                 <div>
-                  <p className='font-medium text-gray-900'>{job.hiringManager}</p>
+                  <p className='font-medium text-gray-900'>{job.hiringManager || 'Unknown'}</p>
                   <p className='text-sm text-gray-600'>Hiring Manager</p>
                 </div>
               </div>

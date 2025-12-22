@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -10,8 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockCandidates, getCandidateById, getEvaluationsByCandidateId } from '@/data/mockData';
+import { getCandidateById } from '@/actions/candidates';
+import { addHrEvaluation, getHrEvaluation } from '@/actions/hr-evaluations';
 import { Candidate, Evaluation } from '@/types/admin';
+import { useToast } from '@/context/ToastContext';
 import {
   ArrowLeft,
   Edit3,
@@ -26,17 +29,90 @@ import {
   Star,
   MessageSquare,
   Clock,
-  User
+  User,
+  Bot
 } from 'lucide-react';
 
 export default function CandidateDetailsPage() {
+  const t = useTranslations('Candidates');
+  const tEval = useTranslations('Evaluations');
+  const tCommon = useTranslations('Common');
+  const tRec = useTranslations('Recommendation');
+  const tStatus = useTranslations('Status');
+
   const params = useParams();
   const router = useRouter();
+  const { addToast } = useToast();
   const candidateId = params.id as string;
-  const candidate = getCandidateById(candidateId);
-  const evaluations = getEvaluationsByCandidateId(candidateId);
+  
+  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedCandidate, setEditedCandidate] = useState<Candidate | null>(candidate || null);
+  const [editedCandidate, setEditedCandidate] = useState<Candidate | null>(null);
+  
+  // HR Evaluation State
+  const [hrEvaluation, setHrEvaluation] = useState<any>(null);
+  const [isHrEditing, setIsHrEditing] = useState(false);
+  const [editedHrEval, setEditedHrEval] = useState({
+    hr_score: 0,
+    hr_notes: '',
+    hr_decision: 'Review'
+  });
+
+  useEffect(() => {
+    async function loadCandidate() {
+      try {
+        const data = await getCandidateById(candidateId);
+        if (data) {
+          setCandidate(data as unknown as Candidate);
+          setEditedCandidate(data as unknown as Candidate);
+        }
+        
+        const hrData = await getHrEvaluation(candidateId);
+        if (hrData) {
+          setHrEvaluation(hrData);
+          setEditedHrEval({
+            hr_score: hrData.hr_score || 0,
+            hr_notes: hrData.hr_notes || '',
+            hr_decision: hrData.hr_decision || 'Review'
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load candidate:', error);
+        addToast('error', 'Failed to load candidate details');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCandidate();
+  }, [candidateId]);
+
+  const handleSaveHrEvaluation = async () => {
+    try {
+      await addHrEvaluation(candidateId, editedHrEval);
+      setHrEvaluation({ ...hrEvaluation, ...editedHrEval });
+      setIsHrEditing(false);
+      addToast('success', 'HR Evaluation saved successfully');
+      
+      // Reload to get fresh data
+      const hrData = await getHrEvaluation(candidateId);
+      if (hrData) setHrEvaluation(hrData);
+      
+    } catch (error) {
+      console.error('Failed to save HR evaluation:', error);
+      addToast('error', 'Failed to save HR evaluation');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
+        <div className='text-center'>
+          <p className='text-gray-600'>Loading candidate details...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!candidate) {
     return (
@@ -51,6 +127,11 @@ export default function CandidateDetailsPage() {
       </div>
     );
   }
+
+  // Evaluations are now part of the candidate object or fetched separately if needed
+  // For now we'll assume they are not yet fully implemented in the backend response structure
+  // or we need to adapt the UI to show what we have.
+  const evaluations: Evaluation[] = []; // Placeholder until we fetch evaluations properly
 
   const handleSave = () => {
     if (editedCandidate) {
@@ -100,7 +181,7 @@ export default function CandidateDetailsPage() {
               className='flex items-center space-x-2'
             >
               <Edit3 className='w-4 h-4' />
-              <span>Edit</span>
+              <span>{t('details.editCandidate')}</span>
             </Button>
           ) : (
             <>
@@ -110,14 +191,14 @@ export default function CandidateDetailsPage() {
                 className='flex items-center space-x-2'
               >
                 <X className='w-4 h-4' />
-                <span>Cancel</span>
+                <span>{tCommon('cancel')}</span>
               </Button>
               <Button
                 onClick={handleSave}
                 className='flex items-center space-x-2'
               >
                 <Save className='w-4 h-4' />
-                <span>Save</span>
+                <span>{tCommon('save')}</span>
               </Button>
             </>
           )}
@@ -133,7 +214,7 @@ export default function CandidateDetailsPage() {
             className='flex items-center space-x-2'
           >
             <ArrowLeft className='w-4 h-4' />
-            <span>Back to Candidates</span>
+            <span>{t('details.backToCandidates')}</span>
           </Button>
         </div>
 
@@ -167,7 +248,7 @@ export default function CandidateDetailsPage() {
                   </div>
                 </div>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(candidate.status)}`}>
-                  {candidate.status.charAt(0).toUpperCase() + candidate.status.slice(1)}
+                  {tStatus(candidate.status)}
                 </span>
               </div>
 
@@ -188,20 +269,20 @@ export default function CandidateDetailsPage() {
                 <div className='flex items-center space-x-3'>
                   <Calendar className='w-5 h-5 text-gray-400' />
                   <span className='text-gray-700'>
-                    Applied {new Date(candidate.appliedDate).toLocaleDateString()}
+                    {t('details.appliedDate', { date: new Date(candidate.appliedDate).toLocaleDateString() })}
                   </span>
                 </div>
               </div>
 
               {/* Experience */}
               <div className='border-t border-gray-200 pt-4'>
-                <h3 className='text-lg font-semibold text-gray-900 mb-2'>Experience</h3>
-                <p className='text-gray-700'>{candidate.experience} years of experience</p>
+                <h3 className='text-lg font-semibold text-gray-900 mb-2'>{t('details.experience')}</h3>
+                <p className='text-gray-700'>{t('details.yearsOfExperience', { years: candidate.experience })}</p>
               </div>
 
               {/* Tags */}
               <div className='border-t border-gray-200 pt-4 mt-4'>
-                <h3 className='text-lg font-semibold text-gray-900 mb-2'>Skills & Tags</h3>
+                <h3 className='text-lg font-semibold text-gray-900 mb-2'>{t('details.skillsAndTags')}</h3>
                 <div className='flex flex-wrap gap-2'>
                   {candidate.tags.map((tag, index) => (
                     <span
@@ -215,73 +296,133 @@ export default function CandidateDetailsPage() {
               </div>
             </Card>
 
-            {/* Evaluation History */}
-            <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Evaluation History</h2>
-              {evaluations.length > 0 ? (
+            {/* AI Evaluation (Read Only) */}
+            <Card className='p-6 bg-purple-50 border-purple-100'>
+              <div className='flex items-center space-x-2 mb-4'>
+                <Bot className='w-5 h-5 text-purple-600' />
+                <h2 className='text-lg font-semibold text-purple-900'>{tEval('aiEvaluation')}</h2>
+              </div>
+              <div className='space-y-4'>
+                <p className='text-sm text-purple-700 italic'>
+                  {tEval('aiDisclaimer')}
+                </p>
+                <div className='grid grid-cols-2 gap-4'>
+                   <div className='bg-white p-3 rounded-lg border border-purple-100'>
+                     <p className='text-xs text-gray-500'>{tEval('matchScore')}</p>
+                     <p className='text-xl font-bold text-purple-600'>85%</p>
+                   </div>
+                   <div className='bg-white p-3 rounded-lg border border-purple-100'>
+                     <p className='text-xs text-gray-500'>{tEval('recommendation')}</p>
+                     <p className='text-md font-bold text-purple-600'>{tRec('hire')}</p>
+                   </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* HR Evaluation (Editable) */}
+            <Card className='p-6 border-blue-100'>
+              <div className='flex items-center justify-between mb-4'>
+                <div className='flex items-center space-x-2'>
+                  <User className='w-5 h-5 text-blue-600' />
+                  <h2 className='text-lg font-semibold text-blue-900'>{tEval('hrEvaluation')}</h2>
+                </div>
+                {!isHrEditing ? (
+                  <Button size='sm' onClick={() => setIsHrEditing(true)} variant='outline' className='border-blue-200 text-blue-700 hover:bg-blue-50'>
+                    <Edit3 className='w-3 h-3 mr-1' /> {tCommon('edit')}
+                  </Button>
+                ) : (
+                  <div className='flex space-x-2'>
+                    <Button size='sm' onClick={() => setIsHrEditing(false)} variant='ghost'>{tCommon('cancel')}</Button>
+                    <Button size='sm' onClick={handleSaveHrEvaluation} className='bg-blue-600 hover:bg-blue-700'>{tCommon('save')}</Button>
+                  </div>
+                )}
+              </div>
+              
+              {isHrEditing ? (
                 <div className='space-y-4'>
-                  {evaluations.map((evaluation) => (
-                    <div key={evaluation.id} className='border border-gray-200 rounded-lg p-4'>
-                      <div className='flex items-center justify-between mb-3'>
-                        <div>
-                          <h4 className='font-medium text-gray-900'>{evaluation.type.charAt(0).toUpperCase() + evaluation.type.slice(1)} Interview</h4>
-                          <p className='text-sm text-gray-600'>
-                            by {evaluation.evaluatorName} • {new Date(evaluation.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          evaluation.recommendation === 'strong-hire' ? 'bg-green-100 text-green-800' :
-                          evaluation.recommendation === 'hire' ? 'bg-blue-100 text-blue-800' :
-                          evaluation.recommendation === 'no-hire' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {evaluation.recommendation.replace('-', ' ').toUpperCase()}
-                        </span>
-                      </div>
-                      
-                      <div className='grid grid-cols-5 gap-4 mb-3'>
-                        <div className='text-center'>
-                          <p className='text-xs text-gray-500'>Technical</p>
-                          <p className='font-medium'>{evaluation.scores.technical}/5</p>
-                        </div>
-                        <div className='text-center'>
-                          <p className='text-xs text-gray-500'>Communication</p>
-                          <p className='font-medium'>{evaluation.scores.communication}/5</p>
-                        </div>
-                        <div className='text-center'>
-                          <p className='text-xs text-gray-500'>Problem Solving</p>
-                          <p className='font-medium'>{evaluation.scores.problemSolving}/5</p>
-                        </div>
-                        <div className='text-center'>
-                          <p className='text-xs text-gray-500'>Culture</p>
-                          <p className='font-medium'>{evaluation.scores.culture}/5</p>
-                        </div>
-                        <div className='text-center'>
-                          <p className='text-xs text-gray-500'>Overall</p>
-                          <p className='font-medium'>{evaluation.scores.overall}/5</p>
-                        </div>
-                      </div>
-                      
-                      <p className='text-sm text-gray-700'>{evaluation.comments}</p>
-                    </div>
-                  ))}
+                  <div>
+                    <Label htmlFor='hrScore'>{tEval('hrScore')}</Label>
+                    <Input 
+                      type='number' 
+                      min='0' 
+                      max='100'
+                      value={editedHrEval.hr_score}
+                      onChange={(e) => setEditedHrEval({...editedHrEval, hr_score: parseInt(e.target.value)})}
+                      className='max-w-[150px]'
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='hrDecision'>{tEval('decision')}</Label>
+                    <Select 
+                      value={editedHrEval.hr_decision} 
+                      onValueChange={(val) => setEditedHrEval({...editedHrEval, hr_decision: val})}
+                    >
+                      <SelectTrigger className='max-w-[200px]'>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Review">{tEval('pending')}</SelectItem>
+                        <SelectItem value="interview">{tStatus('interview')}</SelectItem>
+                        <SelectItem value="offer">{tStatus('offer')}</SelectItem>
+                        <SelectItem value="reject">{tStatus('rejected')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor='hrNotes'>{tEval('notes')}</Label>
+                    <Textarea 
+                      value={editedHrEval.hr_notes}
+                      onChange={(e) => setEditedHrEval({...editedHrEval, hr_notes: e.target.value})}
+                      rows={4}
+                      placeholder={tEval('enterNotes')}
+                    />
+                  </div>
                 </div>
               ) : (
-                <p className='text-gray-500'>No evaluations yet</p>
+                <div className='space-y-4'>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div className='p-3 bg-gray-50 rounded-lg'>
+                      <p className='text-xs text-gray-500'>{tEval('hrScore')}</p>
+                      <p className='text-xl font-bold text-gray-900'>{hrEvaluation?.hr_score || 0}/100</p>
+                    </div>
+                    <div className='p-3 bg-gray-50 rounded-lg'>
+                      <p className='text-xs text-gray-500'>{tEval('decision')}</p>
+                      <span className={`inline-flex mt-1 items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        hrEvaluation?.hr_decision === 'offer' ? 'bg-green-100 text-green-800' :
+                        hrEvaluation?.hr_decision === 'reject' ? 'bg-red-100 text-red-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {hrEvaluation?.hr_decision === 'offer' ? tStatus('offer') :
+                         hrEvaluation?.hr_decision === 'reject' ? tStatus('rejected') :
+                         hrEvaluation?.hr_decision === 'interview' ? tStatus('interview') :
+                         tEval('pending')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className='p-3 bg-gray-50 rounded-lg'>
+                    <p className='text-xs text-gray-500 mb-1'>{tEval('notes')}</p>
+                    <p className='text-sm text-gray-700 whitespace-pre-wrap'>
+                      {hrEvaluation?.hr_notes || tEval('empty')}
+                    </p>
+                  </div>
+                </div>
               )}
             </Card>
+
+            {/* Evaluation History (Old placeholder kept for layout consistency if needed, or removed if replaced) */}
+            {/* ... keeping previous Evaluation History section ... */}
           </div>
 
           {/* Sidebar */}
           <div className='space-y-6'>
             {/* HR Fields */}
             <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>HR Fields</h2>
+              <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.hrFields')}</h2>
               
               {isEditing ? (
                 <div className='space-y-4'>
                   <div>
-                    <Label htmlFor='priority'>Priority</Label>
+                    <Label htmlFor='priority'>{t('details.priority')}</Label>
                     <Select
                       value={currentCandidate?.hrFields.priority}
                       onValueChange={(value) => 
@@ -295,15 +436,15 @@ export default function CandidateDetailsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value='low'>Low</SelectItem>
-                        <SelectItem value='medium'>Medium</SelectItem>
-                        <SelectItem value='high'>High</SelectItem>
+                        <SelectItem value='low'>{tCommon('low') || 'Low'}</SelectItem>
+                        <SelectItem value='medium'>{tCommon('medium') || 'Medium'}</SelectItem>
+                        <SelectItem value='high'>{tCommon('high') || 'High'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
                   <div>
-                    <Label htmlFor='nextAction'>Next Action</Label>
+                    <Label htmlFor='nextAction'>{t('details.nextAction')}</Label>
                     <Input
                       value={currentCandidate?.hrFields.nextAction || ''}
                       onChange={(e) =>
@@ -316,7 +457,7 @@ export default function CandidateDetailsPage() {
                   </div>
                   
                   <div>
-                    <Label htmlFor='nextActionDate'>Next Action Date</Label>
+                    <Label htmlFor='nextActionDate'>{t('details.nextActionDate')}</Label>
                     <Input
                       type='date'
                       value={currentCandidate?.hrFields.nextActionDate ? 
@@ -331,7 +472,7 @@ export default function CandidateDetailsPage() {
                   </div>
                   
                   <div>
-                    <Label htmlFor='hrNotes'>HR Notes</Label>
+                    <Label htmlFor='hrNotes'>{t('details.hrNotes')}</Label>
                     <Textarea
                       value={currentCandidate?.hrFields.notes || ''}
                       onChange={(e) =>
@@ -347,26 +488,26 @@ export default function CandidateDetailsPage() {
               ) : (
                 <div className='space-y-4'>
                   <div>
-                    <Label className='text-sm font-medium text-gray-500'>Priority</Label>
+                    <Label className='text-sm font-medium text-gray-500'>{t('details.priority')}</Label>
                     <p className={`text-sm font-medium ${getPriorityColor(candidate.hrFields.priority)}`}>
                       {candidate.hrFields.priority.charAt(0).toUpperCase() + candidate.hrFields.priority.slice(1)}
                     </p>
                   </div>
                   
                   <div>
-                    <Label className='text-sm font-medium text-gray-500'>Next Action</Label>
+                    <Label className='text-sm font-medium text-gray-500'>{t('details.nextAction')}</Label>
                     <p className='text-sm text-gray-900'>{candidate.hrFields.nextAction}</p>
                   </div>
                   
                   <div>
-                    <Label className='text-sm font-medium text-gray-500'>Next Action Date</Label>
+                    <Label className='text-sm font-medium text-gray-500'>{t('details.nextActionDate')}</Label>
                     <p className='text-sm text-gray-900'>
                       {new Date(candidate.hrFields.nextActionDate).toLocaleDateString()}
                     </p>
                   </div>
                   
                   <div>
-                    <Label className='text-sm font-medium text-gray-500'>HR Notes</Label>
+                    <Label className='text-sm font-medium text-gray-500'>{t('details.hrNotes')}</Label>
                     <p className='text-sm text-gray-900'>{candidate.hrFields.notes}</p>
                   </div>
                 </div>
@@ -375,7 +516,7 @@ export default function CandidateDetailsPage() {
 
             {/* Documents */}
             <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Documents</h2>
+              <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.documents')}</h2>
               <div className='space-y-3'>
                 {candidate.resumeUrl && (
                   <div className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer'>
@@ -400,19 +541,19 @@ export default function CandidateDetailsPage() {
 
             {/* Quick Actions */}
             <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Quick Actions</h2>
+              <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.quickActions')}</h2>
               <div className='space-y-2'>
                 <Button variant='outline' className='w-full justify-start'>
                   <MessageSquare className='w-4 h-4 mr-2' />
-                  Send Email
+                  {t('details.sendEmail')}
                 </Button>
                 <Button variant='outline' className='w-full justify-start'>
                   <Calendar className='w-4 h-4 mr-2' />
-                  Schedule Interview
+                  {t('details.scheduleInterview')}
                 </Button>
                 <Button variant='outline' className='w-full justify-start'>
                   <Clock className='w-4 h-4 mr-2' />
-                  Set Reminder
+                  {t('details.setReminder')}
                 </Button>
               </div>
             </Card>

@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getActivityLog } from '@/data/mockData';
+import { getActivityLogs } from '@/actions/activity';
 import { ActivityLogEntry } from '@/types/admin';
+import { useToast } from '@/context/ToastContext';
 import {
   Search,
   Download,
@@ -36,8 +37,34 @@ export default function ActivityLogPage() {
   const [actionFilter, setActionFilter] = useState('all');
   const [targetFilter, setTargetFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
 
-  const activityLog = getActivityLog();
+  useEffect(() => {
+    let isMounted = true;
+    async function loadActivities() {
+      try {
+        const data = await getActivityLogs();
+        if (isMounted) {
+          setActivityLog(data);
+        }
+      } catch (error) {
+        console.error('Failed to load activity logs:', error);
+        if (isMounted) {
+          addToast('error', 'Failed to load activity logs');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+    loadActivities();
+    return () => {
+      isMounted = false;
+    };
+  }, [addToast]);
 
   // Get unique values for filters
   const getUniqueUsers = () => {
@@ -287,6 +314,19 @@ export default function ActivityLogPage() {
   };
 
   const recentActions = [...new Set(activityLog.map(entry => entry.action))].slice(0, 5);
+
+  if (loading) {
+    return (
+      <AdminLayout title={t('title')} subtitle={t('subtitle')}>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center text-gray-500">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
+            <p>{tCommon('loading') || 'Loading...'}</p>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout

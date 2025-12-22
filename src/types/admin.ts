@@ -17,7 +17,7 @@ export interface Job {
   department: string;
   location: string;
   type: 'full-time' | 'part-time' | 'contract' | 'internship';
-  status: 'active' | 'paused' | 'closed';
+  status: 'active' | 'paused' | 'closed' | 'draft';
   salary: {
     min: number;
     max: number;
@@ -58,24 +58,31 @@ export interface Candidate {
     nextAction: string;
     nextActionDate: string;
   };
+  // Only populated for Super Admin views
+  organizationName?: string;
+  jobOwnerName?: string;
 }
 
 export interface Evaluation {
   id: string;
   candidateId: string;
+  candidateName: string;
+  candidatePosition: string;
   evaluatorId: string;
   evaluatorName: string;
-  type: 'technical' | 'behavioral' | 'cultural' | 'final';
+  type: string;
+  date: string;
+  createdAt: string;
   scores: {
     technical: number;
     communication: number;
     problemSolving: number;
-    culture: number;
+    experience: number;
     overall: number;
   };
-  comments: string;
-  recommendation: 'strong-hire' | 'hire' | 'no-hire' | 'strong-no-hire';
-  createdAt: string;
+  notes: string;
+  recommendation: string;
+  status: string;
 }
 
 export interface DashboardStats {

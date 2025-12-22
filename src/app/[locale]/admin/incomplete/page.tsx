@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getIncompleteApplications } from '@/data/mockData';
+import { getIncompleteApplications } from '@/actions/incomplete';
 import { IncompleteApplication } from '@/types/admin';
 import {
   Search,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
+import { useToast } from '@/context/ToastContext';
 
 export default function IncompleteApplicationsPage() {
   const t = useTranslations('Incomplete');
@@ -28,13 +29,29 @@ export default function IncompleteApplicationsPage() {
   const tTable = useTranslations('Table');
   const tProgress = useTranslations('Progress');
   const format = useFormatter();
+  const { addToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [jobFilter, setJobFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [progressFilter, setProgressFilter] = useState('all');
+  const [incompleteApps, setIncompleteApps] = useState<IncompleteApplication[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const incompleteApps = getIncompleteApplications();
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getIncompleteApplications();
+        setIncompleteApps(data);
+      } catch (error) {
+        console.error('Failed to load incomplete applications:', error);
+        addToast('error', 'Failed to load incomplete applications');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   // Filter applications based on search and filters
   const filteredApplications = incompleteApps.filter(app => {
@@ -189,6 +206,9 @@ export default function IncompleteApplicationsPage() {
             variant='outline'
             size='sm'
             className='flex items-center space-x-1'
+            onClick={() => {
+              addToast('success', `Reminder sent to ${record.firstName} ${record.lastName}`);
+            }}
           >
             <Mail className='w-3 h-3' />
             <span>{tTable('remind')}</span>

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Link, usePathname } from '@/i18n/navigation';
+import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import {
@@ -17,7 +17,8 @@ import {
   Activity,
   Clock
 } from 'lucide-react';
-import { mockAdminUser } from '@/data/mockData';
+import { AdminUser } from '@/types/admin';
+import { createClient } from '@/utils/supabase/client';
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -25,6 +26,8 @@ interface SidebarItemProps {
   href: string;
   isActive?: boolean;
 }
+
+type AllowedRole = 'super-admin' | 'admin' | 'reviewer';
 
 const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }) => {
   return (
@@ -44,18 +47,25 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }
   );
 };
 
-export const AdminSidebar: React.FC = () => {
+export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const t = useTranslations('Sidebar');
   const tCommon = useTranslations('Common');
   
-  // Get current user role (in a real app, this would come from auth context)
-  const currentUser = mockAdminUser;
-  const userRole = currentUser.role;
+  // Get current user role
+  const userRole = user?.role || 'viewer';
+  const currentUser = user || { name: 'Guest', role: 'viewer' } as any;
 
   // Permission-based navigation items
   const getNavigationItems = () => {
-    const allItems = [
+    const allItems: Array<{
+      icon: React.ReactNode;
+      label: string;
+      href: string;
+      allowedRoles?: AllowedRole[];
+      requiredRole?: AllowedRole | null;
+    }> = [
       {
         icon: <LayoutDashboard className='w-5 h-5' />,
         label: t('dashboard'),
@@ -66,19 +76,19 @@ export const AdminSidebar: React.FC = () => {
         icon: <Users className='w-5 h-5' />,
         label: t('candidates'),
         href: '/admin/candidates',
-        requiredRole: null // All roles can access
+        allowedRoles: ['admin', 'reviewer'] as const // Super Admin مستثنى
       },
       {
         icon: <Briefcase className='w-5 h-5' />,
         label: t('jobs'),
         href: '/admin/jobs',
-        requiredRole: null // All roles can access
+        allowedRoles: ['admin', 'super-admin'] as const // Super Admin يستطيع إدارة كل الوظائف
       },
       {
         icon: <Clock className='w-5 h-5' />,
         label: t('incomplete'),
         href: '/admin/incomplete',
-        requiredRole: null // All roles can access
+        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <FileText className='w-5 h-5' />,
@@ -102,24 +112,34 @@ export const AdminSidebar: React.FC = () => {
         icon: <BarChart3 className='w-5 h-5' />,
         label: t('reports'),
         href: '/admin/reports',
-        requiredRole: 'admin' // Admin and super-admin
+        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <Settings className='w-5 h-5' />,
         label: t('settings'),
         href: '/admin/settings',
-        requiredRole: null // All roles can access
+        allowedRoles: ['super-admin'] as const // Reviewers/Admin ممنوع
       }
     ];
 
     // Filter items based on user role
     return allItems.filter(item => {
-      if (!item.requiredRole) return true; // Public items
-      return userRole === item.requiredRole;
+      if (item.allowedRoles) {
+        return item.allowedRoles.includes(userRole as AllowedRole);
+      }
+      if (item.requiredRole === null || item.requiredRole === undefined) return true;
+      return item.requiredRole === userRole;
     });
   };
 
   const navigationItems = getNavigationItems();
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/admin/login');
+    router.refresh();
+  };
 
   // Get role display name
   const getRoleDisplayName = (role: string) => {
@@ -161,7 +181,7 @@ export const AdminSidebar: React.FC = () => {
         <div className='flex items-center space-x-3 mb-3'>
           <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
             <span className='text-white text-sm font-medium'>
-              {currentUser.name.split(' ').map(n => n[0]).join('')}
+              {(currentUser?.name || 'Guest').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
             </span>
           </div>
           <div>
@@ -180,7 +200,10 @@ export const AdminSidebar: React.FC = () => {
           </div>
         )}
         
-        <button className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'>
+        <button
+          onClick={handleLogout}
+          className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'
+        >
           <LogOut className='w-5 h-5' />
           <span>{tCommon('logout')}</span>
         </button>
