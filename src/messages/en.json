@@ -23,7 +23,8 @@
     "export": "Export",
     "last": "Last",
     "min": "min",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "back": "Back"
   },
   "Sidebar": {
     "dashboard": "Dashboard",

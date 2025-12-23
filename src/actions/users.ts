@@ -1,39 +1,90 @@
 
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { AdminUser } from '@/types/admin'
-import { requireSuperAdmin } from '@/utils/authz'
+import { getSessionInfo, requireAdminOrSuper, requireSuperAdmin } from '@/utils/authz'
+
+interface CreateUserInput {
+  fullName: string
+  email: string
+  password: string
+  role: 'super-admin' | 'admin' | 'reviewer'
+  organizationName: string
+}
 
 export async function getUsers(): Promise<AdminUser[]> {
-  await requireSuperAdmin()
+  await requireAdminOrSuper()
   const supabase = createClient()
-  
-  const { data: users, error } = await supabase
+  const session = await getSessionInfo()
+
+  if (!session) {
+    return []
+  }
+
+  let query = supabase
     .from('users')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) {
+  if (session.role === 'admin') {
+    if (!session.organizationId) {
+      return []
+    }
+    query = query.eq('organization_id', session.organizationId).eq('role', 'reviewer')
+  } else if (session.role === 'reviewer') {
+    return []
+  }
+
+  const { data: users, error } = await query
+
+  if (error || !users) {
     console.error('Error fetching users:', error)
     return []
   }
 
-  // Transform database users to AdminUser type
   return users.map((user: any) => ({
     id: user.id,
-    name: user.name || 'Unknown',
+    name: user.name || user.full_name || 'Unknown',
     email: user.email,
     role: user.role,
     isActive: user.is_active,
-    lastLogin: user.last_sign_in_at || new Date().toISOString(), // Fallback if not tracked in this table
+    lastLogin: user.last_sign_in_at || new Date().toISOString(),
     createdAt: user.created_at
   }))
 }
 
 export async function toggleUserStatus(userId: string, currentStatus: boolean) {
-  await requireSuperAdmin()
+  await requireAdminOrSuper()
   const supabase = createClient()
+  const session = await getSessionInfo()
+
+  if (!session) {
+    throw new Error('Access denied')
+  }
+
+  const { data: targetUser, error: fetchError } = await supabase
+    .from('users')
+    .select('role, organization_id')
+    .eq('id', userId)
+    .single()
+
+  if (fetchError || !targetUser) {
+    throw new Error('User not found')
+  }
+
+  if (session.role === 'super-admin') {
+  } else if (session.role === 'admin') {
+    if (
+      targetUser.role !== 'reviewer' ||
+      !session.organizationId ||
+      targetUser.organization_id !== session.organizationId
+    ) {
+      throw new Error('Access denied')
+    }
+  } else {
+    throw new Error('Access denied')
+  }
   
   const { error } = await supabase
     .from('users')
@@ -44,13 +95,16 @@ export async function toggleUserStatus(userId: string, currentStatus: boolean) {
     console.error('Error toggling user status:', error)
     throw new Error('Failed to update user status')
   }
-  
-  // Revalidate is handled by the page component or we can add revalidatePath here if needed
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
   await requireSuperAdmin()
   const supabase = createClient()
+  const session = await getSessionInfo()
+
+  if (!session || session.role !== 'super-admin') {
+    throw new Error('Access denied')
+  }
   
   const { error } = await supabase
     .from('users')
@@ -61,4 +115,90 @@ export async function updateUserRole(userId: string, newRole: string) {
     console.error('Error updating user role:', error)
     throw new Error('Failed to update user role')
   }
+}
+
+export async function createUser(input: CreateUserInput) {
+  const supabase = createClient()
+  const session = await getSessionInfo()
+
+  if (!session || session.role !== 'super-admin') {
+    return { error: 'Access denied' }
+  }
+
+  const trimmedName = input.organizationName.trim()
+  if (!trimmedName) {
+    return { error: 'Organization name is required' }
+  }
+
+  const { data: existingOrgs, error: orgSearchError } = await supabase
+    .from('organizations')
+    .select('id, name')
+    .ilike('name', trimmedName)
+    .limit(1)
+
+  if (orgSearchError) {
+    console.error('Error searching organizations:', orgSearchError)
+    return { error: orgSearchError.message || 'Failed to find organization' }
+  }
+
+  let organizationId: string
+
+  if (existingOrgs && existingOrgs.length > 0) {
+    organizationId = existingOrgs[0].id
+  } else {
+    const { data: newOrg, error: createOrgError } = await supabase
+      .from('organizations')
+      .insert({
+        name: trimmedName,
+      })
+      .select('id')
+      .single()
+
+    if (createOrgError || !newOrg) {
+      console.error('Error creating organization:', createOrgError)
+      return { error: createOrgError?.message || 'Failed to create organization' }
+    }
+
+    organizationId = newOrg.id
+  }
+
+  let adminClient
+  try {
+    adminClient = createAdminClient()
+  } catch (e) {
+    console.error('Error creating Supabase admin client:', e)
+    return { error: 'Server configuration error: unable to create auth client' }
+  }
+
+  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+    email: input.email,
+    password: input.password,
+    email_confirm: true,
+  })
+
+  if (authError || !authData?.user) {
+    console.error('Error creating auth user:', authError)
+    return { error: authError?.message || 'Failed to create auth user' }
+  }
+
+  const authUserId = authData.user.id
+
+  const { data, error } = await supabase
+    .from('users')
+    .insert({
+      id: authUserId,
+      email: input.email,
+      role: input.role,
+      organization_id: organizationId,
+      full_name: input.fullName,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating user:', error)
+    return { error: error.message || 'Failed to create user' }
+  }
+
+  return { data }
 }

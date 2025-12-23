@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
+import { useUser } from '@/context/UserContext';
+import { useRouter } from '@/i18n/navigation';
 
 export default function UsersPage() {
   const t = useTranslations('Users');
@@ -32,6 +34,8 @@ export default function UsersPage() {
   const tRole = useTranslations('Role');
   const format = useFormatter();
   const { addToast } = useToast();
+  const { isSuperAdmin, isAdmin, isReviewer } = useUser();
+  const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -53,7 +57,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   if (loading) {
     return (
@@ -225,19 +229,21 @@ export default function UsersPage() {
       title: tTable('actions'),
       render: (_, record) => (
         <div className='flex items-center space-x-2'>
-          <Select
-            value={record.role}
-            onValueChange={(value) => handleRoleChange(record.id, value)}
-          >
-            <SelectTrigger className="w-[130px] h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
-              <SelectItem value="admin">{tRole('admin')}</SelectItem>
-              <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
-            </SelectContent>
-          </Select>
+          {isSuperAdmin && (
+            <Select
+              value={record.role}
+              onValueChange={(value) => handleRoleChange(record.id, value)}
+            >
+              <SelectTrigger className="w-[130px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
+                <SelectItem value="admin">{tRole('admin')}</SelectItem>
+                <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           
           <Button
             variant={record.isActive ? 'outline' : 'default'}
@@ -263,7 +269,6 @@ export default function UsersPage() {
             size='sm'
             onClick={() => {
               console.log('Reset password for user:', record.id);
-              // In a real app, this would call an API
             }}
             className='h-8'
           >
@@ -287,22 +292,45 @@ export default function UsersPage() {
     reviewers: users.filter(u => u.role === 'reviewer').length
   };
 
+  if (isReviewer) {
+    return (
+      <AdminLayout
+        title={t('title')}
+        subtitle={t('subtitle')}
+      >
+        <div className='space-y-6'>
+          <Card className='p-6'>
+            <div className='space-y-4'>
+              <h2 className='text-lg font-semibold text-gray-900'>
+                {tCommon('profile') || 'Profile'}
+              </h2>
+              <p className='text-sm text-gray-600'>
+                {tCommon('profileDescription') || 'Manage your personal information and preferences.'}
+              </p>
+            </div>
+          </Card>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout
       title={t('title')}
       subtitle={t('count', { count: filteredUsers.length })}
       actions={
-        <Button 
-          className='flex items-center space-x-2'
-          onClick={() => addToast('info', 'Add User feature will be implemented in the next phase')}
-        >
-          <Plus className='w-4 h-4' />
-          <span>{t('addUser')}</span>
-        </Button>
+        isSuperAdmin || isAdmin ? (
+          <Button 
+            className='flex items-center space-x-2'
+            onClick={() => router.push('/admin/users/new')}
+          >
+            <Plus className='w-4 h-4' />
+            <span>{t('addUser')}</span>
+          </Button>
+        ) : null
       }
     >
       <div className='space-y-6'>
-        {/* Stats */}
         <div className='grid grid-cols-1 md:grid-cols-5 gap-4'>
           <Card className='p-4'>
             <div className='text-center'>
@@ -316,18 +344,22 @@ export default function UsersPage() {
               <p className='text-sm text-gray-600'>{t('stats.active')}</p>
             </div>
           </Card>
-          <Card className='p-4'>
-            <div className='text-center'>
-              <p className='text-2xl font-bold text-purple-600'>{stats.superAdmins}</p>
-              <p className='text-sm text-gray-600'>{t('stats.superAdmins')}</p>
-            </div>
-          </Card>
-          <Card className='p-4'>
-            <div className='text-center'>
-              <p className='text-2xl font-bold text-blue-600'>{stats.admins}</p>
-              <p className='text-sm text-gray-600'>{t('stats.admins')}</p>
-            </div>
-          </Card>
+          {isSuperAdmin && (
+            <>
+              <Card className='p-4'>
+                <div className='text-center'>
+                  <p className='text-2xl font-bold text-purple-600'>{stats.superAdmins}</p>
+                  <p className='text-sm text-gray-600'>{t('stats.superAdmins')}</p>
+                </div>
+              </Card>
+              <Card className='p-4'>
+                <div className='text-center'>
+                  <p className='text-2xl font-bold text-blue-600'>{stats.admins}</p>
+                  <p className='text-sm text-gray-600'>{t('stats.admins')}</p>
+                </div>
+              </Card>
+            </>
+          )}
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.reviewers}</p>
@@ -336,7 +368,6 @@ export default function UsersPage() {
           </Card>
         </div>
 
-        {/* Permission Notice */}
         <Card className='p-4 bg-blue-50 border border-blue-200'>
           <div className='flex items-start space-x-3'>
             <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5" />

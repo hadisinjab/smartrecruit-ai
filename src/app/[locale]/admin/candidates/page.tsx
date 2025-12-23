@@ -50,7 +50,7 @@ export default function CandidatesPage() {
       }
     }
     loadCandidates();
-  }, []);
+  }, [addToast]);
 
   const handleFiltersChange = (newFilters: any) => {
     setFilters(newFilters);

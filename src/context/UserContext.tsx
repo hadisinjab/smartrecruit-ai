@@ -1,12 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getCurrentUser } from '@/actions/auth';
 
 export type UserRole = 'super-admin' | 'admin' | 'reviewer';
 
 interface UserContextType {
   role: UserRole;
-  setRole: (role: UserRole) => void;
   isAdmin: boolean;
   isReviewer: boolean;
   isSuperAdmin: boolean;
@@ -23,12 +23,27 @@ export const useUser = () => {
 };
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Default role is admin
-  const [role, setRole] = useState<UserRole>('admin');
+  const [role, setRole] = useState<UserRole>('reviewer');
 
-  const value = {
+  useEffect(() => {
+    const loadRole = async () => {
+      try {
+        const user = await getCurrentUser();
+        const userRole = user?.role;
+        if (userRole === 'super-admin' || userRole === 'admin' || userRole === 'reviewer') {
+          setRole(userRole);
+        } else {
+          setRole('reviewer');
+        }
+      } catch {
+        setRole('reviewer');
+      }
+    };
+    loadRole();
+  }, []);
+
+  const value: UserContextType = {
     role,
-    setRole,
     isAdmin: role === 'admin' || role === 'super-admin',
     isSuperAdmin: role === 'super-admin',
     isReviewer: role === 'reviewer',

@@ -7,7 +7,6 @@ import { IncompleteApplication } from '@/types/admin'
 export async function getIncompleteApplications(): Promise<IncompleteApplication[]> {
   const supabase = createClient()
   
-  // Fetch applications with status 'new' AND submitted_at is NULL (which implies incomplete/draft)
   const { data: applications, error } = await supabase
     .from('applications')
     .select(`
@@ -24,26 +23,22 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
     return []
   }
 
-  // Transform data to match frontend IncompleteApplication interface
-  // We'll estimate completion percentage based on answers count vs expected questions (simplified logic for now)
   return applications.map((app: any) => {
-    // Mock logic for progress estimation (since we don't have full questions count here easily without another query)
-    // In a real scenario, we'd compare app.answers.length with total questions for the job
-    const randomProgress = Math.floor(Math.random() * 90) + 10; // Placeholder until we have real logic
+    const randomProgress = Math.floor(Math.random() * 90) + 10
     
     return {
       id: app.id,
       firstName: app.candidate_name?.split(' ')[0] || 'Unknown',
       lastName: app.candidate_name?.split(' ').slice(1).join(' ') || '',
       email: app.candidate_email || '',
-      phone: '', // Placeholder
-      location: 'Remote', // Placeholder
+      phone: '',
+      location: 'Remote',
       position: app.job_form?.title || 'Unknown Position',
-      experience: 0, // Placeholder
-      status: 'applied', // Mapping 'new' to 'applied' to match Candidate type
+      experience: 0,
+      status: 'applied',
       appliedDate: app.created_at,
       lastUpdate: app.updated_at || app.created_at,
-      source: 'Website', // Placeholder
+      source: 'Website',
       notes: '',
       rating: 0,
       tags: [],
@@ -55,13 +50,13 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
       },
       lastActivity: app.updated_at || app.created_at,
       completionPercentage: randomProgress,
-      timeSpent: Math.floor(Math.random() * 60) + 5, // Placeholder
+      timeSpent: Math.floor(Math.random() * 60) + 5,
       progress: {
         personalInfo: true,
         experience: randomProgress > 30,
         documents: randomProgress > 60,
         questionnaire: randomProgress > 80
       }
-    };
-  });
+    }
+  })
 }

@@ -52,12 +52,10 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
   const router = useRouter();
   const t = useTranslations('Sidebar');
   const tCommon = useTranslations('Common');
-  
-  // Get current user role
-  const userRole = user?.role || 'viewer';
-  const currentUser = user || { name: 'Guest', role: 'viewer' } as any;
 
-  // Permission-based navigation items
+  const currentUser = user || ({ name: 'Guest', role: 'viewer' } as any);
+  const userRole = (currentUser.role as AllowedRole) || 'reviewer';
+
   const getNavigationItems = () => {
     const allItems: Array<{
       icon: React.ReactNode;
@@ -69,20 +67,19 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
       {
         icon: <LayoutDashboard className='w-5 h-5' />,
         label: t('dashboard'),
-        href: '/admin/dashboard',
-        requiredRole: null // All roles can access
+        href: '/admin/dashboard'
       },
       {
         icon: <Users className='w-5 h-5' />,
         label: t('candidates'),
         href: '/admin/candidates',
-        allowedRoles: ['admin', 'reviewer'] as const // Super Admin مستثنى
+        allowedRoles: ['admin', 'reviewer', 'super-admin'] as const
       },
       {
         icon: <Briefcase className='w-5 h-5' />,
         label: t('jobs'),
         href: '/admin/jobs',
-        allowedRoles: ['admin', 'super-admin'] as const // Super Admin يستطيع إدارة كل الوظائف
+        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <Clock className='w-5 h-5' />,
@@ -93,20 +90,17 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
       {
         icon: <FileText className='w-5 h-5' />,
         label: t('evaluations'),
-        href: '/admin/evaluations',
-        requiredRole: null // All roles can access
+        href: '/admin/evaluations'
       },
       {
         icon: <UserCog className='w-5 h-5' />,
         label: t('userManagement'),
-        href: '/admin/users',
-        requiredRole: 'super-admin' // Only super-admin can access
+        href: '/admin/users'
       },
       {
         icon: <Activity className='w-5 h-5' />,
         label: t('activityLog'),
-        href: '/admin/activity',
-        requiredRole: 'super-admin' // Only super-admin can access
+        href: '/admin/activity'
       },
       {
         icon: <BarChart3 className='w-5 h-5' />,
@@ -118,7 +112,7 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         icon: <Settings className='w-5 h-5' />,
         label: t('settings'),
         href: '/admin/settings',
-        allowedRoles: ['super-admin'] as const // Reviewers/Admin ممنوع
+        allowedRoles: ['super-admin'] as const
       }
     ];
 
@@ -186,10 +180,9 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
           </div>
           <div>
             <p className='text-sm font-medium text-gray-900'>{currentUser.name}</p>
-            <p className='text-xs text-gray-600'>{getRoleDisplayName(userRole)}</p>
+            <p className='text-xs text-gray-600'>{getRoleDisplayName(currentUser.role)}</p>
           </div>
         </div>
-        
         {/* Role indicator for restricted access */}
         {userRole === 'reviewer' && (
           <div className='mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg'>
@@ -199,7 +192,7 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
             </div>
           </div>
         )}
-        
+
         <button
           onClick={handleLogout}
           className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'

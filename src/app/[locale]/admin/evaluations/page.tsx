@@ -10,7 +10,7 @@ import { DataTable } from '@/components/admin/DataTable';
 import { Column } from '@/components/admin/DataTable';
 import { getEvaluations } from '@/actions/evaluations';
 import { Evaluation } from '@/types/admin';
-import { Plus, Search, Star, MessageSquare, User, Calendar } from 'lucide-react';
+import { Search, Star, MessageSquare, User, Calendar } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 
 export default function EvaluationsPage() {
@@ -38,7 +38,7 @@ export default function EvaluationsPage() {
       }
     }
     loadData();
-  }, []);
+  }, [addToast]);
 
   const filteredEvaluations = evaluations.filter(evaluation => {
     return (
@@ -162,22 +162,9 @@ export default function EvaluationsPage() {
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <div className='flex space-x-3'>
-          <Button variant='outline'>
-            {t('exportReport')}
-          </Button>
-          <Button 
-            className='flex items-center space-x-2'
-            onClick={() => {
-              // Redirect to candidates list to start a new evaluation flow
-              router.push('/admin/candidates');
-              addToast('info', 'Please select a candidate to evaluate');
-            }}
-          >
-            <Plus className='w-4 h-4' />
-            <span>{t('newEvaluation')}</span>
-          </Button>
-        </div>
+        <Button variant='outline'>
+          {t('exportReport')}
+        </Button>
       }
     >
       <div className='space-y-6'>
@@ -230,6 +217,12 @@ export default function EvaluationsPage() {
         <DataTable
           data={filteredEvaluations}
           columns={evaluationColumns}
+          loading={loading}
+          onRowClick={(record) => {
+            if (record.candidateId) {
+              router.push(`/admin/candidates/${record.candidateId}`);
+            }
+          }}
           emptyText={t('empty')}
         />
 
