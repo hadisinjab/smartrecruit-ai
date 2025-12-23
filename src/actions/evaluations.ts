@@ -7,7 +7,6 @@ import { Evaluation } from '@/types/admin'
 export async function getEvaluations(): Promise<Evaluation[]> {
   const supabase = createClient()
   
-  // Fetch evaluations with related application details
   const { data: evaluations, error } = await supabase
     .from('hr_evaluations')
     .select(`
@@ -26,7 +25,6 @@ export async function getEvaluations(): Promise<Evaluation[]> {
     return []
   }
 
-  // Transform data to match frontend Evaluation interface
   return evaluations.map((evalData: any) => {
     // Determine type based on notes or random if not specified (placeholder logic)
     // In a real schema, we might want to add 'type' to hr_evaluations

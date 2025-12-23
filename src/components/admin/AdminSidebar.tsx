@@ -48,80 +48,62 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
   const pathname = usePathname();
   const t = useTranslations('Sidebar');
   const tCommon = useTranslations('Common');
-  
-  // Get current user role
-  const userRole = user?.role || 'viewer';
-  const currentUser = user || { name: 'Guest', role: 'viewer' } as any;
 
-  // Permission-based navigation items
+  const currentUser = user || ({ name: 'Guest', role: 'viewer' } as any);
+
   const getNavigationItems = () => {
     const allItems = [
       {
         icon: <LayoutDashboard className='w-5 h-5' />,
         label: t('dashboard'),
-        href: '/admin/dashboard',
-        requiredRole: null // All roles can access
+        href: '/admin/dashboard'
       },
       {
         icon: <Users className='w-5 h-5' />,
         label: t('candidates'),
-        href: '/admin/candidates',
-        requiredRole: null // All roles can access
+        href: '/admin/candidates'
       },
       {
         icon: <Briefcase className='w-5 h-5' />,
         label: t('jobs'),
-        href: '/admin/jobs',
-        requiredRole: null // All roles can access
+        href: '/admin/jobs'
       },
       {
         icon: <Clock className='w-5 h-5' />,
         label: t('incomplete'),
-        href: '/admin/incomplete',
-        requiredRole: null // All roles can access
+        href: '/admin/incomplete'
       },
       {
         icon: <FileText className='w-5 h-5' />,
         label: t('evaluations'),
-        href: '/admin/evaluations',
-        requiredRole: null // All roles can access
+        href: '/admin/evaluations'
       },
       {
         icon: <UserCog className='w-5 h-5' />,
         label: t('userManagement'),
-        href: '/admin/users',
-        requiredRole: 'super-admin' // Only super-admin can access
+        href: '/admin/users'
       },
       {
         icon: <Activity className='w-5 h-5' />,
         label: t('activityLog'),
-        href: '/admin/activity',
-        requiredRole: 'super-admin' // Only super-admin can access
+        href: '/admin/activity'
       },
       {
         icon: <BarChart3 className='w-5 h-5' />,
         label: t('reports'),
-        href: '/admin/reports',
-        requiredRole: 'admin' // Admin and super-admin
+        href: '/admin/reports'
       },
       {
         icon: <Settings className='w-5 h-5' />,
         label: t('settings'),
-        href: '/admin/settings',
-        requiredRole: null // All roles can access
+        href: '/admin/settings'
       }
     ];
-
-    // Filter items based on user role
-    return allItems.filter(item => {
-      if (!item.requiredRole) return true; // Public items
-      return userRole === item.requiredRole;
-    });
+    return allItems;
   };
 
   const navigationItems = getNavigationItems();
 
-  // Get role display name
   const getRoleDisplayName = (role: string) => {
     switch (role) {
       case 'super-admin':
@@ -166,20 +148,10 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
           </div>
           <div>
             <p className='text-sm font-medium text-gray-900'>{currentUser.name}</p>
-            <p className='text-xs text-gray-600'>{getRoleDisplayName(userRole)}</p>
+            <p className='text-xs text-gray-600'>{getRoleDisplayName(currentUser.role)}</p>
           </div>
         </div>
-        
-        {/* Role indicator for restricted access */}
-        {userRole === 'reviewer' && (
-          <div className='mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg'>
-            <div className='flex items-center space-x-2'>
-              <AlertCircle className='w-4 h-4 text-yellow-600' />
-              <span className='text-xs text-yellow-800'>Read-only access</span>
-            </div>
-          </div>
-        )}
-        
+
         <button className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'>
           <LogOut className='w-5 h-5' />
           <span>{tCommon('logout')}</span>
