@@ -3,7 +3,7 @@
 
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { AdminUser } from '@/types/admin'
-import { getSessionInfo } from '@/utils/authz'
+import { getSessionInfo, requireAdminOrSuper, requireSuperAdmin } from '@/utils/authz'
 
 interface CreateUserInput {
   fullName: string
@@ -14,6 +14,7 @@ interface CreateUserInput {
 }
 
 export async function getUsers(): Promise<AdminUser[]> {
+  await requireAdminOrSuper()
   const supabase = createClient()
   const session = await getSessionInfo()
 
@@ -54,6 +55,7 @@ export async function getUsers(): Promise<AdminUser[]> {
 }
 
 export async function toggleUserStatus(userId: string, currentStatus: boolean) {
+  await requireAdminOrSuper()
   const supabase = createClient()
   const session = await getSessionInfo()
 
@@ -96,6 +98,7 @@ export async function toggleUserStatus(userId: string, currentStatus: boolean) {
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
+  await requireSuperAdmin()
   const supabase = createClient()
   const session = await getSessionInfo()
 

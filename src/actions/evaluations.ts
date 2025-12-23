@@ -3,9 +3,17 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { Evaluation } from '@/types/admin'
+import { requireReviewerOrAdmin } from '@/utils/authz'
 
 export async function getEvaluations(): Promise<Evaluation[]> {
   const supabase = createClient()
+  const role = await requireReviewerOrAdmin()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
   
   const { data: evaluations, error } = await supabase
     .from('hr_evaluations')
@@ -15,7 +23,7 @@ export async function getEvaluations(): Promise<Evaluation[]> {
         id,
         candidate_name,
         candidate_email,
-        job_form:job_forms(title)
+        job_form:job_forms(title, created_by)
       )
     `)
     .order('created_at', { ascending: false })
@@ -25,7 +33,16 @@ export async function getEvaluations(): Promise<Evaluation[]> {
     return []
   }
 
-  return evaluations.map((evalData: any) => {
+  if (!evaluations) return []
+
+  // Transform data to match frontend Evaluation interface
+  return evaluations
+    .filter((evalData: any) => {
+      if (role === 'super-admin' || role === 'reviewer') return true
+      // Admins only see evaluations for their job forms
+      return evalData.application?.job_form?.created_by === user.id
+    })
+    .map((evalData: any) => {
     // Determine type based on notes or random if not specified (placeholder logic)
     // In a real schema, we might want to add 'type' to hr_evaluations
     const type = 'technical'; // Placeholder default

@@ -58,6 +58,9 @@ export interface Candidate {
     nextAction: string;
     nextActionDate: string;
   };
+  // Only populated for Super Admin views
+  organizationName?: string;
+  jobOwnerName?: string;
 }
 
 export interface Evaluation {

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Link, usePathname } from '@/i18n/navigation';
+import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +18,7 @@ import {
   Clock
 } from 'lucide-react';
 import { AdminUser } from '@/types/admin';
+import { createClient } from '@/utils/supabase/client';
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -25,6 +26,8 @@ interface SidebarItemProps {
   href: string;
   isActive?: boolean;
 }
+
+type AllowedRole = 'super-admin' | 'admin' | 'reviewer';
 
 const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }) => {
   return (
@@ -46,13 +49,21 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }
 
 export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const t = useTranslations('Sidebar');
   const tCommon = useTranslations('Common');
 
   const currentUser = user || ({ name: 'Guest', role: 'viewer' } as any);
+  const userRole = (currentUser.role as AllowedRole) || 'reviewer';
 
   const getNavigationItems = () => {
-    const allItems = [
+    const allItems: Array<{
+      icon: React.ReactNode;
+      label: string;
+      href: string;
+      allowedRoles?: AllowedRole[];
+      requiredRole?: AllowedRole | null;
+    }> = [
       {
         icon: <LayoutDashboard className='w-5 h-5' />,
         label: t('dashboard'),
@@ -61,17 +72,20 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
       {
         icon: <Users className='w-5 h-5' />,
         label: t('candidates'),
-        href: '/admin/candidates'
+        href: '/admin/candidates',
+        allowedRoles: ['admin', 'reviewer', 'super-admin'] as const
       },
       {
         icon: <Briefcase className='w-5 h-5' />,
         label: t('jobs'),
-        href: '/admin/jobs'
+        href: '/admin/jobs',
+        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <Clock className='w-5 h-5' />,
         label: t('incomplete'),
-        href: '/admin/incomplete'
+        href: '/admin/incomplete',
+        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <FileText className='w-5 h-5' />,
@@ -91,19 +105,37 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
       {
         icon: <BarChart3 className='w-5 h-5' />,
         label: t('reports'),
-        href: '/admin/reports'
+        href: '/admin/reports',
+        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <Settings className='w-5 h-5' />,
         label: t('settings'),
-        href: '/admin/settings'
+        href: '/admin/settings',
+        allowedRoles: ['super-admin'] as const
       }
     ];
-    return allItems;
+
+    // Filter items based on user role
+    return allItems.filter(item => {
+      if (item.allowedRoles) {
+        return item.allowedRoles.includes(userRole as AllowedRole);
+      }
+      if (item.requiredRole === null || item.requiredRole === undefined) return true;
+      return item.requiredRole === userRole;
+    });
   };
 
   const navigationItems = getNavigationItems();
 
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/admin/login');
+    router.refresh();
+  };
+
+  // Get role display name
   const getRoleDisplayName = (role: string) => {
     switch (role) {
       case 'super-admin':
@@ -151,8 +183,20 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
             <p className='text-xs text-gray-600'>{getRoleDisplayName(currentUser.role)}</p>
           </div>
         </div>
+        {/* Role indicator for restricted access */}
+        {userRole === 'reviewer' && (
+          <div className='mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg'>
+            <div className='flex items-center space-x-2'>
+              <AlertCircle className='w-4 h-4 text-yellow-600' />
+              <span className='text-xs text-yellow-800'>Read-only access</span>
+            </div>
+          </div>
+        )}
 
-        <button className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'>
+        <button
+          onClick={handleLogout}
+          className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'
+        >
           <LogOut className='w-5 h-5' />
           <span>{tCommon('logout')}</span>
         </button>

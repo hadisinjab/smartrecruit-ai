@@ -8,6 +8,9 @@ export interface SessionInfo {
   organizationId: string | null
 }
 
+/**
+ * Hierarchical role check. Super Admin inherits Admin permissions.
+ */
 export function canAccessRole(userRole: string | null | undefined, requiredRole?: Role | null) {
   if (!requiredRole) return true
   return userRole === requiredRole
@@ -36,6 +39,17 @@ export async function getSessionInfo(): Promise<SessionInfo | null> {
   }
 }
 
+/**
+ * Returns the current authenticated user's role from the database.
+ */
+export async function getSessionRole(): Promise<Role | null> {
+  const session = await getSessionInfo()
+  return session?.role ?? null
+}
+
+/**
+ * Ensures the current user is a Super Admin before allowing sensitive actions.
+ */
 export async function requireSuperAdmin(): Promise<SessionInfo> {
   const session = await getSessionInfo()
   if (!session || session.role !== 'super-admin') {
@@ -44,6 +58,9 @@ export async function requireSuperAdmin(): Promise<SessionInfo> {
   return session
 }
 
+/**
+ * Reviewer or Admin or Super Admin (all staff).
+ */
 export async function requireStaff(): Promise<SessionInfo> {
   const session = await getSessionInfo()
   if (!session || (session.role !== 'reviewer' && session.role !== 'admin' && session.role !== 'super-admin')) {
@@ -52,6 +69,9 @@ export async function requireStaff(): Promise<SessionInfo> {
   return session
 }
 
+/**
+ * Admin or Super Admin.
+ */
 export async function requireAdminOrSuper(): Promise<SessionInfo> {
   const session = await getSessionInfo()
   if (!session || (session.role !== 'admin' && session.role !== 'super-admin')) {
@@ -60,6 +80,10 @@ export async function requireAdminOrSuper(): Promise<SessionInfo> {
   return session
 }
 
+/**
+ * Ensures the current user is at least Reviewer (Reviewer, Admin, Super Admin).
+ * Returns the resolved session for downstream checks.
+ */
 export async function requireReviewerOrAbove(): Promise<SessionInfo> {
   const session = await getSessionInfo()
   if (!session || (session.role !== 'reviewer' && session.role !== 'admin' && session.role !== 'super-admin')) {
@@ -68,6 +92,9 @@ export async function requireReviewerOrAbove(): Promise<SessionInfo> {
   return session
 }
 
+/**
+ * Admin only (Super Admin intentionally excluded here).
+ */
 export async function requireAdmin(): Promise<SessionInfo> {
   const session = await getSessionInfo()
   if (!session || session.role !== 'admin') {
@@ -76,14 +103,20 @@ export async function requireAdmin(): Promise<SessionInfo> {
   return session
 }
 
-export async function requireReviewerOrAdmin(): Promise<SessionInfo> {
+/**
+ * Reviewer or Admin; Super Admin is permitted for convenience.
+ */
+export async function requireReviewerOrAdmin(): Promise<Role> {
   const session = await getSessionInfo()
-  if (!session || (session.role !== 'reviewer' && session.role !== 'admin')) {
+  if (!session || (session.role !== 'reviewer' && session.role !== 'admin' && session.role !== 'super-admin')) {
     throw new Error('Access denied: Reviewer or Admin required.')
   }
-  return session
+  return session.role
 }
 
+/**
+ * Ensures the current user owns the job (created_by) or is Super Admin.
+ */
 export async function requireJobOwnerOrSuper(jobId: string) {
   const supabase = createClient()
   const session = await requireAdminOrSuper()
