@@ -85,7 +85,7 @@ export default function CandidateDetailsPage() {
       }
     }
     loadCandidate();
-  }, [candidateId, addToast]);
+  }, [candidateId]);
 
   const handleSaveHrEvaluation = async () => {
     try {
@@ -117,13 +117,13 @@ export default function CandidateDetailsPage() {
   if (!candidate) {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
-          <div className='text-center'>
-            <h2 className='text-2xl font-bold text-gray-900 mb-2'>Candidate Not Found</h2>
-            <p className='text-gray-600 mb-4'>The candidate you&apos;re looking for doesn&apos;t exist.</p>
-            <Button onClick={() => router.push('/admin/candidates')}>
-              Back to Candidates
-            </Button>
-          </div>
+        <div className='text-center'>
+          <h2 className='text-2xl font-bold text-gray-900 mb-2'>Candidate Not Found</h2>
+          <p className='text-gray-600 mb-4'>The candidate you're looking for doesn't exist.</p>
+          <Button onClick={() => router.push('/admin/candidates')}>
+            Back to Candidates
+          </Button>
+        </div>
       </div>
     );
   }

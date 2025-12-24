@@ -23,8 +23,7 @@
     "export": "تصدير",
     "last": "آخر نشاط",
     "min": "دقيقة",
-    "loading": "جاري التحميل...",
-    "back": "العودة"
+    "loading": "جاري التحميل..."
   },
   "Sidebar": {
     "dashboard": "لوحة القيادة",
@@ -212,7 +211,6 @@
     "title": "إدارة المستخدمين",
     "subtitle": "إدارة المستخدمين والصلاحيات",
     "addUser": "إضافة مستخدم",
-    "editUser": "تعديل مستخدم",
     "searchPlaceholder": "بحث عن مستخدمين...",
     "count": "تم العثور على {count} مستخدم",
     "stats": {
@@ -307,13 +305,11 @@
     "user": "المستخدم",
     "role": "الدور",
     "lastLogin": "آخر دخول",
-    "actions": "الإجراءات",
     "action": "الإجراء",
     "target": "الهدف",
     "description": "الوصف",
     "timestamp": "الوقت",
-    "joined": "انضم",
-    "organization": "الشركة"
+    "joined": "انضم"
   },
   "Status": {
     "applied": "تم التقديم",

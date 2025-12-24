@@ -220,7 +220,7 @@ export default function Home() {
                 Application Submitted Successfully!
               </CardTitle>
               <CardDescription>
-                Thank you for applying. We&apos;ll review your application and get back to you soon.
+                Thank you for applying. We'll review your application and get back to you soon.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

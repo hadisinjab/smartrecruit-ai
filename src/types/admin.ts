@@ -9,7 +9,6 @@ export interface AdminUser {
   lastLogin: string;
   isActive: boolean;
   createdAt: string;
-  organizationName?: string;
 }
 
 export interface Job {

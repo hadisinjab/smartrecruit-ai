@@ -51,7 +51,7 @@ export default function IncompleteApplicationsPage() {
       }
     }
     loadData();
-  }, [addToast]);
+  }, []);
 
   // Filter applications based on search and filters
   const filteredApplications = incompleteApps.filter(app => {

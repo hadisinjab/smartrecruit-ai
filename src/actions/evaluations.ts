@@ -15,6 +15,7 @@ export async function getEvaluations(): Promise<Evaluation[]> {
 
   if (!user) throw new Error('Unauthorized')
   
+  // Fetch evaluations with related application details
   const { data: evaluations, error } = await supabase
     .from('hr_evaluations')
     .select(`
@@ -33,12 +34,10 @@ export async function getEvaluations(): Promise<Evaluation[]> {
     return []
   }
 
-  if (!evaluations) return []
-
   // Transform data to match frontend Evaluation interface
   return evaluations
     .filter((evalData: any) => {
-      if (role === 'super-admin' || role === 'reviewer') return true
+      if (role === 'super-admin') return true
       // Admins only see evaluations for their job forms
       return evalData.application?.job_form?.created_by === user.id
     })
