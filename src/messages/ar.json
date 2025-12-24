@@ -212,6 +212,7 @@
     "title": "إدارة المستخدمين",
     "subtitle": "إدارة المستخدمين والصلاحيات",
     "addUser": "إضافة مستخدم",
+    "editUser": "تعديل مستخدم",
     "searchPlaceholder": "بحث عن مستخدمين...",
     "count": "تم العثور على {count} مستخدم",
     "stats": {
@@ -306,11 +307,13 @@
     "user": "المستخدم",
     "role": "الدور",
     "lastLogin": "آخر دخول",
+    "actions": "الإجراءات",
     "action": "الإجراء",
     "target": "الهدف",
     "description": "الوصف",
     "timestamp": "الوقت",
-    "joined": "انضم"
+    "joined": "انضم",
+    "organization": "الشركة"
   },
   "Status": {
     "applied": "تم التقديم",

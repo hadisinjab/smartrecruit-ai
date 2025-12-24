@@ -183,15 +183,6 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
             <p className='text-xs text-gray-600'>{getRoleDisplayName(currentUser.role)}</p>
           </div>
         </div>
-        {/* Role indicator for restricted access */}
-        {userRole === 'reviewer' && (
-          <div className='mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg'>
-            <div className='flex items-center space-x-2'>
-              <AlertCircle className='w-4 h-4 text-yellow-600' />
-              <span className='text-xs text-yellow-800'>Read-only access</span>
-            </div>
-          </div>
-        )}
 
         <button
           onClick={handleLogout}

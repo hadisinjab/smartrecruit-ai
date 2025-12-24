@@ -19,12 +19,23 @@ alter table public.users enable row level security;
 create policy "Users can view their own profile." on public.users
   for select using (auth.uid() = id);
 
--- Admins can view all users
-create policy "Admins can view all users." on public.users
+-- Super Admins can view all users
+create policy "Super Admins can view all users." on public.users
   for select using (
     exists (
       select 1 from public.users
-      where users.id = auth.uid() and users.role in ('super-admin', 'admin')
+      where users.id = auth.uid() and users.role = 'super-admin'
+    )
+  );
+
+-- Staff can view users in their own organization
+create policy "Staff can view users in their organization." on public.users
+  for select using (
+    exists (
+      select 1 from public.users as staff
+      where staff.id = auth.uid() 
+      and staff.organization_id = users.organization_id
+      and staff.role in ('admin', 'reviewer')
     )
   );
 
@@ -340,17 +351,22 @@ create policy "Admins can manage settings." on public.system_settings
     )
   );
 
+-- Clean up any old triggers to avoid "duplicate key" errors
+drop trigger if exists on_auth_user_created on auth.users;
+drop trigger if exists on_auth_user_created_v2 on auth.users;
+
 -- Trigger to handle new user signup -> public.users
 create or replace function public.handle_new_auth_user()
 returns trigger as $$
 begin
-  insert into public.users (id, email, full_name, avatar_url, role)
+  insert into public.users (id, email, full_name, avatar_url, role, organization_id)
   values (
     new.id,
     new.email,
     new.raw_user_meta_data->>'full_name',
     new.raw_user_meta_data->>'avatar_url',
-    coalesce(new.raw_user_meta_data->>'role', 'reviewer') -- Default role
+    coalesce(new.raw_user_meta_data->>'role', 'reviewer'),
+    (new.raw_user_meta_data->>'organization_id')::uuid
   );
   return new;
 end;
