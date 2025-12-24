@@ -23,8 +23,7 @@
     "export": "Export",
     "last": "Last",
     "min": "min",
-    "loading": "Loading...",
-    "back": "Back"
+    "loading": "Loading..."
   },
   "Sidebar": {
     "dashboard": "Dashboard",
@@ -213,7 +212,6 @@
     "title": "User Management",
     "subtitle": "Manage admin users and permissions",
     "addUser": "Add User",
-    "editUser": "Edit User",
     "searchPlaceholder": "Search users...",
     "count": "{count} users found",
     "stats": {
@@ -308,13 +306,11 @@
     "user": "User",
     "role": "Role",
     "lastLogin": "Last Login",
-    "actions": "Actions",
     "action": "Action",
     "target": "Target",
     "description": "Description",
     "timestamp": "Timestamp",
-    "joined": "Joined",
-    "organization": "Organization"
+    "joined": "Joined"
   },
   "Status": {
     "applied": "Applied",

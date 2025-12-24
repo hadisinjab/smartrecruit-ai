@@ -19,27 +19,11 @@ import {
   UserCheck,
   UserX,
   Key,
-  Edit,
-  Trash2,
   MoreVertical,
   User as UserIcon
 } from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
-import { useUser } from '@/context/UserContext';
-import { useRouter } from '@/i18n/navigation';
-import { cn } from '@/lib/utils';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { deleteUser } from '@/actions/users';
 
 export default function UsersPage() {
   const t = useTranslations('Users');
@@ -48,15 +32,12 @@ export default function UsersPage() {
   const tRole = useTranslations('Role');
   const format = useFormatter();
   const { addToast } = useToast();
-  const { isSuperAdmin, isAdmin, isReviewer } = useUser();
-  const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadUsers = async () => {
     try {
@@ -72,7 +53,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
+  }, []);
 
   if (loading) {
     return (
@@ -107,33 +88,18 @@ export default function UsersPage() {
     }
   };
 
-  const handleDeleteUser = async () => {
-    if (!userToDelete) return;
-    setIsDeleting(true);
-    try {
-      const result = await deleteUser(userToDelete.id);
-      if ('error' in result && result.error) {
-        addToast('error', result.error);
-      } else {
-        addToast('success', 'User deleted successfully');
-        loadUsers();
-      }
-    } catch {
-      addToast('error', 'Failed to delete user');
-    } finally {
-      setIsDeleting(false);
-      setUserToDelete(null);
-    }
-  };
-
   // Filter users based on search and filters
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase());
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && user.isActive) ||
+      (statusFilter === 'inactive' && !user.isActive);
     
-    return matchesSearch && matchesRole;
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   const getRoleColor = (role: string) => {
@@ -174,31 +140,20 @@ export default function UsersPage() {
       title: tTable('user'),
       render: (_, record) => (
         <div className='flex items-center space-x-3'>
-          <div className='w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0'>
+          <div className='w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center'>
             <span className='text-white text-sm font-medium'>
-              {record.name ? record.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
+              {record.name.split(' ').map(n => n[0]).join('')}
             </span>
           </div>
-          <div className='flex flex-col'>
-            <p className='font-medium text-gray-900 leading-none mb-1'>
+          <div>
+            <p className='font-medium text-gray-900'>
               {record.name}
             </p>
-            <p className='text-xs text-gray-500 leading-none'>{record.email}</p>
+            <p className='text-sm text-gray-500'>{record.email}</p>
           </div>
         </div>
       )
     },
-    ...(isSuperAdmin ? [
-      {
-        key: 'organization',
-        title: tTable('organization'),
-        render: (_: any, record: AdminUser) => (
-          <div className='text-sm text-gray-600 font-medium'>
-            {record.organizationName || 'N/A'}
-          </div>
-        )
-      } as Column<AdminUser>
-    ] : []),
     {
       key: 'role',
       title: tTable('role'),
@@ -267,54 +222,69 @@ export default function UsersPage() {
     },
     {
       key: 'actions',
-      title: tCommon('actions'),
+      title: tTable('actions'),
       render: (_, record) => (
         <div className='flex items-center space-x-2'>
-          {isSuperAdmin && (
-            <>
-              <Select
-                value={record.role}
-                onValueChange={(value) => handleRoleChange(record.id, value)}
-              >
-                <SelectTrigger className="w-[130px] h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
-                  <SelectItem value="admin">{tRole('admin')}</SelectItem>
-                  <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button 
-                variant='ghost' 
-                size='sm' 
-                className='h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50'
-                onClick={() => router.push(`/admin/users/${record.id}/edit`)}
-              >
-                <Edit className='w-4 h-4' />
-              </Button>
-
-              <Button 
-                variant='ghost' 
-                size='sm' 
-                className='h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50'
-                onClick={() => setUserToDelete(record)}
-              >
-                <Trash2 className='w-4 h-4' />
-              </Button>
-            </>
-          )}
+          <Select
+            value={record.role}
+            onValueChange={(value) => handleRoleChange(record.id, value)}
+          >
+            <SelectTrigger className="w-[130px] h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
+              <SelectItem value="admin">{tRole('admin')}</SelectItem>
+              <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Button
+            variant={record.isActive ? 'outline' : 'default'}
+            size='sm'
+            onClick={() => handleStatusToggle(record.id, record.isActive)}
+            className='h-8'
+          >
+            {record.isActive ? (
+              <>
+                <UserX className="w-3 h-3 mr-1" />
+                {t('actions.deactivate')}
+              </>
+            ) : (
+              <>
+                <UserCheck className="w-3 h-3 mr-1" />
+                {t('actions.activate')}
+              </>
+            )}
+          </Button>
+          
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => {
+              console.log('Reset password for user:', record.id);
+              // In a real app, this would call an API
+            }}
+            className='h-8'
+          >
+            <Key className="w-3 h-3 mr-1" />
+            {t('actions.reset')}
+          </Button>
+          
+          <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
+            <MoreVertical className='w-4 h-4' />
+          </Button>
         </div>
       )
     }
   ];
 
   const stats = {
-    total: filteredUsers.length,
-    superAdmins: filteredUsers.filter(u => u.role === 'super-admin').length,
-    admins: filteredUsers.filter(u => u.role === 'admin').length,
-    reviewers: filteredUsers.filter(u => u.role === 'reviewer').length
+    total: users.length,
+    active: users.filter(u => u.isActive).length,
+    superAdmins: users.filter(u => u.role === 'super-admin').length,
+    admins: users.filter(u => u.role === 'admin').length,
+    reviewers: users.filter(u => u.role === 'reviewer').length
   };
 
   return (
@@ -322,23 +292,28 @@ export default function UsersPage() {
       title={t('title')}
       subtitle={t('count', { count: filteredUsers.length })}
       actions={
-        isSuperAdmin ? (
-          <Button 
-            className='flex items-center space-x-2'
-            onClick={() => router.push('/admin/users/new')}
-          >
-            <Plus className='w-4 h-4' />
-            <span>{t('addUser')}</span>
-          </Button>
-        ) : null
+        <Button 
+          className='flex items-center space-x-2'
+          onClick={() => addToast('info', 'Add User feature will be implemented in the next phase')}
+        >
+          <Plus className='w-4 h-4' />
+          <span>{t('addUser')}</span>
+        </Button>
       }
     >
       <div className='space-y-6'>
-        <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+        {/* Stats */}
+        <div className='grid grid-cols-1 md:grid-cols-5 gap-4'>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-gray-900'>{stats.total}</p>
               <p className='text-sm text-gray-600'>{t('stats.total')}</p>
+            </div>
+          </Card>
+          <Card className='p-4'>
+            <div className='text-center'>
+              <p className='text-2xl font-bold text-green-600'>{stats.active}</p>
+              <p className='text-sm text-gray-600'>{t('stats.active')}</p>
             </div>
           </Card>
           <Card className='p-4'>
@@ -360,6 +335,21 @@ export default function UsersPage() {
             </div>
           </Card>
         </div>
+
+        {/* Permission Notice */}
+        <Card className='p-4 bg-blue-50 border border-blue-200'>
+          <div className='flex items-start space-x-3'>
+            <ShieldCheck className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div>
+              <h3 className='text-sm font-medium text-blue-900'>{t('permissions.title')}</h3>
+              <div className='mt-2 text-sm text-blue-800'>
+                <p><strong>{tRole('super-admin')}:</strong> {t('permissions.superAdminDesc')}</p>
+                <p><strong>{tRole('admin')}:</strong> {t('permissions.adminDesc')}</p>
+                <p><strong>{tRole('reviewer')}:</strong> {t('permissions.reviewerDesc')}</p>
+              </div>
+            </div>
+          </div>
+        </Card>
 
         {/* Filters */}
         <Card className='p-6'>
@@ -387,6 +377,17 @@ export default function UsersPage() {
                 <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
               </SelectContent>
             </Select>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className='w-full sm:w-[150px]'>
+                <SelectValue placeholder={t('filters.status')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('filters.allStatus')}</SelectItem>
+                <SelectItem value="active">{t('filters.active')}</SelectItem>
+                <SelectItem value="inactive">{t('filters.inactive')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </Card>
 
@@ -398,31 +399,6 @@ export default function UsersPage() {
             emptyText={t('empty')}
           />
         </Card>
-
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{tCommon('delete')} {userToDelete?.name}</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this user? This action cannot be undone and will remove the user from the system.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>{tCommon('cancel')}</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleDeleteUser();
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white"
-                disabled={isDeleting}
-              >
-                {isDeleting ? tCommon('loading') : tCommon('delete')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </AdminLayout>
   );
