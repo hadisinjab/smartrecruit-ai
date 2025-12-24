@@ -246,7 +246,9 @@
       "justNow": "الآن",
       "hoursAgo": "منذ {count} ساعة",
       "daysAgo": "منذ {count} يوم"
-    }
+    },
+    "deleteUserConfirmation": "حذف المستخدم",
+    "deleteUserWarning": "هل أنت متأكد من رغبتك في حذف {userName}؟ لا يمكن التراجع عن هذا الإجراء وسيتم إزالة المستخدم نهائياً من النظام."
   },
   "Activity": {
     "title": "سجل النشاطات",

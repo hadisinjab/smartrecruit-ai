@@ -272,37 +272,37 @@ export default function UsersPage() {
         <div className='flex items-center space-x-2'>
           {isSuperAdmin && (
             <>
-              <Select
-                value={record.role}
-                onValueChange={(value) => handleRoleChange(record.id, value)}
-              >
-                <SelectTrigger className="w-[130px] h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
-                  <SelectItem value="admin">{tRole('admin')}</SelectItem>
-                  <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button 
+            <Select
+              value={record.role}
+              onValueChange={(value) => handleRoleChange(record.id, value)}
+            >
+              <SelectTrigger className="w-[130px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
+                <SelectItem value="admin">{tRole('admin')}</SelectItem>
+                <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
+              </SelectContent>
+            </Select>
+          
+          <Button
                 variant='ghost' 
-                size='sm' 
+            size='sm'
                 className='h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50'
                 onClick={() => router.push(`/admin/users/${record.id}/edit`)}
               >
                 <Edit className='w-4 h-4' />
-              </Button>
-
-              <Button 
+          </Button>
+          
+          <Button
                 variant='ghost' 
-                size='sm' 
+            size='sm'
                 className='h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50'
                 onClick={() => setUserToDelete(record)}
-              >
+          >
                 <Trash2 className='w-4 h-4' />
-              </Button>
+          </Button>
             </>
           )}
         </div>
@@ -341,18 +341,18 @@ export default function UsersPage() {
               <p className='text-sm text-gray-600'>{t('stats.total')}</p>
             </div>
           </Card>
-          <Card className='p-4'>
-            <div className='text-center'>
-              <p className='text-2xl font-bold text-purple-600'>{stats.superAdmins}</p>
-              <p className='text-sm text-gray-600'>{t('stats.superAdmins')}</p>
-            </div>
-          </Card>
-          <Card className='p-4'>
-            <div className='text-center'>
-              <p className='text-2xl font-bold text-blue-600'>{stats.admins}</p>
-              <p className='text-sm text-gray-600'>{t('stats.admins')}</p>
-            </div>
-          </Card>
+              <Card className='p-4'>
+                <div className='text-center'>
+                  <p className='text-2xl font-bold text-purple-600'>{stats.superAdmins}</p>
+                  <p className='text-sm text-gray-600'>{t('stats.superAdmins')}</p>
+                </div>
+              </Card>
+              <Card className='p-4'>
+                <div className='text-center'>
+                  <p className='text-2xl font-bold text-blue-600'>{stats.admins}</p>
+                  <p className='text-sm text-gray-600'>{t('stats.admins')}</p>
+                </div>
+              </Card>
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>{stats.reviewers}</p>

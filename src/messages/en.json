@@ -247,7 +247,9 @@
       "justNow": "Just now",
       "hoursAgo": "{count} hours ago",
       "daysAgo": "{count} days ago"
-    }
+    },
+    "deleteUserConfirmation": "Delete User",
+    "deleteUserWarning": "Are you sure you want to delete {userName}? This action cannot be undone and will remove the user from the system."
   },
   "Activity": {
     "title": "Activity Log",
