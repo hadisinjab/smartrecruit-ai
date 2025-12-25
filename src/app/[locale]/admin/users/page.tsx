@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ export default function UsersPage() {
   const tRole = useTranslations('Role');
   const format = useFormatter();
   const { addToast } = useToast();
-  const { isSuperAdmin, isAdmin, isReviewer } = useUser();
+  const { isSuperAdmin, isAdmin, isReviewer, isLoading: isUserLoading } = useUser();
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,7 +58,7 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const data = await getUsers();
       setUsers(data);
@@ -68,13 +68,13 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [addToast]);
 
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
 
-  if (loading) {
+  if (loading || isUserLoading) {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')}>
         <div className="flex items-center justify-center h-64">
@@ -270,17 +270,18 @@ export default function UsersPage() {
       title: tCommon('actions'),
       render: (_, record) => (
         <div className='flex items-center space-x-2'>
-          {isSuperAdmin && (
+          {isAdmin && (
             <>
             <Select
               value={record.role}
               onValueChange={(value) => handleRoleChange(record.id, value)}
+              disabled={record.role === 'super-admin' && !isSuperAdmin}
             >
               <SelectTrigger className="w-[130px] h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>
+                {isSuperAdmin && <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>}
                 <SelectItem value="admin">{tRole('admin')}</SelectItem>
                 <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
               </SelectContent>
@@ -291,6 +292,7 @@ export default function UsersPage() {
             size='sm'
                 className='h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50'
                 onClick={() => router.push(`/admin/users/${record.id}/edit`)}
+                disabled={record.role === 'super-admin' && !isSuperAdmin}
               >
                 <Edit className='w-4 h-4' />
           </Button>
@@ -300,6 +302,7 @@ export default function UsersPage() {
             size='sm'
                 className='h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50'
                 onClick={() => setUserToDelete(record)}
+                disabled={record.role === 'super-admin' && !isSuperAdmin}
           >
                 <Trash2 className='w-4 h-4' />
           </Button>

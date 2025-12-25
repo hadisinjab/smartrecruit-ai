@@ -21,7 +21,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const tRole = useTranslations('Role');
   const router = useRouter();
   const { addToast } = useToast();
-  const { isSuperAdmin } = useUser();
+  const { isSuperAdmin, isAdmin } = useUser();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,7 +33,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     async function loadUser() {
-      if (!isSuperAdmin) return;
+      if (!isAdmin) return;
       try {
         const user = await getUser(userId);
         if (user) {
@@ -52,11 +52,11 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
       }
     }
     loadUser();
-  }, [userId, isSuperAdmin, router, addToast]);
+  }, [userId, isAdmin, router, addToast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !fullName || !organizationName) {
+    if (!email || !fullName || (!organizationName && isSuperAdmin)) {
       addToast('error', 'Please fill all required fields');
       return;
     }
@@ -85,7 +85,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     }
   };
 
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <AdminLayout title={tUsers('title')} subtitle={tUsers('subtitle')}>
         <div className='space-y-6'>

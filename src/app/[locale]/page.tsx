@@ -98,9 +98,23 @@ const sampleFormSteps: FormStep[] = [
     fields: [
       {
         id: 'highestDegree',
-        type: 'text',
+        type: 'select',
         label: 'Highest Degree',
-        placeholder: 'Bachelor\'s in Computer Science',
+        placeholder: 'Select your degree',
+        required: true,
+        options: [
+          { label: 'High School', value: 'high_school' },
+          { label: 'Associate Degree', value: 'associate' },
+          { label: 'Bachelor\'s Degree', value: 'bachelor' },
+          { label: 'Master\'s Degree', value: 'master' },
+          { label: 'Ph.D.', value: 'phd' }
+        ]
+      },
+      {
+        id: 'university',
+        type: 'text',
+        label: 'University/Institution',
+        placeholder: 'Stanford University',
         required: true
       },
       {
@@ -113,81 +127,18 @@ const sampleFormSteps: FormStep[] = [
           min: 1950,
           max: 2030
         }
-      },
-      {
-        id: 'university',
-        type: 'text',
-        label: 'University/Institution',
-        placeholder: 'University Name',
-        required: true
-      },
-      {
-        id: 'additionalNotes',
-        type: 'textarea',
-        label: 'Additional Notes',
-        placeholder: 'Any additional information about your education...',
-        required: false
       }
     ]
   },
   {
-    id: 'personal-experience',
-    title: 'Personal & Experience Information',
-    description: 'Additional details about your background',
+    id: 'voice-intro',
+    title: 'Voice Introduction',
+    description: 'Introduce yourself in a short voice recording',
     fields: [
       {
-        id: 'age',
-        type: 'select',
-        label: 'Age',
-        placeholder: 'Select your age',
-        required: true,
-        options: Array.from({ length: 48 }, (_, i) => (i + 18).toString())
-      },
-      {
-        id: 'yearsExperience',
-        type: 'select',
-        label: 'Years of Work Experience',
-        placeholder: 'Select years of experience',
-        required: true,
-        options: Array.from({ length: 9 }, (_, i) => i.toString())
-      },
-      {
-        id: 'previousCompanies',
-        type: 'text',
-        label: 'Previous Companies',
-        placeholder: 'List company names you worked at (comma separated)',
-        required: true
-      }
-    ]
-  },
-  {
-    id: 'additional-requirements',
-    title: 'Final Materials',
-    description: 'Upload your CV and complete the final requirements',
-    fields: [
-      {
-        id: 'portfolioUrl',
-        type: 'url',
-        label: 'Portfolio/LinkedIn URL',
-        placeholder: 'https://linkedin.com/in/yourprofile or https://behance.net/yourportfolio',
-        required: true
-      },
-      {
-        id: 'cvUpload',
-        type: 'file',
-        label: 'Upload Your CV/Resume',
-        placeholder: 'Upload PDF, DOC, or DOCX file',
-        required: true,
-        validation: {
-          maxFileSize: 5,
-          acceptedTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-        }
-      },
-      {
-        id: 'videoIntroduction',
+        id: 'introRecording',
         type: 'voice',
-        label: 'Video Introduction',
-        placeholder: 'Record a 3-minute introduction about yourself',
+        label: 'Record your introduction (max 2 minutes)',
         required: true
       }
     ]
@@ -195,82 +146,64 @@ const sampleFormSteps: FormStep[] = [
 ];
 
 export default function Home() {
-  const [applicationSubmitted, setApplicationSubmitted] = useState(false);
-  const [submittedData, setSubmittedData] = useState<any>(null);
-  const [rtl, setRtl] = useState(false);
+  const [isFormComplete, setIsFormComplete] = useState(false);
+  const [formData, setFormData] = useState<any>(null);
 
   const handleFormComplete = (data: any) => {
-    setSubmittedData(data);
-    setApplicationSubmitted(true);
-    console.log('Form submitted with data:', data);
+    console.log('Form completed with data:', data);
+    setFormData(data);
+    setIsFormComplete(true);
   };
 
-  const handleReset = () => {
-    setApplicationSubmitted(false);
-    setSubmittedData(null);
-  };
-
-  if (applicationSubmitted) {
+  if (isFormComplete) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-2xl mx-auto">
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl text-green-600">
-                Application Submitted Successfully!
-              </CardTitle>
-              <CardDescription>
-                Thank you for applying. We&apos;ll review your application and get back to you soon.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Submitted Data (for demo purposes):</h3>
-                <pre className="text-xs overflow-auto">
-                  {JSON.stringify(submittedData, null, 2)}
-                </pre>
-              </div>
-              <div className="flex justify-center">
-                <Button onClick={handleReset} variant="outline">
-                  Submit Another Application
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-green-600 flex items-center gap-2">
+              Application Submitted Successfully!
+            </CardTitle>
+            <CardDescription>
+              Thank you for submitting your application. Here's a summary of your data:
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-[500px] text-sm">
+              {JSON.stringify(formData, null, 2)}
+            </pre>
+            <Button 
+              className="mt-6 w-full" 
+              onClick={() => {
+                setIsFormComplete(false);
+                setFormData(null);
+              }}
+            >
+              Submit Another Application
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header with RTL toggle for demo */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">SmartRecruit AI</h1>
-              <p className="text-gray-600">AI-Powered Hiring Platform</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={rtl}
-                  onChange={(e) => setRtl(e.target.checked)}
-                  className="rounded"
-                />
-                <span>RTL Layout</span>
-              </label>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto text-center mb-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          SmartRecruit AI Application
+        </h1>
+        <p className="text-lg text-gray-600">
+          Please complete the following steps to submit your application.
+          Your voice recording will be analyzed by our AI system.
+        </p>
       </div>
 
-      <MultiStepForm
-        steps={sampleFormSteps}
-        onComplete={handleFormComplete}
-      />
+      <div className="max-w-3xl mx-auto">
+        <MultiStepForm 
+          steps={sampleFormSteps} 
+          onComplete={handleFormComplete}
+        />
+      </div>
     </div>
   );
 }

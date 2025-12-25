@@ -24,13 +24,13 @@ export default function NewUserPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'super-admin' | 'admin' | 'reviewer'>('reviewer');
+  const [selectedRole, setSelectedRole] = useState<'super-admin' | 'admin' | 'reviewer'>('reviewer');
   const [organizationName, setOrganizationName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !fullName || !organizationName || !password) {
+    if (!email || !fullName || !password) {
       addToast('error', 'Please fill all required fields');
       return;
     }
@@ -41,7 +41,7 @@ export default function NewUserPage() {
         fullName,
         email,
         password,
-        role,
+        role: selectedRole,
         organizationName,
       });
 
@@ -59,7 +59,8 @@ export default function NewUserPage() {
     }
   };
 
-  if (!isSuperAdmin) {
+  // Check permission: Only Super Admin and Admin can view this page
+  if (!isSuperAdmin && !isAdmin) {
     return (
       <AdminLayout title={tUsers('title')} subtitle={tUsers('subtitle')}>
         <div className='space-y-6'>
@@ -123,8 +124,8 @@ export default function NewUserPage() {
             <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
               <div>
                 <Select
-                  value={role}
-                  onValueChange={(value) => setRole(value as 'super-admin' | 'admin' | 'reviewer')}
+                  value={selectedRole}
+                  onValueChange={(value) => setSelectedRole(value as 'super-admin' | 'admin' | 'reviewer')}
                 >
                   <SelectTrigger className='w-full'>
                     <SelectValue placeholder={tUsers('filters.role')} />
@@ -140,13 +141,15 @@ export default function NewUserPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Input
-                  placeholder='Company name'
-                  value={organizationName}
-                  onChange={(e) => setOrganizationName(e.target.value)}
-                />
-              </div>
+              {isSuperAdmin && (
+                <div>
+                  <Input
+                    placeholder='Company name'
+                    value={organizationName}
+                    onChange={(e) => setOrganizationName(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className='flex justify-end'>

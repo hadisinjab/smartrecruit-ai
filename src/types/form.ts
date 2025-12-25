@@ -4,7 +4,8 @@ export interface FormField {
   label: string;
   placeholder?: string;
   required?: boolean;
-  options?: string[]; // For select dropdown options
+  pageNumber?: number; // Page number for multi-step form
+  options?: (string | { label: string; value: string })[]; // For select dropdown options
   validation?: {
     min?: number;
     max?: number;

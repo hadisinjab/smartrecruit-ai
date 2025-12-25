@@ -3,9 +3,10 @@
 import React from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
-import { AlertTriangle } from 'lucide-react';
-import { getCurrentUser } from '@/actions/auth';
+import { useUser } from '@/context/UserContext';
+import { useRouter } from '@/i18n/navigation';
 import { AdminUser } from '@/types/admin';
+import { getCurrentUser } from '@/actions/auth';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -20,13 +21,45 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   subtitle,
   actions
 }) => {
+  const { role, isLoading } = useUser();
+  const router = useRouter();
   const [user, setUser] = React.useState<AdminUser | null>(null);
 
   React.useEffect(() => {
     getCurrentUser().then(setUser);
   }, []);
 
-  const isReadOnly = user?.role === 'reviewer';
+  React.useEffect(() => {
+    if (!isLoading && !role) {
+      // Use window.location.href as fallback if router.push fails or is slow
+      const loginPath = '/admin/login';
+      router.push(loginPath);
+      
+      // Force reload if redirect doesn't happen quickly
+      const timeout = setTimeout(() => {
+         window.location.href = loginPath;
+      }, 1000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading, role, router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 mx-auto mb-2"></div>
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!role) {
+    return null; // Will redirect via useEffect
+  }
+
+  const isReadOnly = role === 'reviewer';
 
   return (
     <div className='flex h-screen bg-gray-50'>

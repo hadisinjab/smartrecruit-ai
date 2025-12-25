@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useUser } from '@/context/UserContext';
 import { createJob } from '@/actions/jobs';
 
 export default function CreateJobPage() {
@@ -33,8 +34,18 @@ export default function CreateJobPage() {
   const tCommon = useTranslations('Common');
   const router = useRouter();
   const { addToast } = useToast();
+  const { isReviewer, isSuperAdmin, isAdmin } = useUser();
 
   const [loading, setLoading] = useState(false);
+  
+  // Protect page: Redirect Reviewers to Jobs list
+  if (isReviewer) {
+    // Ideally this should be done in useEffect or middleware, but for client-side rendering protection:
+    React.useEffect(() => {
+        router.push('/admin/jobs');
+    }, [router]);
+    return null; // Or show Access Denied message
+  }
   const [jobData, setJobData, clearJobData] = useAutoSave('create-job-data', {
     title: '',
     department: '',
@@ -98,7 +109,8 @@ export default function CreateJobPage() {
       type,
       label: tCreate('questionText'),
       required: true,
-      placeholder: tCreate('questionText')
+      placeholder: tCreate('questionText'),
+      pageNumber: 1 // Default to page 1
     };
 
     const newSteps = [...formSteps];
@@ -159,8 +171,9 @@ export default function CreateJobPage() {
         benefits: jobData.benefits.filter(b => b.trim() !== ''),
         deadline: jobData.deadline || null,
         hiring_manager_name: jobData.hiringManager,
-        // Also save the form builder structure if you want to use it later
-        // For now, we are storing it in 'evaluation_criteria' or a new column if needed
+        // Send questions separately to be inserted into the questions table
+        questions: formSteps[0].fields,
+        // Keep evaluation_criteria for other potential uses or backward compatibility
         evaluation_criteria: formSteps
       };
 
@@ -392,10 +405,69 @@ export default function CreateJobPage() {
                             />
                             <Label htmlFor={`req-${field.id}`} className="cursor-pointer">{tCreate('required')}</Label>
                           </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Label className="text-sm text-gray-600">Page:</Label>
+                            <Select
+                              value={(field.pageNumber || 1).toString()}
+                              onValueChange={(val) => updateQuestion(index, { pageNumber: parseInt(val) })}
+                            >
+                              <SelectTrigger className="w-16 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[1, 2, 3, 4, 5].map((num) => (
+                                  <SelectItem key={num} value={num.toString()}>
+                                    {num}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                           
+                          {/* Config inputs based on type */}
                           {field.type === 'voice' && (
-                            <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                              {tCreate('voiceEnabled')}
+                            <div className="flex items-center gap-2">
+                               <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                                 {tCreate('voiceEnabled')}
+                               </div>
+                               <Input 
+                                 type="number" 
+                                 placeholder="Duration (sec)" 
+                                 className="w-24 h-8 text-xs"
+                                 value={(() => {
+                                   const opt = field.options?.[0];
+                                   if (typeof opt === 'object' && opt !== null) {
+                                      return opt.value;
+                                   }
+                                   return '';
+                                 })()}
+                                 onChange={(e) => {
+                                    const val = e.target.value;
+                                    updateQuestion(index, { options: [{ label: 'duration', value: val }] });
+                                 }}
+                               />
+                            </div>
+                          )}
+                          
+                          {field.type === 'file' && (
+                            <div className="flex items-center gap-2">
+                               <Input 
+                                 placeholder="Max size (MB)" 
+                                 className="w-24 h-8 text-xs"
+                                 type="number"
+                                 value={(() => {
+                                   const opt = field.options?.[0];
+                                   if (typeof opt === 'object' && opt !== null) {
+                                      return opt.value;
+                                   }
+                                   return '';
+                                 })()}
+                                 onChange={(e) => {
+                                    const val = e.target.value;
+                                    updateQuestion(index, { options: [{ label: 'maxSize', value: val }] });
+                                 }}
+                               />
                             </div>
                           )}
                         </div>

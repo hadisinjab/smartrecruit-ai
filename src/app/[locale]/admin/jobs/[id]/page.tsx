@@ -6,7 +6,8 @@ import { useRouter } from '@/i18n/navigation';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
-import { getJobById } from '@/actions/jobs';
+import { getJob } from '@/actions/jobs';
+import { useUser } from '@/context/UserContext';
 import {
   ArrowLeft,
   Edit3,
@@ -17,17 +18,18 @@ import {
   Calendar,
   Briefcase,
   Award,
-  CheckCircle
+  CheckCircle,
+  Building
 } from 'lucide-react';
-
-import { Job } from '@/types/admin';
+import { Loader2 } from 'lucide-react';
 
 export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
-  const [job, setJob] = useState<Job | null>(null);
+  const [job, setJob] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isReviewer, isSuperAdmin, isAdmin, user } = useUser();
 
   useEffect(() => {
     let isMounted = true;
@@ -35,7 +37,8 @@ export default function JobDetailsPage() {
     async function loadJob() {
       try {
         setLoading(true);
-        const jobData = await getJobById(jobId);
+        // Using getJob which handles permissions internally
+        const jobData = await getJob(jobId);
         if (isMounted) {
           setJob(jobData);
         }
@@ -59,42 +62,44 @@ export default function JobDetailsPage() {
 
   if (loading) {
     return (
-      <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
-        <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
-          <p className='text-gray-600'>Loading job details...</p>
+      <AdminLayout title="Job Details">
+        <div className="flex justify-center items-center h-64">
+           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   if (!job) {
     return (
-      <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
-        <div className='text-center'>
-          <h2 className='text-2xl font-bold text-gray-900 mb-2'>Job Not Found</h2>
-          <p className='text-gray-600 mb-4'>The job you&apos;re looking for doesn&apos;t exist.</p>
-          <Button onClick={() => router.push('/admin/jobs')}>
-            Back to Jobs
-          </Button>
-        </div>
-      </div>
+      <AdminLayout title="Job Details">
+         <div className='text-center py-12'>
+           <h2 className='text-2xl font-bold text-gray-900 mb-2'>Job Not Found</h2>
+           <p className='text-gray-600 mb-4'>The job you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.</p>
+           <Button onClick={() => router.push('/admin/jobs')}>
+             Back to Jobs
+           </Button>
+         </div>
+      </AdminLayout>
     );
   }
 
-  // Helper functions for safe rendering
-  const getJobStatus = (status: string | undefined) => status || 'draft';
-  const getJobType = (type: string | undefined) => type || 'full-time';
-  const getSafeDate = (date: string | undefined) => date ? new Date(date).toLocaleDateString() : 'N/A';
-  const getInitials = (name: string | undefined) => (name || 'Unknown').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  // Determine if user can edit
+  const canEdit = isSuperAdmin || (isAdmin && job.created_by === user?.id) || (isAdmin && !job.created_by); // Allow edit if owner or if no owner set (legacy) but ideally strictly check org
 
+  // Helper functions for safe rendering
   const getStatusColor = (status: string) => {
     const colors = {
       active: 'bg-green-100 text-green-800',
       paused: 'bg-yellow-100 text-yellow-800',
-      closed: 'bg-red-100 text-red-800'
+      closed: 'bg-red-100 text-red-800',
+      draft: 'bg-gray-100 text-gray-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getInitials = (name: string | undefined) => {
+    return (name || 'Unknown').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
   const getTypeColor = (type: string) => {
@@ -107,8 +112,8 @@ export default function JobDetailsPage() {
     return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
-  const status = getJobStatus(job.status);
-  const type = getJobType(job.type);
+  const status = job.status || 'draft';
+  const type = job.type || 'full-time';
 
   return (
     <AdminLayout
@@ -116,10 +121,12 @@ export default function JobDetailsPage() {
       subtitle={job.department || 'General'}
       actions={
         <div className='flex space-x-3'>
-          <Button variant='outline'>
-            <Edit3 className='w-4 h-4 mr-2' />
-            Edit Job
-          </Button>
+          {canEdit && (
+            <Button variant='outline' onClick={() => router.push(`/admin/jobs/${jobId}/edit`)}>
+              <Edit3 className='w-4 h-4 mr-2' />
+              Edit Job
+            </Button>
+          )}
           <Button variant='outline'>
             View Applications
           </Button>
@@ -167,15 +174,15 @@ export default function JobDetailsPage() {
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Clock className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>Posted {getSafeDate(job.postedDate)}</span>
+                  <span className='text-gray-700'>Posted {job.created_at ? new Date(job.created_at).toLocaleDateString() : 'N/A'}</span>
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Calendar className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>Deadline {getSafeDate(job.deadline)}</span>
+                  <span className='text-gray-700'>Deadline {job.deadline ? new Date(job.deadline).toLocaleDateString() : 'N/A'}</span>
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Users className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>{job.applicantsCount || 0} applicants</span>
+                  <span className='text-gray-700'>0 applicants</span>
                 </div>
               </div>
 
@@ -184,7 +191,7 @@ export default function JobDetailsPage() {
                 <div className='flex items-center space-x-3 mb-2'>
                   <DollarSign className='w-5 h-5 text-gray-400' />
                   <span className='text-lg font-semibold text-gray-900'>
-                    ${(job.salary?.min || 0).toLocaleString()} - ${(job.salary?.max || 0).toLocaleString()} {job.salary?.currency || 'USD'}
+                    ${(job.salary_min || 0).toLocaleString()} - ${(job.salary_max || 0).toLocaleString()} {job.salary_currency || 'USD'}
                   </span>
                 </div>
               </div>

@@ -31,6 +31,8 @@ export interface Job {
   deadline: string;
   applicantsCount: number;
   hiringManager: string;
+  creatorName?: string; // New field for creator's name
+  organizationName?: string; // New field for organization name (Super Admin only)
 }
 
 export interface Candidate {

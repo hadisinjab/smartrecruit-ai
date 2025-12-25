@@ -5,28 +5,33 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 import { Job } from '@/types/admin';
-import { requireAdminOrSuper, requireJobOwnerOrSuper } from '@/utils/authz'
+import { requireAdminOrSuper, requireJobOwnerOrSuper, requireStaff } from '@/utils/authz'
 
 export async function getJobs(): Promise<Job[]> {
   const supabase = createClient()
-  const role = await requireAdminOrSuper()
+  const session = await requireStaff() // Use requireStaff to allow reviewers too
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     throw new Error('Unauthorized')
   }
 
   let query = supabase
     .from('job_forms')
-    .select('*')
+    .select('*, creator:users!created_by(full_name), organization:organizations(name)')
     .order('created_at', { ascending: false })
 
-  // Admin يرى وظائفه فقط؛ Super Admin يرى كل الوظائف
-  if (role === 'admin') {
-    query = query.eq('created_by', user.id)
+  // Super Admin: sees everything (no filter needed)
+  
+  // Admin: sees jobs belonging to their organization
+  if (session.role === 'admin') {
+    if (!session.organizationId) return [] // Safety check
+    query = query.eq('organization_id', session.organizationId)
+  }
+  
+  // Reviewer: sees jobs belonging to their organization
+  if (session.role === 'reviewer') {
+    if (!session.organizationId) return [] // Safety check
+    query = query.eq('organization_id', session.organizationId)
   }
 
   const { data, error } = await query
@@ -67,21 +72,24 @@ export async function getJobs(): Promise<Job[]> {
     postedDate: job.created_at,
     deadline: job.deadline || '',
     applicantsCount: counts[job.id] || 0,
-    hiringManager: job.hiring_manager_name || 'Admin'
+    hiringManager: job.hiring_manager_name || 'Admin',
+    creatorName: job.creator?.full_name || 'Unknown',
+    organizationName: job.organization?.name || 'Unknown'
   }))
+}
+
+export async function getJob(id: string) {
+  return getJobById(id);
 }
 
 export async function getJobById(id: string): Promise<Job | null> {
   const supabase = createClient()
-  const role = await requireAdminOrSuper()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  const session = await requireStaff() // Use requireStaff to support Reviewers too
+  
+  if (!session) {
     throw new Error('Unauthorized')
   }
-  
+
   // Get job details
   const { data: jobData, error: jobError } = await supabase
     .from('job_forms')
@@ -94,8 +102,12 @@ export async function getJobById(id: string): Promise<Job | null> {
     return null
   }
 
-  if (role === 'admin' && jobData.created_by !== user.id) {
-    throw new Error('Access denied')
+  // Check access permissions
+  // Admin and Reviewer can only access jobs from their own organization
+  if (session.role === 'admin' || session.role === 'reviewer') {
+    if (jobData.organization_id !== session.organizationId) {
+       throw new Error('Access denied')
+    }
   }
 
   // Get applicants count
@@ -106,6 +118,17 @@ export async function getJobById(id: string): Promise<Job | null> {
 
   if (countError) {
     console.error('Error fetching applicants count:', countError)
+  }
+
+  // Fetch questions for this job
+  const { data: questions, error: questionsError } = await supabase
+    .from('questions')
+    .select('*')
+    .eq('job_form_id', id)
+    .order('order_index', { ascending: true });
+
+  if (questionsError) {
+    console.error('Error fetching questions:', questionsError);
   }
 
   // Map to Job interface
@@ -127,7 +150,15 @@ export async function getJobById(id: string): Promise<Job | null> {
     postedDate: jobData.created_at,
     deadline: jobData.deadline,
     applicantsCount: count || 0,
-    hiringManager: jobData.hiring_manager_name
+    hiringManager: jobData.hiring_manager_name,
+    evaluation_criteria: questions?.map(q => ({
+      id: q.id,
+      type: q.type,
+      label: q.label,
+      required: q.required,
+      pageNumber: q.page_number,
+      options: q.config?.options || []
+    })) || []
   }
 }
 
@@ -179,6 +210,28 @@ export async function createJob(formData: any) {
     console.error('Error creating job:', error)
     // Return the error instead of throwing to let frontend handle it gracefully
     return { error: error.message || 'Failed to create job', details: error }
+  }
+
+  // Insert questions if provided
+  if (formData.questions && Array.isArray(formData.questions) && formData.questions.length > 0) {
+    const questionsToInsert = formData.questions.map((q: any, index: number) => ({
+      job_form_id: data.id,
+      page_number: q.pageNumber || 1, // Use provided page number or default to 1
+      type: q.type,
+      label: q.label,
+      required: q.required,
+      config: q.options ? { options: q.options } : {}, // Store additional config like options in JSON
+      order_index: index + 1 // 1-based index
+    }));
+
+    const { error: questionsError } = await supabase
+      .from('questions')
+      .insert(questionsToInsert);
+
+    if (questionsError) {
+       console.error('Error creating questions:', questionsError);
+       // We don't throw here to avoid failing the whole job creation, but we log it
+    }
   }
 
   revalidatePath('/admin/jobs')

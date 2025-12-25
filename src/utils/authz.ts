@@ -22,13 +22,18 @@ export async function getSessionInfo(): Promise<SessionInfo | null> {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return null
+  if (!user) {
+    console.log('[Authz] No user found in auth.getUser()');
+    return null
+  }
 
   const { data, error } = await supabase
     .from('users')
     .select('role, organization_id')
     .eq('id', user.id)
     .single()
+
+  console.log('[Authz] User:', user.id, 'DB Role:', data?.role, 'DB Error:', error?.message);
 
   if (error || !data?.role) return null
 

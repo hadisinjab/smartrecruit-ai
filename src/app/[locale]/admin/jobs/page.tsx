@@ -23,7 +23,7 @@ export default function JobsPage() {
   const tCommon = useTranslations('Common');
   const format = useFormatter();
   const { addToast } = useToast();
-  const { isReviewer } = useUser();
+  const { isReviewer, isSuperAdmin } = useUser();
   const { searchTerm } = useSearch();
 
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -34,27 +34,8 @@ export default function JobsPage() {
     async function loadJobs() {
       try {
         const data = await getJobs();
-        const formattedJobs: Job[] = data.map((job: any) => ({
-          id: job.id,
-          title: job.title,
-          department: job.department || 'General',
-          location: job.location || 'Remote',
-          type: job.type || 'full-time',
-          status: job.status,
-          salary: {
-            min: job.salary_min || 0,
-            max: job.salary_max || 0,
-            currency: job.salary_currency || 'USD'
-          },
-          description: job.description || '',
-          requirements: job.requirements || [],
-          benefits: job.benefits || [],
-          postedDate: job.created_at, // Use created_at if posted_date is null
-          deadline: job.deadline || '',
-          applicantsCount: 0, // Need to implement count logic separately
-          hiringManager: job.hiring_manager_name || 'Admin'
-        }));
-        setJobs(formattedJobs);
+        // Data is already formatted in getJobs action
+        setJobs(data);
       } catch (error) {
         console.error('Failed to load jobs:', error);
         addToast('error', 'Failed to load jobs');
@@ -119,11 +100,29 @@ export default function JobsPage() {
         const type = value as string;
         return (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(type)}`}>
-            {type.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+            {type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
           </span>
         );
       }
     },
+    {
+      key: 'creatorName',
+      title: tTable('createdBy'),
+      render: (creatorName) => (
+        <span className='text-sm text-gray-700 font-medium'>
+          {creatorName || 'Unknown'}
+        </span>
+      )
+    },
+    ...(isSuperAdmin ? [{
+      key: 'organizationName',
+      title: tTable('organization'),
+      render: (orgName: any) => (
+        <span className='text-sm text-gray-700 font-medium'>
+          {orgName || 'Unknown'}
+        </span>
+      )
+    }] : []),
     {
       key: 'status',
       title: tTable('status'),
@@ -171,6 +170,32 @@ export default function JobsPage() {
         </div>
       ),
       sortable: true
+    },
+    {
+      key: 'actions',
+      title: 'Actions',
+      render: (_, job) => (
+        <div className='flex items-center space-x-2' onClick={(e) => e.stopPropagation()}>
+           <Button
+             variant='ghost'
+             size='sm'
+             onClick={() => router.push(`/admin/jobs/${job.id}`)}
+             className='text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+           >
+             View
+           </Button>
+           {!isReviewer && (
+             <Button
+               variant='ghost'
+               size='sm'
+               onClick={() => router.push(`/admin/jobs/${job.id}/edit`)}
+               className='text-green-600 hover:text-green-700 hover:bg-green-50'
+             >
+               Edit
+             </Button>
+           )}
+        </div>
+      )
     }
   ];
 
@@ -179,7 +204,9 @@ export default function JobsPage() {
     totalJobs: jobs.length,
     activeJobs: jobs.filter(job => job.status === 'active').length,
     totalApplicants: jobs.reduce((sum, job) => sum + job.applicantsCount, 0),
-    avgApplicantsPerJob: Math.round(jobs.reduce((sum, job) => sum + job.applicantsCount, 0) / jobs.length)
+    avgApplicantsPerJob: jobs.length > 0 
+      ? Math.round(jobs.reduce((sum, job) => sum + job.applicantsCount, 0) / jobs.length) 
+      : 0
   };
 
   return (
@@ -197,13 +224,15 @@ export default function JobsPage() {
           >
             {t('exportData')}
           </Button>
-          <Button 
-            className='flex items-center space-x-2'
-            onClick={() => router.push('/admin/jobs/new')}
-          >
-            <Plus className='w-4 h-4' />
-            <span>{t('createJob')}</span>
-          </Button>
+          {!isReviewer && (
+            <Button 
+              className='flex items-center space-x-2'
+              onClick={() => router.push('/admin/jobs/new')}
+            >
+              <Plus className='w-4 h-4' />
+              <span>{t('createJob')}</span>
+            </Button>
+          )}
         </div>
       }
     >

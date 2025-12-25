@@ -3,7 +3,10 @@
 
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { AdminUser } from '@/types/admin'
+import { Database } from '@/types/supabase'
 import { getSessionInfo, requireAdminOrSuper, requireSuperAdmin, requireReviewerOrAbove } from '@/utils/authz'
+
+type UserUpdate = Database['public']['Tables']['users']['Update']
 
 interface CreateUserInput {
   fullName: string
@@ -103,11 +106,36 @@ export async function toggleUserStatus(userId: string, currentStatus: boolean) {
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
-  await requireSuperAdmin()
+  await requireAdminOrSuper()
   const supabase = createClient()
   const session = await getSessionInfo()
 
-  if (!session || session.role !== 'super-admin') {
+  if (!session) {
+    throw new Error('Access denied')
+  }
+
+  // Check permissions
+  if (session.role === 'admin') {
+    // Admins can only update users in their org
+    const { data: targetUser } = await supabase
+      .from('users')
+      .select('role, organization_id')
+      .eq('id', userId)
+      .single()
+    
+    if (
+      !targetUser || 
+      targetUser.organization_id !== session.organizationId || 
+      targetUser.role === 'super-admin'
+    ) {
+      throw new Error('Access denied')
+    }
+
+    // Admins cannot promote to super-admin
+    if (newRole === 'super-admin') {
+      throw new Error('Access denied: Cannot promote to Super Admin')
+    }
+  } else if (session.role !== 'super-admin') {
     throw new Error('Access denied')
   }
   
@@ -123,18 +151,30 @@ export async function updateUserRole(userId: string, newRole: string) {
 }
 
 export async function getUser(userId: string): Promise<AdminUser | null> {
-  await requireSuperAdmin()
+  await requireAdminOrSuper()
   const adminSupabase = createAdminClient()
+  const session = await getSessionInfo()
   
-  const { data: user, error } = await adminSupabase
+  if (!session) return null
+
+  const { data: rawUser, error } = await adminSupabase
     .from('users')
     .select('*, organizations(name)')
     .eq('id', userId)
     .single()
 
-  if (error || !user) {
+  if (error || !rawUser) {
     console.error('Error fetching user:', error)
     return null
+  }
+
+  const user = rawUser as any
+
+  // Access check for Admins
+  if (session.role === 'admin') {
+    if (user.organization_id !== session.organizationId) {
+      throw new Error('Access denied')
+    }
   }
 
   return {
@@ -150,9 +190,44 @@ export async function getUser(userId: string): Promise<AdminUser | null> {
 }
 
 export async function updateUser(userId: string, input: Partial<CreateUserInput>) {
-  await requireSuperAdmin()
+  await requireAdminOrSuper()
   const adminClient = createAdminClient()
+  const session = await getSessionInfo()
   
+  if (!session) throw new Error('Access denied')
+
+  // Access check for Admins
+  if (session.role === 'admin') {
+    const { data: rawTargetUser } = await adminClient
+      .from('users')
+      .select('organization_id, role')
+      .eq('id', userId)
+      .single()
+      
+    const targetUser = rawTargetUser as any
+
+    if (!targetUser || targetUser.organization_id !== session.organizationId) {
+      throw new Error('Access denied')
+    }
+    
+    // Admins cannot update super-admins
+    if (targetUser.role === 'super-admin') {
+      throw new Error('Access denied')
+    }
+
+    // Admins cannot promote to super-admin
+    if (input.role === 'super-admin') {
+      throw new Error('Access denied')
+    }
+
+    // Admins cannot change organization
+    if (input.organizationName) {
+      // Allow if it's the same organization name (noop), but block changes
+      // Ideally we just ignore it or throw error. Let's ignore it to be safe or throw.
+      // Better to just not process organization update for admins.
+    }
+  }
+
   // 1. Update Auth user (email and password if provided)
   const authUpdate: any = {}
   if (input.email) authUpdate.email = input.email
@@ -179,32 +254,36 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
     }
   }
 
-  // 3. Handle organization update if name changed
+  // 3. Handle organization update if name changed (Super Admin Only)
   let organizationId: string | undefined
-  if (input.organizationName) {
+  if (input.organizationName && session.role === 'super-admin') {
     const trimmedName = input.organizationName.trim()
-    const { data: existingOrg } = await adminClient
+    const { data: rawExistingOrg } = await adminClient
       .from('organizations')
       .select('id')
       .ilike('name', trimmedName)
       .single()
 
+    const existingOrg = rawExistingOrg as any
+
     if (existingOrg) {
       organizationId = existingOrg.id
     } else {
-      const { data: newOrg, error: createOrgError } = await adminClient
+      const { data: rawNewOrg, error: createOrgError } = await adminClient
         .from('organizations')
-        .insert({ name: trimmedName })
+        .insert({ name: trimmedName } as any)
         .select('id')
         .single()
       
+      const newOrg = rawNewOrg as any
+
       if (createOrgError) return { error: 'Failed to create organization' }
       organizationId = newOrg.id
     }
   }
 
   // 4. Update public.users table
-  const publicUpdate: any = {}
+  const publicUpdate: UserUpdate = {}
   if (input.fullName) publicUpdate.full_name = input.fullName
   if (input.email) publicUpdate.email = input.email
   if (input.role) publicUpdate.role = input.role
@@ -224,9 +303,30 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
 }
 
 export async function deleteUser(userId: string) {
-  await requireSuperAdmin()
+  await requireAdminOrSuper()
   const adminClient = createAdminClient()
+  const session = await getSessionInfo()
+
+  if (!session) throw new Error('Access denied')
   
+  if (session.role === 'admin') {
+    const { data: rawTargetUser } = await adminClient
+      .from('users')
+      .select('organization_id, role')
+      .eq('id', userId)
+      .single()
+      
+    const targetUser = rawTargetUser as any
+
+    if (
+      !targetUser || 
+      targetUser.organization_id !== session.organizationId || 
+      targetUser.role === 'super-admin'
+    ) {
+      throw new Error('Access denied')
+    }
+  }
+
   // Delete from Auth (which cascades to public.users because of the 'on delete cascade' foreign key)
   const { error } = await adminClient.auth.admin.deleteUser(userId)
   
@@ -242,45 +342,69 @@ export async function createUser(input: CreateUserInput) {
   const supabase = createClient()
   const session = await getSessionInfo()
 
-  if (!session || session.role !== 'super-admin') {
-    return { error: 'Access denied' }
+  if (!session) {
+    console.log('Session not found in createUser');
+    return { error: 'Access denied: No session found' }
   }
 
-  const trimmedName = input.organizationName.trim()
-  if (!trimmedName) {
-    return { error: 'Organization name is required' }
+  console.log('Creating user with role:', session.role);
+
+  // Allow Super Admin AND Admin to create users
+  if (session.role !== 'super-admin' && session.role !== 'admin') {
+    return { error: `Access denied: Insufficient permissions (Role: ${session.role})` }
   }
 
-  const { data: existingOrgs, error: orgSearchError } = await supabase
-    .from('organizations')
-    .select('id, name')
-    .ilike('name', trimmedName)
-    .limit(1)
-
-  if (orgSearchError) {
-    console.error('Error searching organizations:', orgSearchError)
-    return { error: orgSearchError.message || 'Failed to find organization' }
+  // If role is Admin, they can only create Reviewers
+  if (session.role === 'admin') {
+    if (input.role !== 'reviewer') {
+      return { error: 'Access denied: Admins can only create Reviewers' }
+    }
   }
 
   let organizationId: string
 
-  if (existingOrgs && existingOrgs.length > 0) {
-    organizationId = existingOrgs[0].id
-  } else {
-    const { data: newOrg, error: createOrgError } = await supabase
-      .from('organizations')
-      .insert({
-        name: trimmedName,
-      })
-      .select('id')
-      .single()
-
-    if (createOrgError || !newOrg) {
-      console.error('Error creating organization:', createOrgError)
-      return { error: createOrgError?.message || 'Failed to create organization' }
+  // If Super Admin, handle organization logic as before
+  if (session.role === 'super-admin') {
+    const trimmedName = input.organizationName.trim()
+    if (!trimmedName) {
+      return { error: 'Organization name is required' }
     }
 
-    organizationId = newOrg.id
+    const { data: existingOrgs, error: orgSearchError } = await supabase
+      .from('organizations')
+      .select('id, name')
+      .ilike('name', trimmedName)
+      .limit(1)
+
+    if (orgSearchError) {
+      console.error('Error searching organizations:', orgSearchError)
+      return { error: orgSearchError.message || 'Failed to find organization' }
+    }
+
+    if (existingOrgs && existingOrgs.length > 0) {
+      organizationId = existingOrgs[0].id
+    } else {
+      const { data: newOrg, error: createOrgError } = await supabase
+        .from('organizations')
+        .insert({
+          name: trimmedName,
+        })
+        .select('id')
+        .single()
+
+      if (createOrgError || !newOrg) {
+        console.error('Error creating organization:', createOrgError)
+        return { error: createOrgError?.message || 'Failed to create organization' }
+      }
+
+      organizationId = newOrg.id
+    }
+  } else {
+    // If Admin, use their existing organization ID
+    if (!session.organizationId) {
+      return { error: 'Admin has no organization assigned' }
+    }
+    organizationId = session.organizationId
   }
 
   let adminClient

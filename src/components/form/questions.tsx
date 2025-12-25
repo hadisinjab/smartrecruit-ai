@@ -449,11 +449,15 @@ export const SelectQuestion: React.FC<QuestionComponentProps> = ({
           <SelectValue placeholder={field.placeholder || 'Select an option'} />
         </SelectTrigger>
         <SelectContent>
-          {field.options?.map((option, index) => (
-            <SelectItem key={index} value={option}>
-              {option}
-            </SelectItem>
-          ))}
+          {field.options?.map((option, index) => {
+            const value = typeof option === 'string' ? option : option.value;
+            const label = typeof option === 'string' ? option : option.label;
+            return (
+              <SelectItem key={index} value={value}>
+                {label}
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
       {error && (

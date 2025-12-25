@@ -6,10 +6,12 @@ import { getCurrentUser } from '@/actions/auth';
 export type UserRole = 'super-admin' | 'admin' | 'reviewer';
 
 interface UserContextType {
-  role: UserRole;
+  role: UserRole | null;
+  user: any | null; // Adding user object
   isAdmin: boolean;
   isReviewer: boolean;
   isSuperAdmin: boolean;
+  isLoading: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -23,20 +25,30 @@ export const useUser = () => {
 };
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<UserRole>('reviewer');
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [user, setUser] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadRole = async () => {
       try {
-        const user = await getCurrentUser();
-        const userRole = user?.role;
+        const userData = await getCurrentUser();
+        setUser(userData);
+        
+        const userRole = userData?.role?.trim().toLowerCase(); // Trim whitespace and normalize case
+        console.log('Current User Role:', userRole); // Debug log
+
         if (userRole === 'super-admin' || userRole === 'admin' || userRole === 'reviewer') {
-          setRole(userRole);
+          setRole(userRole as UserRole);
         } else {
-          setRole('reviewer');
+          setRole(null);
         }
-      } catch {
-        setRole('reviewer');
+      } catch (error) {
+        console.error('Failed to load user role:', error);
+        setRole(null);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
     };
     loadRole();
@@ -44,9 +56,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: UserContextType = {
     role,
+    user,
     isAdmin: role === 'admin' || role === 'super-admin',
     isSuperAdmin: role === 'super-admin',
     isReviewer: role === 'reviewer',
+    isLoading,
   };
 
   return (

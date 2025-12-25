@@ -58,6 +58,11 @@ export async function updateSession(request: NextRequest, response?: NextRespons
     normalizedPath.startsWith(`${adminBase}/log in`) ||
     normalizedPath.startsWith('/admin/log in')
 
+  // If it's NOT an admin route, allow access without auth
+  if (!isAdminRoute) {
+    return supabaseResponse
+  }
+  
   const allowedAdminRoles = new Set(['admin', 'super-admin', 'reviewer'])
 
   const redirectToLogin = () => {
@@ -69,22 +74,30 @@ export async function updateSession(request: NextRequest, response?: NextRespons
     return redirectResponse
   }
 
-  if (isAdminRoute && !isAdminAuthRoute) {
-    if (!user) {
-      return redirectToLogin()
-    }
+  // Allow access to login pages
+  if (isAdminAuthRoute) {
+    return supabaseResponse
+  }
 
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+  // Check authentication for all other routes
+  if (!user) {
+    return redirectToLogin()
+  }
 
-    const role = userData?.role
-    if (userError || !role || !allowedAdminRoles.has(role)) {
-      await supabase.auth.signOut()
-      return redirectToLogin()
-    }
+  // Check role in database
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  console.log('[Middleware] User:', user.id, 'Role:', userData?.role, 'Error:', userError?.message);
+
+  // If user is not found in database, or has no role, or role is not allowed
+  if (userError || !userData || !userData.role || !allowedAdminRoles.has(userData.role)) {
+    console.log('[Middleware] Access Denied. Redirecting to login.');
+    await supabase.auth.signOut()
+    return redirectToLogin()
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
