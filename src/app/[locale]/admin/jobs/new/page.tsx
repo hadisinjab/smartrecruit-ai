@@ -26,7 +26,7 @@ import {
 import { useToast } from '@/context/ToastContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useUser } from '@/context/UserContext';
-import { createJob } from '@/actions/jobs';
+import { createJob, getOrganizationUsers } from '@/actions/jobs';
 
 export default function CreateJobPage() {
   const t = useTranslations('Jobs');
@@ -37,6 +37,7 @@ export default function CreateJobPage() {
   const { isReviewer, isSuperAdmin, isAdmin } = useUser();
 
   const [loading, setLoading] = useState(false);
+  const [organizationUsers, setOrganizationUsers] = useState<Array<{id: string, name: string, email: string, role: string}>>([]);
   
   // Protect page: Redirect Reviewers to Jobs list
   if (isReviewer) {
@@ -46,6 +47,16 @@ export default function CreateJobPage() {
     }, [router]);
     return null; // Or show Access Denied message
   }
+
+  // Load organization users on mount
+  React.useEffect(() => {
+    async function loadUsers() {
+      const users = await getOrganizationUsers();
+      setOrganizationUsers(users);
+    }
+    loadUsers();
+  }, []);
+
   const [jobData, setJobData, clearJobData] = useAutoSave('create-job-data', {
     title: '',
     department: '',
@@ -104,13 +115,21 @@ export default function CreateJobPage() {
   };
 
   const addQuestion = (type: FormField['type']) => {
+    // Automatically assign page number based on question type
+    // Text questions (text, textarea) → page 3
+    // Media questions (voice, file, url) → page 4
+    const isTextQuestion = type === 'text' || type === 'textarea'
+    const pageNumber = isTextQuestion ? 3 : 4
+
     const newField: FormField = {
       id: `field-${Date.now()}`,
       type,
       label: tCreate('questionText'),
       required: true,
       placeholder: tCreate('questionText'),
-      pageNumber: 1 // Default to page 1
+      pageNumber, // Auto-assigned based on type
+      // Set default duration for voice questions (3 minutes = 180 seconds)
+      ...(type === 'voice' && { options: [{ label: 'duration', value: '180' }] })
     };
 
     const newSteps = [...formSteps];
@@ -120,7 +139,15 @@ export default function CreateJobPage() {
 
   const updateQuestion = (index: number, updates: Partial<FormField>) => {
     const newSteps = [...formSteps];
-    newSteps[0].fields[index] = { ...newSteps[0].fields[index], ...updates };
+    const currentField = newSteps[0].fields[index];
+    
+    // If type is being changed, auto-update pageNumber
+    if (updates.type && updates.type !== currentField.type) {
+      const isTextQuestion = updates.type === 'text' || updates.type === 'textarea'
+      updates.pageNumber = isTextQuestion ? 3 : 4
+    }
+    
+    newSteps[0].fields[index] = { ...currentField, ...updates };
     setFormSteps(newSteps);
   };
 
@@ -406,23 +433,15 @@ export default function CreateJobPage() {
                             <Label htmlFor={`req-${field.id}`} className="cursor-pointer">{tCreate('required')}</Label>
                           </div>
 
+                          {/* Page number is auto-assigned based on question type */}
                           <div className="flex items-center space-x-2">
-                            <Label className="text-sm text-gray-600">Page:</Label>
-                            <Select
-                              value={(field.pageNumber || 1).toString()}
-                              onValueChange={(val) => updateQuestion(index, { pageNumber: parseInt(val) })}
-                            >
-                              <SelectTrigger className="w-16 h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[1, 2, 3, 4, 5].map((num) => (
-                                  <SelectItem key={num} value={num.toString()}>
-                                    {num}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Label className="text-sm text-gray-500">
+                              Page: <span className="font-semibold text-gray-700">
+                                {(field.pageNumber === 3 || field.pageNumber === 4) 
+                                  ? field.pageNumber 
+                                  : (field.type === 'text' || field.type === 'textarea') ? 3 : 4}
+                              </span>
+                            </Label>
                           </div>
                           
                           {/* Config inputs based on type */}
@@ -433,18 +452,24 @@ export default function CreateJobPage() {
                                </div>
                                <Input 
                                  type="number" 
-                                 placeholder="Duration (sec)" 
-                                 className="w-24 h-8 text-xs"
+                                 placeholder="Duration (minutes)" 
+                                 className="w-32 h-8 text-xs"
+                                 min="1"
                                  value={(() => {
                                    const opt = field.options?.[0];
                                    if (typeof opt === 'object' && opt !== null) {
-                                      return opt.value;
+                                      // Convert from seconds to minutes for display
+                                      const seconds = parseInt(opt.value) || 0;
+                                      return seconds > 0 ? (seconds / 60).toString() : '';
                                    }
                                    return '';
                                  })()}
                                  onChange={(e) => {
                                     const val = e.target.value;
-                                    updateQuestion(index, { options: [{ label: 'duration', value: val }] });
+                                    // Convert from minutes to seconds for storage
+                                    const minutes = parseFloat(val) || 0;
+                                    const seconds = Math.round(minutes * 60);
+                                    updateQuestion(index, { options: [{ label: 'duration', value: seconds.toString() }] });
                                  }}
                                />
                             </div>
@@ -543,8 +568,15 @@ export default function CreateJobPage() {
                       <SelectValue placeholder={tCreate('selectManager')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="manager1">John Doe</SelectItem>
-                      <SelectItem value="manager2">Sarah Smith</SelectItem>
+                      {organizationUsers.length > 0 ? (
+                        organizationUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name} ({user.role})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-gray-500">Loading users...</div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

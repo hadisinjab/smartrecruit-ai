@@ -5,7 +5,56 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 import { Job } from '@/types/admin';
-import { requireAdminOrSuper, requireJobOwnerOrSuper, requireStaff } from '@/utils/authz'
+import { requireAdminOrSuper, requireJobOwnerOrSuper, requireStaff, getSessionInfo } from '@/utils/authz'
+
+// Get users from the same organization as the current user or job creator
+export async function getOrganizationUsers(jobCreatorId?: string) {
+  const supabase = createClient()
+  const session = await getSessionInfo()
+
+  if (!session) {
+    return []
+  }
+
+  let organizationId: string | null = session.organizationId
+
+  // If jobCreatorId is provided, get the organization of the job creator
+  if (jobCreatorId) {
+    const { data: jobCreator } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('id', jobCreatorId)
+      .single()
+
+    if (jobCreator?.organization_id) {
+      organizationId = jobCreator.organization_id
+    }
+  }
+
+  if (!organizationId) {
+    return []
+  }
+
+  // Get all users from the same organization (super-admin, admin, reviewer)
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('id, full_name, email, role')
+    .eq('organization_id', organizationId)
+    .in('role', ['super-admin', 'admin', 'reviewer'])
+    .order('full_name', { ascending: true })
+
+  if (error || !users) {
+    console.error('Error fetching organization users:', error)
+    return []
+  }
+
+  return users.map((user: any) => ({
+    id: user.id,
+    name: user.full_name || user.email || 'Unknown',
+    email: user.email,
+    role: user.role
+  }))
+}
 
 export async function getJobs(): Promise<Job[]> {
   const supabase = createClient()
@@ -131,6 +180,28 @@ export async function getJobById(id: string): Promise<Job | null> {
     console.error('Error fetching questions:', questionsError);
   }
 
+  // Get hiring manager name if hiring_manager_name is a user ID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let hiringManagerName = jobData.hiring_manager_name || '';
+  let hiringManagerId: string | undefined = undefined;
+  
+  if (jobData.hiring_manager_name) {
+    // Check if it's a UUID (user ID)
+    if (uuidRegex.test(jobData.hiring_manager_name)) {
+      // It's a user ID, get the user's name
+      hiringManagerId = jobData.hiring_manager_name;
+      const { data: hiringManager } = await supabase
+        .from('users')
+        .select('full_name, email')
+        .eq('id', jobData.hiring_manager_name)
+        .single();
+      
+      if (hiringManager) {
+        hiringManagerName = hiringManager.full_name || hiringManager.email || jobData.hiring_manager_name;
+      }
+    }
+  }
+
   // Map to Job interface
   return {
     id: jobData.id,
@@ -150,7 +221,9 @@ export async function getJobById(id: string): Promise<Job | null> {
     postedDate: jobData.created_at,
     deadline: jobData.deadline,
     applicantsCount: count || 0,
-    hiringManager: jobData.hiring_manager_name,
+    hiringManager: hiringManagerName,
+    hiring_manager_id: hiringManagerId, // Keep ID for editing
+    created_by: jobData.created_by, // Add created_by for getting organization users
     evaluation_criteria: questions?.map(q => ({
       id: q.id,
       type: q.type,
@@ -159,7 +232,7 @@ export async function getJobById(id: string): Promise<Job | null> {
       pageNumber: q.page_number,
       options: q.config?.options || []
     })) || []
-  }
+  } as Job & { created_by?: string; hiring_manager_id?: string }
 }
 
 export async function createJob(formData: any) {
@@ -183,6 +256,9 @@ export async function createJob(formData: any) {
     throw new Error('Missing organization for current user')
   }
 
+  // Generate application link - will be set after job creation
+  // For now, we'll generate it after getting the job ID
+  
   const { data, error } = await supabase
     .from('job_forms')
     .insert({
@@ -219,7 +295,7 @@ export async function createJob(formData: any) {
       page_number: q.pageNumber || 1, // Use provided page number or default to 1
       type: q.type,
       label: q.label,
-      required: q.required,
+      required: q.required || false,
       config: q.options ? { options: q.options } : {}, // Store additional config like options in JSON
       order_index: index + 1 // 1-based index
     }));
@@ -232,6 +308,24 @@ export async function createJob(formData: any) {
        console.error('Error creating questions:', questionsError);
        // We don't throw here to avoid failing the whole job creation, but we log it
     }
+  }
+
+  // Update evaluation_criteria to match questions for backward compatibility
+  // This ensures consistency between questions table and evaluation_criteria
+  if (formData.questions && Array.isArray(formData.questions) && formData.questions.length > 0) {
+    const evaluationCriteria = formData.questions.map((q: any) => ({
+      id: q.id || `temp-${Date.now()}-${Math.random()}`,
+      type: q.type,
+      label: q.label,
+      required: q.required || false,
+      pageNumber: q.pageNumber || 1,
+      options: q.options || []
+    }));
+
+    await supabase
+      .from('job_forms')
+      .update({ evaluation_criteria: evaluationCriteria })
+      .eq('id', data.id);
   }
 
   revalidatePath('/admin/jobs')
@@ -268,6 +362,42 @@ export async function updateJob(id: string, formData: any) {
   if (error) {
     console.error('Error updating job:', error)
     throw new Error('Failed to update job')
+  }
+
+  // Update questions if provided
+  if (formData.questions && Array.isArray(formData.questions)) {
+    // Delete existing questions
+    const { error: deleteError } = await supabase
+      .from('questions')
+      .delete()
+      .eq('job_form_id', id)
+
+    if (deleteError) {
+      console.error('Error deleting old questions:', deleteError)
+      // Continue anyway, but log the error
+    }
+
+    // Insert new questions if there are any
+    if (formData.questions.length > 0) {
+      const questionsToInsert = formData.questions.map((q: any, index: number) => ({
+        job_form_id: id,
+        page_number: q.pageNumber || 1,
+        type: q.type,
+        label: q.label,
+        required: q.required || false,
+        config: q.options ? { options: q.options } : {},
+        order_index: index + 1
+      }))
+
+      const { error: questionsError } = await supabase
+        .from('questions')
+        .insert(questionsToInsert)
+
+      if (questionsError) {
+        console.error('Error updating questions:', questionsError)
+        // Don't throw here to avoid failing the whole update, but log it
+      }
+    }
   }
 
   revalidatePath('/admin/jobs')

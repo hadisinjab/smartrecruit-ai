@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MultiStepFormProps, FormData } from '@/types/form';
+import { MultiStepFormProps, FormData, FormValue } from '@/types/form';
 import { FormStepComponent } from './form-step';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -10,7 +10,11 @@ import { ChevronRight, ChevronLeft } from 'lucide-react';
 export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   steps,
   onComplete,
-  rtl = false
+  rtl = false,
+  applicationId,
+  jobFormId,
+  onVoiceUploadComplete,
+  onFileUploadComplete
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
@@ -18,7 +22,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
   const progress = ((currentStep + 1) / steps.length) * 100;
 
-  const handleFieldChange = (fieldId: string, value: string | number | boolean | File | null) => {
+  const handleFieldChange = (fieldId: string, value: FormValue) => {
     setFormData(prev => ({
       ...prev,
       [fieldId]: value
@@ -105,6 +109,10 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
   const handleNext = () => {
     if (validateCurrentStep()) {
+      // المرحلة 5️⃣: Auto-save عند الانتقال للصفحة التالية
+      // يتم حفظ الإجابات تلقائياً عند الضغط Next
+      // (سيتم استدعاء onComplete الذي يحفظ الإجابات)
+      
       if (currentStep < steps.length - 1) {
         setCurrentStep(prev => prev + 1);
       } else {
@@ -159,6 +167,10 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
             onFieldChange={handleFieldChange}
             rtl={rtl}
             errors={errors}
+            applicationId={applicationId}
+            jobFormId={jobFormId}
+            onVoiceUploadComplete={onVoiceUploadComplete}
+            onFileUploadComplete={onFileUploadComplete}
           />
         </div>
 

@@ -1,16 +1,22 @@
 'use client';
 
 import React from 'react';
-import { FormStep, FormData } from '@/types/form';
+import { FormStep, FormData, FormValue } from '@/types/form';
 import { TextQuestion, NumberQuestion, TextareaQuestion, VoiceQuestion, FileUploadQuestion, URLQuestion, SelectQuestion } from './questions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface FormStepComponentProps {
   step: FormStep;
   formData: FormData;
-  onFieldChange: (fieldId: string, value: string | number | boolean | File | null) => void;
+  onFieldChange: (fieldId: string, value: FormValue) => void;
   rtl?: boolean;
   errors?: { [key: string]: string };
+  // Additional props for voice questions
+  applicationId?: string;
+  jobFormId?: string;
+  onVoiceUploadComplete?: (questionId: string, audioJson: any) => void;
+  // Additional props for file upload questions
+  onFileUploadComplete?: (questionId: string, fileUrl: string) => void;
 }
 
 export const FormStepComponent: React.FC<FormStepComponentProps> = ({
@@ -18,15 +24,31 @@ export const FormStepComponent: React.FC<FormStepComponentProps> = ({
   formData,
   onFieldChange,
   rtl = false,
-  errors = {}
+  errors = {},
+  applicationId,
+  jobFormId,
+  onVoiceUploadComplete,
+  onFileUploadComplete
 }) => {
   const renderQuestion = (field: any) => {
     const commonProps = {
       field,
       value: formData[field.id] || (field.type === 'voice' ? false : field.type === 'file' ? null : field.type === 'select' ? '' : ''),
-      onChange: (value: string | number | boolean | File | null) => onFieldChange(field.id, value),
+      onChange: (value: FormValue) => onFieldChange(field.id, value),
       rtl,
-      error: errors[field.id]
+      error: errors[field.id],
+      // Pass additional props for voice questions
+      ...(field.type === 'voice' && {
+        applicationId,
+        jobFormId,
+        onUploadComplete: onVoiceUploadComplete
+      }),
+      // Pass additional props for file upload questions
+      ...(field.type === 'file' && {
+        applicationId,
+        jobFormId,
+        onFileUploadComplete: onFileUploadComplete
+      })
     };
 
     switch (field.type) {

@@ -519,22 +519,39 @@ export default function CandidateDetailsPage() {
               <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.documents')}</h2>
               <div className='space-y-3'>
                 {candidate.resumeUrl && (
-                  <div className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer'>
+                  <a
+                    href={candidate.resumeUrl}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
+                  >
                     <FileText className='w-5 h-5 text-gray-400' />
-                    <span className='text-sm text-gray-700'>Resume.pdf</span>
-                  </div>
+                    <span className='text-sm text-gray-700 hover:text-blue-600'>
+                      {candidate.resumeUrl.split('/').pop() || 'Resume.pdf'}
+                    </span>
+                  </a>
                 )}
                 {candidate.portfolioUrl && (
-                  <div className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer'>
+                  <a
+                    href={candidate.portfolioUrl}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
+                  >
                     <Globe className='w-5 h-5 text-gray-400' />
-                    <span className='text-sm text-gray-700'>Portfolio</span>
-                  </div>
+                    <span className='text-sm text-gray-700 hover:text-blue-600'>Portfolio</span>
+                  </a>
                 )}
                 {candidate.linkedinUrl && (
-                  <div className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer'>
+                  <a
+                    href={candidate.linkedinUrl}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
+                  >
                     <User className='w-5 h-5 text-gray-400' />
-                    <span className='text-sm text-gray-700'>LinkedIn Profile</span>
-                  </div>
+                    <span className='text-sm text-gray-700 hover:text-blue-600'>LinkedIn Profile</span>
+                  </a>
                 )}
               </div>
             </Card>

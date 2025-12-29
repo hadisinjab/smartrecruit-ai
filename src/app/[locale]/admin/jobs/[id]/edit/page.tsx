@@ -21,22 +21,28 @@ import {
   FileText, 
   AlignLeft, 
   Upload, 
-  Link as LinkIcon 
+  Link as LinkIcon,
+  Copy,
+  ExternalLink,
+  CheckCircle
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useUser } from '@/context/UserContext';
-import { getJob, updateJob } from '@/actions/jobs';
+import { getJob, updateJob, getOrganizationUsers } from '@/actions/jobs';
 import { Loader2 } from 'lucide-react';
 
-export default function EditJobPage({ params }: { params: { id: string } }) {
+export default function EditJobPage({ params }: { params: { id: string; locale?: string } }) {
   const t = useTranslations('Jobs');
   const tCreate = useTranslations('Jobs.create');
   const tCommon = useTranslations('Common');
   const router = useRouter();
   const { addToast } = useToast();
   const { isReviewer, user } = useUser();
+  const locale = params.locale || 'en'; // Get locale from params
   const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [organizationUsers, setOrganizationUsers] = useState<Array<{id: string, name: string, email: string, role: string}>>([]);
   
   // Protect page: Redirect Reviewers to Jobs list
   if (isReviewer) {
@@ -83,6 +89,11 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
             return;
         }
         
+        // Load organization users based on job creator
+        const jobCreatorId = (job as any).created_by;
+        const users = await getOrganizationUsers(jobCreatorId);
+        setOrganizationUsers(users);
+        
         // Transform fetched data to state format
         setJobData({
             title: job.title,
@@ -99,17 +110,26 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
             requirements: job.requirements || [''],
             benefits: job.benefits || [''],
             deadline: job.deadline || '',
-            hiringManager: job.hiring_manager_name || ''
+            hiringManager: (job as any).hiring_manager_id || job.hiring_manager_name || ''
         });
 
         // If there are questions, load them into formSteps
-        if (job.evaluation_criteria && Array.isArray(job.evaluation_criteria)) {
+        // evaluation_criteria comes from getJobById which converts questions to FormField[]
+        if (job.evaluation_criteria && Array.isArray(job.evaluation_criteria) && job.evaluation_criteria.length > 0) {
              setFormSteps([{
                id: 'step-1',
                title: 'Application Questions',
                description: 'Please answer the following questions',
                fields: job.evaluation_criteria as FormField[]
              }]);
+        } else {
+          // Initialize empty form steps if no questions exist
+          setFormSteps([{
+            id: 'step-1',
+            title: 'Application Questions',
+            description: 'Please answer the following questions',
+            fields: []
+          }]);
         }
       } catch (error) {
         console.error('Error fetching job:', error);
@@ -153,13 +173,21 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
   };
 
   const addQuestion = (type: FormField['type']) => {
+    // Automatically assign page number based on question type
+    // Text questions (text, textarea) → page 3
+    // Media questions (voice, file, url) → page 4
+    const isTextQuestion = type === 'text' || type === 'textarea'
+    const pageNumber = isTextQuestion ? 3 : 4
+
     const newField: FormField = {
       id: `field-${Date.now()}`,
       type,
       label: tCreate('questionText'),
       required: true,
       placeholder: tCreate('questionText'),
-      pageNumber: 1
+      pageNumber, // Auto-assigned based on type
+      // Set default duration for voice questions (3 minutes = 180 seconds)
+      ...(type === 'voice' && { options: [{ label: 'duration', value: '180' }] })
     };
 
     const newSteps = [...formSteps];
@@ -452,23 +480,15 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                           <Label htmlFor={`req-${field.id}`} className="cursor-pointer">{tCreate('required')}</Label>
                         </div>
 
+                         {/* Page number is auto-assigned based on question type */}
                          <div className="flex items-center space-x-2">
-                             <Label className="text-sm text-gray-600">Page:</Label>
-                             <Select
-                               value={(field.pageNumber || 1).toString()}
-                               onValueChange={(val) => updateQuestion(index, { pageNumber: parseInt(val) })}
-                             >
-                               <SelectTrigger className="w-16 h-8 text-xs">
-                                 <SelectValue />
-                               </SelectTrigger>
-                               <SelectContent>
-                                 {[1, 2, 3, 4, 5].map((num) => (
-                                   <SelectItem key={num} value={num.toString()}>
-                                     {num}
-                                   </SelectItem>
-                                 ))}
-                               </SelectContent>
-                             </Select>
+                             <Label className="text-sm text-gray-500">
+                               Page: <span className="font-semibold text-gray-700">
+                                 {(field.pageNumber === 3 || field.pageNumber === 4) 
+                                   ? field.pageNumber 
+                                   : (field.type === 'text' || field.type === 'textarea') ? 3 : 4}
+                               </span>
+                             </Label>
                            </div>
                         
                         {/* Config inputs based on type */}
@@ -479,18 +499,24 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                              </div>
                              <Input 
                                type="number" 
-                               placeholder="Duration (sec)" 
-                               className="w-24 h-8 text-xs"
+                               placeholder="Duration (minutes)" 
+                               className="w-32 h-8 text-xs"
+                               min="1"
                                value={(() => {
                                  const opt = field.options?.[0];
                                  if (typeof opt === 'object' && opt !== null) {
-                                    return opt.value;
+                                    // Convert from seconds to minutes for display
+                                    const seconds = parseInt(opt.value) || 0;
+                                    return seconds > 0 ? (seconds / 60).toString() : '';
                                  }
                                  return '';
                                })()}
                                onChange={(e) => {
                                   const val = e.target.value;
-                                  updateQuestion(index, { options: [{ label: 'duration', value: val }] });
+                                  // Convert from minutes to seconds for storage
+                                  const minutes = parseFloat(val) || 0;
+                                  const seconds = Math.round(minutes * 60);
+                                  updateQuestion(index, { options: [{ label: 'duration', value: seconds.toString() }] });
                                }}
                              />
                           </div>
@@ -579,21 +605,28 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                 </Select>
               </div>
 
-              <div>
-                <Label>{tCreate('hiringManager')}</Label>
-                <Select 
-                  value={jobData.hiringManager} 
-                  onValueChange={(val) => setJobData({...jobData, hiringManager: val})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={tCreate('selectManager')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manager1">John Doe</SelectItem>
-                    <SelectItem value="manager2">Sarah Smith</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <div>
+                  <Label>{tCreate('hiringManager')}</Label>
+                  <Select 
+                    value={jobData.hiringManager} 
+                    onValueChange={(val) => setJobData({...jobData, hiringManager: val})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={tCreate('selectManager')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organizationUsers.length > 0 ? (
+                        organizationUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name} ({user.role})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-gray-500">Loading users...</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
               <div>
                 <Label>{tCreate('deadline')}</Label>
@@ -603,6 +636,56 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                   onChange={(e) => setJobData({...jobData, deadline: e.target.value})}
                 />
               </div>
+            </div>
+          </Card>
+
+          {/* Application Link Card */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Application Link</h3>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <LinkIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                <input
+                  type="text"
+                  readOnly
+                  value={typeof window !== 'undefined' ? `${window.location.origin}/${locale}/apply/${params.id}` : `/${locale}/apply/${params.id}`}
+                  className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 font-mono"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const link = typeof window !== 'undefined' ? `${window.location.origin}/${locale}/apply/${params.id}` : `/${locale}/apply/${params.id}`;
+                    navigator.clipboard.writeText(link);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="flex-shrink-0"
+                >
+                  {linkCopied ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-1 text-green-600" />
+                      <span className="text-green-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-1" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  const link = typeof window !== 'undefined' ? `${window.location.origin}/${locale}/apply/${params.id}` : `/${locale}/apply/${params.id}`;
+                  window.open(link, '_blank');
+                }}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Open Link
+              </Button>
             </div>
           </Card>
 
