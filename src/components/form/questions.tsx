@@ -1,15 +1,14 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QuestionComponentProps } from '@/types/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Mic, MicOff, Upload, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Upload, Link as LinkIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { createClient } from '@/utils/supabase/client';
 
 export const TextQuestion: React.FC<QuestionComponentProps> = ({
   field,
@@ -105,29 +104,31 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
   value,
   onChange,
   rtl = false,
-  error,
-  jobFormId
+  error
 }) => {
-  const maxSeconds = 180;
   const [isRecording, setIsRecording] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [seconds, setSeconds] = useState(0);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
   const [hasRecorded, setHasRecorded] = useState(false);
 
-  const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
-  const timerRef = useRef<any>(null);
-
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, [audioUrl]);
+    let interval: NodeJS.Timeout;
+    
+    if (isRecording && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            setIsRecording(false);
+            setHasRecorded(true);
+            onChange(true); // Mark as completed
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, [isRecording, timeLeft, onChange]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -135,109 +136,10 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const uploadBlobToStorage = async (blob: Blob) => {
-    const supabase = createClient();
-    const buckets = ['voice', 'audio', 'voice-recordings'];
-    const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp4') ? 'mp4' : 'webm';
-    const folder = jobFormId || 'unknown-job';
-    const path = `voice/${folder}/${crypto.randomUUID()}-${field.id}.${ext}`;
-
-    let lastError: any = null;
-    for (const bucket of buckets) {
-      const { error } = await supabase.storage.from(bucket).upload(path, blob, {
-        contentType: blob.type || 'audio/webm',
-        upsert: true
-      });
-      if (!error) {
-        const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-        return { url: data.publicUrl, error: null as string | null };
-      }
-      lastError = error;
-    }
-    return { url: null as string | null, error: lastError?.message || 'Failed to upload recording' };
-  };
-
-  const stopRecording = async () => {
-    if (!recorderRef.current || recorderRef.current.state === 'inactive') return;
-    recorderRef.current.stop();
-  };
-
-  const startRecording = async () => {
-    setErrorMessage(null);
+  const startRecording = () => {
+    setIsRecording(true);
+    setTimeLeft(180);
     setHasRecorded(false);
-    setSeconds(0);
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const preferredMime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : '';
-
-      const recorder = new MediaRecorder(stream, preferredMime ? { mimeType: preferredMime } : undefined);
-      recorderRef.current = recorder;
-      chunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        // Stop tracks
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        if (timerRef.current) clearInterval(timerRef.current);
-
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-        const localUrl = URL.createObjectURL(blob);
-        setAudioUrl(localUrl);
-        setIsRecording(false);
-        setHasRecorded(true);
-
-        // Upload immediately
-        setIsUploading(true);
-        const { url, error } = await uploadBlobToStorage(blob);
-        if (error || !url) {
-          setErrorMessage(error || 'Failed to upload recording');
-          setIsUploading(false);
-          return;
-        }
-
-        const audioJson = {
-          audio_url: url,
-          duration_seconds: seconds,
-          mime_type: blob.type || recorder.mimeType || 'audio/webm',
-          size_bytes: blob.size,
-          transcription: { status: 'pending' }
-        };
-
-        onChange(audioJson);
-        setIsUploading(false);
-      };
-
-      recorder.start(1000);
-      setIsRecording(true);
-      timerRef.current = setInterval(() => {
-        setSeconds((s) => {
-          const next = s + 1;
-          if (next >= maxSeconds) {
-            // auto stop at max duration
-            try { stopRecording(); } catch {}
-          }
-          return next;
-        });
-      }, 1000);
-    } catch (e: any) {
-      console.error(e);
-      setErrorMessage(e?.message || 'Microphone permission denied');
-    }
   };
 
   return (
@@ -249,11 +151,6 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
       
       <Card className={`${isRecording ? 'border-red-300 bg-red-50' : hasRecorded ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
         <CardContent className='p-6 text-center space-y-4'>
-          {errorMessage && (
-            <div className='p-3 bg-red-50 border border-red-200 rounded-lg'>
-              <p className='text-sm text-red-700'>{errorMessage}</p>
-            </div>
-          )}
           <div className='flex justify-center'>
             {isRecording ? (
               <div className='flex flex-col items-center space-y-2'>
@@ -261,43 +158,23 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                   <Mic className='w-8 h-8 text-white' />
                 </div>
                 <div className='text-2xl font-mono font-bold text-red-600'>
-                  {formatTime(seconds)}
+                  {formatTime(timeLeft)}
                 </div>
                 <p className='text-sm text-red-600'>
-                  Recording…
+                  Recording... Cannot pause or re-record
                 </p>
-                <Button
-                  type='button'
-                  variant='outline'
-                  onClick={stopRecording}
-                  className='border-red-300 text-red-700 hover:bg-red-100'
-                >
-                  <MicOff className='w-4 h-4 mr-2' />
-                  Stop Recording
-                </Button>
               </div>
             ) : hasRecorded ? (
               <div className='flex flex-col items-center space-y-2'>
-                {isUploading ? (
-                  <>
-                    <div className='w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center animate-pulse'>
-                      <Loader2 className='w-8 h-8 text-white animate-spin' />
-                    </div>
-                    <p className='text-sm text-blue-700 font-medium'>Uploading…</p>
-                    <p className='text-xs text-gray-500'>Please wait</p>
-                  </>
-                ) : (
-                  <>
-                    <div className='w-16 h-16 bg-green-500 rounded-full flex items-center justify-center'>
-                      <MicOff className='w-8 h-8 text-white' />
-                    </div>
-                    <p className='text-sm text-green-700 font-medium'>Recording uploaded</p>
-                    <p className='text-xs text-gray-500'>Duration: {formatTime(seconds)}</p>
-                    {audioUrl && (
-                      <audio controls src={audioUrl} className='w-full max-w-md mt-2' />
-                    )}
-                  </>
-                )}
+                <div className='w-16 h-16 bg-green-500 rounded-full flex items-center justify-center'>
+                  <MicOff className='w-8 h-8 text-white' />
+                </div>
+                <p className='text-sm text-green-600 font-medium'>
+                  Recording completed successfully
+                </p>
+                <p className='text-xs text-gray-500'>
+                  Duration: 3:00
+                </p>
               </div>
             ) : (
               <div className='flex flex-col items-center space-y-2'>
@@ -313,7 +190,7 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                   Start Recording
                 </Button>
                 <p className='text-xs text-gray-500'>
-                  Max duration: {formatTime(maxSeconds)}
+                  3-minute recording timer will start automatically
                 </p>
               </div>
             )}
@@ -333,38 +210,20 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
   value,
   onChange,
   rtl = false,
-  error,
-  jobFormId,
-  onFileUploadComplete
+  error
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const uploadFileToStorage = async (file: File) => {
-    const supabase = createClient();
-    const buckets = ['files', 'resumes'];
-    const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-    const folder = jobFormId || 'unknown-job';
-    const path = `applications/${folder}/${crypto.randomUUID()}-${field.id}.${ext}`;
-
-    let lastError: any = null;
-    for (const bucket of buckets) {
-      const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
-      if (!error) {
-        const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-        return { url: data.publicUrl, error: null as string | null };
-      }
-      lastError = error;
+  const handleFileSelect = (file: File) => {
+    // Validate file type
+    const acceptedTypes = field.validation?.acceptedTypes || ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!acceptedTypes.includes(file.type)) {
+      alert('Please upload a PDF, DOC, or DOCX file');
+      return;
     }
-    return { url: null as string | null, error: lastError?.message || 'Failed to upload file' };
-  };
 
-  const handleFileSelect = async (file: File) => {
-    setUploadError(null);
     // Validate file size
     const maxSize = field.validation?.maxFileSize || 5; // 5MB default
     if (file.size > maxSize * 1024 * 1024) {
@@ -374,19 +233,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
 
     setFileName(file.name);
     setFileSize((file.size / 1024 / 1024).toFixed(2));
-
-    // Upload immediately so submit is faster
-    setIsUploading(true);
-    const { url, error: upErr } = await uploadFileToStorage(file);
-    if (upErr || !url) {
-      setUploadError(upErr || 'Failed to upload file');
-      setIsUploading(false);
-      return;
-    }
-
-    onChange(url);
-    onFileUploadComplete?.(field.id, url);
-    setIsUploading(false);
+    onChange(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -409,9 +256,6 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
   const removeFile = () => {
     setFileName('');
     setFileSize('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
     onChange(null);
   };
 
@@ -421,15 +265,6 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
         {field.label}
         {field.required && <span className='text-red-500 ms-1'>*</span>}
       </Label>
-
-      {/* Keep input mounted so "Choose/Change" always works */}
-      <input
-        ref={fileInputRef}
-        type='file'
-        accept='*/*'
-        onChange={handleFileInput}
-        className='hidden'
-      />
       
       {!fileName ? (
         <div
@@ -451,25 +286,25 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
             Drag and drop your file here, or click to browse
           </p>
           <p className='text-xs text-gray-400 mb-4'>
-            Accepted formats: Any file type • Max size: {field.validation?.maxFileSize || 5}MB
+            Accepted formats: PDF, DOC, DOCX • Max size: {field.validation?.maxFileSize || 5}MB
           </p>
-
-          <Button
-            type='button'
-            variant='outline'
-            className='cursor-pointer'
-            disabled={isUploading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className='w-4 h-4 mr-2 animate-spin' />
-                Uploading…
-              </>
-            ) : (
-              'Choose File'
-            )}
-          </Button>
+          
+          <input
+            type='file'
+            accept='.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            onChange={handleFileInput}
+            className='hidden'
+            id={field.id}
+          />
+          <label htmlFor={field.id}>
+            <Button
+              type='button'
+              variant='outline'
+              className='cursor-pointer'
+            >
+              Choose File
+            </Button>
+          </label>
         </div>
       ) : (
         <Card className='border-green-200 bg-green-50'>
@@ -489,8 +324,10 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
                   type='button'
                   variant='outline'
                   size='sm'
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
+                  onClick={() => {
+                    const input = document.getElementById(field.id) as HTMLInputElement;
+                    input?.click();
+                  }}
                 >
                   Change
                 </Button>
@@ -500,7 +337,6 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
                   size='sm'
                   onClick={removeFile}
                   className='text-red-600 hover:text-red-700'
-                  disabled={isUploading}
                 >
                   Remove
                 </Button>
@@ -508,10 +344,6 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {uploadError && (
-        <p className='text-sm text-red-500'>{uploadError}</p>
       )}
 
       {error && (

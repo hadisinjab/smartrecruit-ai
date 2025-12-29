@@ -19,10 +19,7 @@ import {
   Briefcase,
   Award,
   CheckCircle,
-  Building,
-  Link as LinkIcon,
-  Copy,
-  ExternalLink
+  Building
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
@@ -30,25 +27,9 @@ export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
-  const locale = params.locale as string || 'en'; // Get locale from params
   const [job, setJob] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [linkCopied, setLinkCopied] = useState(false);
   const { isReviewer, isSuperAdmin, isAdmin, user } = useUser();
-
-  const getApplicationLink = () => {
-    // Calculate link dynamically - Best Practice: no need to store in DB
-    // Include locale in the path
-    const link = `/${locale}/apply/${jobId}`;
-    return typeof window !== 'undefined' ? `${window.location.origin}${link}` : link;
-  };
-
-  const copyLinkToClipboard = () => {
-    const link = getApplicationLink();
-    navigator.clipboard.writeText(link);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -210,7 +191,7 @@ export default function JobDetailsPage() {
                 <div className='flex items-center space-x-3 mb-2'>
                   <DollarSign className='w-5 h-5 text-gray-400' />
                   <span className='text-lg font-semibold text-gray-900'>
-                    ${((job.salary?.min || job.salary_min || 0)).toLocaleString()} - ${((job.salary?.max || job.salary_max || 0)).toLocaleString()} {job.salary?.currency || job.salary_currency || 'USD'}
+                    ${(job.salary_min || 0).toLocaleString()} - ${(job.salary_max || 0).toLocaleString()} {job.salary_currency || 'USD'}
                   </span>
                 </div>
               </div>
@@ -288,48 +269,6 @@ export default function JobDetailsPage() {
                     {job.deadline ? Math.ceil((new Date(job.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0}
                   </span>
                 </div>
-              </div>
-            </Card>
-
-            {/* Application Link */}
-            <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Application Link</h2>
-              <div className='space-y-3'>
-                <div className='flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border border-gray-200'>
-                  <LinkIcon className='w-5 h-5 text-gray-400 flex-shrink-0' />
-                  <input
-                    type='text'
-                    readOnly
-                    value={getApplicationLink()}
-                    className='flex-1 bg-transparent border-none outline-none text-sm text-gray-700 font-mono'
-                  />
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    onClick={copyLinkToClipboard}
-                    className='flex-shrink-0'
-                  >
-                    {linkCopied ? (
-                      <>
-                        <CheckCircle className='w-4 h-4 mr-1 text-green-600' />
-                        <span className='text-green-600'>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className='w-4 h-4 mr-1' />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <Button
-                  variant='outline'
-                  className='w-full'
-                  onClick={() => window.open(getApplicationLink(), '_blank')}
-                >
-                  <ExternalLink className='w-4 h-4 mr-2' />
-                  Open Link
-                </Button>
               </div>
             </Card>
 
