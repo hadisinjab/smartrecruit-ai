@@ -24,34 +24,24 @@ export interface FormStep {
 }
 
 export interface FormData {
-  [key: string]: FormValue;
+  [key: string]: string | number | boolean | File | null;
 }
-
-// Form values can include structured metadata (e.g., voice recording JSON)
-export type FormValue = string | number | boolean | File | null | Record<string, any>;
 
 export interface MultiStepFormProps {
   steps: FormStep[];
   onComplete: (data: FormData) => void;
   rtl?: boolean;
-  // Additional props for voice questions
-  applicationId?: string;
+  applicationId?: string | null;
   jobFormId?: string;
-  onVoiceUploadComplete?: (questionId: string, audioJson: any) => void;
-  // Additional props for file upload questions
-  onFileUploadComplete?: (questionId: string, fileUrl: string) => void;
+  onVoiceUploadComplete?: (info: any) => void;
+  onFileUploadComplete?: (info: any) => void;
+  onFirstStepComplete?: (data: FormData) => void;
 }
 
 export interface QuestionComponentProps {
   field: FormField;
-  value: FormValue;
-  onChange: (value: FormValue) => void;
+  value: string | number | boolean | File | null;
+  onChange: (value: string | number | boolean | File | null) => void;
   rtl?: boolean;
   error?: string;
-  // Additional props for voice questions
-  applicationId?: string;
-  jobFormId?: string;
-  onUploadComplete?: (questionId: string, audioJson: any) => void;
-  // Additional props for file upload questions
-  onFileUploadComplete?: (questionId: string, fileUrl: string) => void;
 }

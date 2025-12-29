@@ -94,12 +94,12 @@ export async function getJobs(): Promise<Job[]> {
   // This is a simplified approach; for large datasets, use a view or RPC
   const { data: appCounts, error: countError } = await supabase
     .from('applications')
-    .select('job_id')
+    .select('job_form_id')
 
   const counts: Record<string, number> = {};
   if (appCounts) {
     appCounts.forEach((app: any) => {
-      counts[app.job_id] = (counts[app.job_id] || 0) + 1;
+      counts[app.job_form_id] = (counts[app.job_form_id] || 0) + 1;
     });
   }
 
@@ -163,7 +163,7 @@ export async function getJobById(id: string): Promise<Job | null> {
   const { count, error: countError } = await supabase
     .from('applications')
     .select('*', { count: 'exact', head: true })
-    .eq('job_id', id)
+    .eq('job_form_id', id)
 
   if (countError) {
     console.error('Error fetching applicants count:', countError)

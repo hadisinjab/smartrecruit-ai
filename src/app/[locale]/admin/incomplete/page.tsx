@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useTranslations, useFormatter } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -28,7 +28,6 @@ export default function IncompleteApplicationsPage() {
   const tCommon = useTranslations('Common');
   const tTable = useTranslations('Table');
   const tProgress = useTranslations('Progress');
-  const format = useFormatter();
   const { addToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -121,6 +120,21 @@ export default function IncompleteApplicationsPage() {
               <span className='text-xs text-gray-500'>{record.location}</span>
             </div>
           </div>
+        </div>
+      )
+    },
+    {
+      key: 'stoppedAt',
+      title: tTable('stoppedAt'),
+      render: (_, record) => (
+        <div className='text-sm text-gray-700'>
+          {record.stoppedAt === 'voice-recording' ? tTable('stoppedVoice') :
+           record.stoppedAt === 'file-upload' ? tTable('stoppedFile') :
+           record.stoppedAt === 'link-input' ? tTable('stoppedLink') :
+           record.stoppedAt === 'text-questions' ? tTable('stoppedText') :
+           record.stoppedAt === 'media-questions' ? tTable('stoppedMedia') :
+           record.stoppedAt === 'candidate' || record.stoppedAt === 'application-info' ? tTable('stoppedCandidate') :
+           record.stoppedAt || tTable('unknown')}
         </div>
       )
     },

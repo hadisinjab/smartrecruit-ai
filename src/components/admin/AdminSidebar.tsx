@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Link, usePathname } from '@/i18n/navigation';
+import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +18,7 @@ import {
   Clock
 } from 'lucide-react';
 import { AdminUser } from '@/types/admin';
+import { createClient } from '@/utils/supabase/client';
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -48,6 +49,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }
 
 export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const t = useTranslations('Sidebar');
   const tCommon = useTranslations('Common');
   
@@ -74,7 +76,7 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         icon: <Users className='w-5 h-5' />,
         label: t('candidates'),
         href: '/admin/candidates',
-        allowedRoles: ['admin', 'reviewer'] as const // Super Admin مستثنى
+        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const
       },
       {
         icon: <Briefcase className='w-5 h-5' />,
@@ -191,7 +193,16 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
           </div>
         )}
         
-        <button className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'>
+        <button
+          className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'
+          onClick={async () => {
+            try {
+              const supabase = createClient();
+              await supabase.auth.signOut();
+            } catch {}
+            router.push('/admin/login');
+          }}
+        >
           <LogOut className='w-5 h-5' />
           <span>{tCommon('logout')}</span>
         </button>

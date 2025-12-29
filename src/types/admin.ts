@@ -37,6 +37,8 @@ export interface Job {
 
 export interface Candidate {
   id: string;
+  submittedAt?: string | null;
+  isDuplicate?: boolean;
   firstName: string;
   lastName: string;
   email: string;
@@ -127,6 +129,7 @@ export interface IncompleteApplication extends Candidate {
   completionPercentage: number;
   lastActivity: string;
   timeSpent: number; // in minutes
+  stoppedAt?: string;
 }
 
 export interface ActivityLogEntry {

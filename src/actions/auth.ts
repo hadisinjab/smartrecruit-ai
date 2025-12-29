@@ -22,7 +22,7 @@ export async function getCurrentUser(): Promise<AdminUser | null> {
       id: user.id,
       name: user.email?.split('@')[0] || 'User',
       email: user.email || '',
-      role: 'viewer', // Default safe role
+      role: 'reviewer',
       avatar: undefined,
       lastLogin: new Date().toISOString(),
       isActive: true,
@@ -34,7 +34,7 @@ export async function getCurrentUser(): Promise<AdminUser | null> {
     id: user.id,
     name: userData.full_name || user.email?.split('@')[0] || 'User',
     email: user.email || '',
-    role: userData.role || 'viewer',
+    role: (userData.role === 'viewer' ? 'reviewer' : userData.role) || 'reviewer',
     avatar: userData.avatar_url,
     lastLogin: new Date().toISOString(),
     isActive: true,

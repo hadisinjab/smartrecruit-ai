@@ -8,6 +8,8 @@ import { SearchProvider } from '@/context/SearchContext';
 
 const cairo = Cairo({
   subsets: ['latin', 'arabic'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal'],
   display: 'swap',
 });
 

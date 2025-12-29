@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { useTranslations, useFormatter } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -17,7 +17,6 @@ export default function EvaluationsPage() {
   const t = useTranslations('Evaluations');
   const tTable = useTranslations('Table');
   const tCommon = useTranslations('Common');
-  const format = useFormatter();
   const router = useRouter();
   const { addToast } = useToast();
 

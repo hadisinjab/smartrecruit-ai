@@ -2,28 +2,37 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { useTranslations, useFormatter } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { FilterPanel } from '@/components/admin/FilterPanel';
 import { DataTable, Column } from '@/components/admin/DataTable';
 import { Card } from '@/components/ui/admin-card';
 import { getCandidates } from '@/actions/candidates';
-import { Candidate } from '@/types/admin';
+import { getJobs } from '@/actions/jobs';
+import { Candidate, Job } from '@/types/admin';
 import { Filter, Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/context/ToastContext';
 import { exportToCSV } from '@/utils/exportUtils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function CandidatesPage() {
   const t = useTranslations('Candidates');
   const tCommon = useTranslations('Common');
   const tTable = useTranslations('Table');
   const tStatus = useTranslations('Status');
-  const format = useFormatter();
   const { addToast } = useToast();
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>([]);
   const [showFilters, setShowFilters] = useState(false);
@@ -37,9 +46,22 @@ export default function CandidatesPage() {
   const router = useRouter();
 
   useEffect(() => {
-    async function loadCandidates() {
+    async function loadJobs() {
       try {
-        const data = await getCandidates();
+        const data = await getJobs();
+        setJobs(data);
+      } catch (error) {
+        console.error('Failed to load jobs:', error);
+      }
+    }
+    loadJobs();
+  }, []);
+
+  useEffect(() => {
+    async function loadCandidates() {
+      setLoading(true);
+      try {
+        const data = await getCandidates(selectedJobId);
         setCandidates(data as unknown as Candidate[]);
         setFilteredCandidates(data as unknown as Candidate[]);
       } catch (error) {
@@ -50,7 +72,7 @@ export default function CandidatesPage() {
       }
     }
     loadCandidates();
-  }, [addToast]);
+  }, [addToast, selectedJobId]);
 
   const handleFiltersChange = (newFilters: any) => {
     setFilters(newFilters);
@@ -99,7 +121,8 @@ export default function CandidatesPage() {
       interview: 'bg-purple-100 text-purple-800',
       offer: 'bg-green-100 text-green-800',
       hired: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800'
+      rejected: 'bg-red-100 text-red-800',
+      duplicate: 'bg-orange-100 text-orange-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
@@ -151,6 +174,28 @@ export default function CandidatesPage() {
           {tStatus(status)}
         </span>
       )
+    },
+    {
+      key: 'completion',
+      title: tTable('completionStatus'),
+      render: (_, record) => {
+        const isIncomplete = !record.submittedAt
+        const isResubmitted = !!record.isDuplicate && !!record.submittedAt
+        const isFirstTime = !!record.submittedAt && !record.isDuplicate
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            isIncomplete ? 'bg-red-100 text-red-800' :
+            isResubmitted ? 'bg-orange-100 text-orange-800' :
+            'bg-green-100 text-green-800'
+          }`}>
+            {isIncomplete
+              ? tTable('incomplete')
+              : isResubmitted
+                ? tTable('completedResubmitted')
+                : tTable('completedFirstTime')}
+          </span>
+        )
+      }
     },
     {
       key: 'priority',
@@ -212,46 +257,56 @@ export default function CandidatesPage() {
     <AdminLayout
       title={t('title')}
       subtitle={t('subtitle')}
-      actions={
-        <div className='flex space-x-3'>
-          <Button
-            variant='outline'
-            onClick={() => {
-              exportToCSV(candidates, 'candidates-data');
-              addToast('success', 'Candidates data exported successfully');
-            }}
-            className='flex items-center space-x-2'
-          >
-            <span>{tCommon('export')}</span>
-          </Button>
-          <Button
-            variant='outline'
-            onClick={() => setShowFilters(true)}
-            className='flex items-center space-x-2'
-          >
-            <Filter className='w-4 h-4' />
-            <span>{t('filters')}</span>
-          </Button>
-        </div>
-      }
     >
       <div className='space-y-6'>
-        {/* Search and Stats */}
-        <div className='flex items-center justify-between'>
-          <div className='relative flex-1 max-w-md'>
-            <Search className='w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
-            <input
-              type='text'
-              placeholder={t('searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-              className='pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-            />
+        <Card className='p-4 mb-6'>
+          <div className='flex flex-col md:flex-row gap-4 items-center justify-between'>
+            <div className='flex flex-col sm:flex-row gap-4 w-full md:flex-1'>
+              <div className="w-full sm:w-[250px]">
+                <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('selectJob')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t('allJobs')}</SelectItem>
+                    {jobs.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='relative flex-1 w-full'>
+                <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4' />
+                <input
+                  type='text'
+                  placeholder={t('searchPlaceholder')}
+                  className='w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none'
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className='flex gap-2 w-full md:w-auto'>
+              <Button
+                variant='outline'
+                onClick={() => setShowFilters(!showFilters)}
+                className='flex items-center gap-2 w-full md:w-auto'
+              >
+                <Filter className='w-4 h-4' />
+                {t('filters')}
+              </Button>
+              <Button
+                variant='outline'
+                onClick={() => exportToCSV(filteredCandidates, 'candidates')}
+                className='flex items-center gap-2 w-full md:w-auto'
+              >
+                {tCommon('export')}
+              </Button>
+            </div>
           </div>
-          <div className='text-sm text-gray-600'>
-            {t('count', { count: filteredCandidates.length })}
-          </div>
-        </div>
+        </Card>
 
         {/* Quick Stats */}
         <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useTranslations, useFormatter } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
@@ -46,7 +46,6 @@ export default function UsersPage() {
   const tTable = useTranslations('Table');
   const tCommon = useTranslations('Common');
   const tRole = useTranslations('Role');
-  const format = useFormatter();
   const { addToast } = useToast();
   const { isSuperAdmin, isAdmin, isReviewer, isLoading: isUserLoading } = useUser();
   const router = useRouter();

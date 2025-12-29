@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
-import { MultiStepFormProps, FormData, FormValue } from '@/types/form';
+import React, { useState, useEffect } from 'react';
+import { MultiStepFormProps, FormData } from '@/types/form';
 import { FormStepComponent } from './form-step';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
+type FormValue = string | number | boolean | File | null;
+import { recordProgress } from '@/actions/applications';
 
 export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   steps,
@@ -14,7 +16,8 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   applicationId,
   jobFormId,
   onVoiceUploadComplete,
-  onFileUploadComplete
+  onFileUploadComplete,
+  onFirstStepComplete
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
@@ -36,6 +39,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
       }));
     }
   };
+
+  useEffect(() => {
+    const id = steps[currentStep]?.id
+    if (applicationId && id && id !== 'job') {
+      recordProgress(applicationId, id).catch(() => {})
+    }
+  }, [currentStep, applicationId, steps])
 
   const validateCurrentStep = (): boolean => {
     const step = steps[currentStep];
@@ -112,6 +122,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
       // المرحلة 5️⃣: Auto-save عند الانتقال للصفحة التالية
       // يتم حفظ الإجابات تلقائياً عند الضغط Next
       // (سيتم استدعاء onComplete الذي يحفظ الإجابات)
+      if (typeof onFirstStepComplete === 'function' && steps[currentStep]?.id === 'candidate') {
+        onFirstStepComplete(formData);
+      }
+      
+      if (applicationId && steps[currentStep]?.id) {
+        recordProgress(applicationId, steps[currentStep].id).catch(() => {});
+      }
       
       if (currentStep < steps.length - 1) {
         setCurrentStep(prev => prev + 1);
@@ -142,9 +159,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
       <div className='max-w-4xl mx-auto'>
         {/* Header */}
         <div className='mb-8 text-center'>
-          <h1 className='text-3xl font-bold text-gray-900 mb-2'>
-            SmartRecruit AI - Job Application
-          </h1>
+          <h1 className='text-3xl font-bold text-gray-900 mb-2'>SmartRecruit AI - Job Application</h1>
           <p className='text-gray-600'>
             Step {currentStep + 1} of {steps.length}
           </p>
@@ -159,19 +174,92 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
           </div>
         </div>
 
-        {/* Form Step */}
+        {/* Form Step / Review */}
         <div className='mb-8'>
-          <FormStepComponent
-            step={steps[currentStep]}
-            formData={formData}
-            onFieldChange={handleFieldChange}
-            rtl={rtl}
-            errors={errors}
-            applicationId={applicationId}
-            jobFormId={jobFormId}
-            onVoiceUploadComplete={onVoiceUploadComplete}
-            onFileUploadComplete={onFileUploadComplete}
-          />
+          {steps[currentStep].id !== 'review' ? (
+            <FormStepComponent
+              step={steps[currentStep]}
+              formData={formData}
+              onFieldChange={handleFieldChange}
+              rtl={rtl}
+              errors={errors}
+              applicationId={applicationId || undefined}
+              jobFormId={jobFormId}
+              onVoiceUploadComplete={onVoiceUploadComplete}
+              onFileUploadComplete={onFileUploadComplete}
+            />
+          ) : (
+            <div className='w-full max-w-2xl mx-auto bg-white border rounded-lg'>
+              <div className='px-6 pt-6'>
+                <h2 className='text-xl font-semibold text-gray-900'>Review & Submit</h2>
+                <p className='text-sm text-gray-600'>Please review your information before submitting.</p>
+              </div>
+              <div className='p-6 space-y-6'>
+                <div>
+                  <h3 className='text-sm font-medium text-gray-700'>Application Information</h3>
+                  <div className='mt-2 space-y-1 text-sm text-gray-800'>
+                    <p>Name: {String(formData['candidate_name'] || '—')}</p>
+                    <p>Email: {String(formData['candidate_email'] || '—')}</p>
+                  </div>
+                </div>
+                <div>
+                  <h3 className='text-sm font-medium text-gray-700'>Text Answers</h3>
+                  <div className='mt-2 space-y-2'>
+                    {steps
+                      .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
+                      .flatMap(s => s.fields)
+                      .filter(f => ['text', 'textarea', 'number', 'select'].includes(f.type))
+                      .map((f) => (
+                        <div key={f.id} className='text-sm'>
+                          <p className='text-gray-500'>{f.label}</p>
+                          <p className='text-gray-900'>{formData[f.id] != null && formData[f.id] !== '' ? String(formData[f.id]) : '—'}</p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className='text-sm font-medium text-gray-700'>Media & Links</h3>
+                  <div className='mt-2 space-y-2'>
+                    {steps
+                      .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
+                      .flatMap(s => s.fields)
+                      .filter(f => ['voice', 'file', 'url'].includes(f.type))
+                      .map((f) => {
+                        const v = formData[f.id]
+                        const isFile = v && typeof v === 'object' && 'name' in (v as any)
+                        const isUrl = typeof v === 'string' && /^https?:\/\//i.test(v)
+                        return (
+                          <div key={f.id} className='text-sm'>
+                            <p className='text-gray-500'>{f.label}</p>
+                            {f.type === 'voice' ? (
+                              <p className='text-gray-900'>{v ? 'Voice response recorded' : '—'}</p>
+                            ) : f.type === 'file' ? (
+                              v ? (
+                                <p className='text-gray-900'>{isFile ? (v as any).name : String(v)}</p>
+                              ) : (
+                                <p className='text-gray-900'>—</p>
+                              )
+                            ) : f.type === 'url' ? (
+                              v ? (
+                                isUrl ? (
+                                  <a href={String(v)} target='_blank' rel='noopener noreferrer' className='text-blue-600 hover:underline'>
+                                    {String(v)}
+                                  </a>
+                                ) : (
+                                  <p className='text-gray-900'>{String(v)}</p>
+                                )
+                              ) : (
+                                <p className='text-gray-900'>—</p>
+                              )
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
@@ -194,10 +282,12 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
             ))}
           </div>
 
-          <Button
-            onClick={handleNext}
-          >
-            {isLastStep ? 'Submit Application' : 'Next'}
+          <Button onClick={handleNext}>
+            {steps[currentStep].id === 'job'
+              ? 'Apply'
+              : isLastStep
+                ? 'Submit Application'
+                : 'Next'}
             <ChevronRight className='w-4 h-4 ms-2 rtl:rotate-180' />
           </Button>
         </div>

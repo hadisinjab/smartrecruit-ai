@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
-import { useTranslations, useFormatter } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/admin/DataTable';
@@ -21,7 +21,6 @@ export default function JobsPage() {
   const tTable = useTranslations('Table');
   const tStatus = useTranslations('Status');
   const tCommon = useTranslations('Common');
-  const format = useFormatter();
   const { addToast } = useToast();
   const { isReviewer, isSuperAdmin } = useUser();
   const { searchTerm } = useSearch();
@@ -161,11 +160,7 @@ export default function JobsPage() {
         <div className='flex items-center space-x-1'>
           <Calendar className='w-4 h-4 text-gray-400' />
           <span className='text-sm text-gray-700'>
-            {format.dateTime(new Date(date), {
-              year: 'numeric',
-              month: 'numeric',
-              day: 'numeric'
-            })}
+            {new Date(date).toLocaleDateString()}
           </span>
         </div>
       ),

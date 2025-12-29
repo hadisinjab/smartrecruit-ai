@@ -12,7 +12,9 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
     .select(`
       *,
       job_form:job_forms(title),
-      answers(question_id)
+      answers(question_id,value,voice_data),
+      resumes(*),
+      external_profiles(*)
     `)
     .eq('status', 'new')
     .is('submitted_at', null)
@@ -23,9 +25,82 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
     return []
   }
 
-  return applications.map((app: any) => {
-    const randomProgress = Math.floor(Math.random() * 90) + 10
+  // Build question counts per job form to compute completion percentages
+  const jobFormIds = Array.from(new Set((applications || []).map((a: any) => a.job_form_id).filter(Boolean)))
+  let questionsByJobForm = new Map<string, number>()
+  let questionTypeById = new Map<string, string>()
+  if (jobFormIds.length) {
+    const { data: qs } = await supabase
+      .from('questions')
+      .select('id,job_form_id,type')
+      .in('job_form_id', jobFormIds)
+    const counts: Record<string, number> = {}
+    ;(qs || []).forEach((q: any) => {
+      const id = q.job_form_id as string
+      counts[id] = (counts[id] || 0) + 1
+      questionTypeById.set(q.id as string, String(q.type || 'text').toLowerCase())
+    })
+    questionsByJobForm = new Map(Object.entries(counts))
+  }
+  
+  const appIds = (applications || []).map((a: any) => a.id)
+  let lastLogByApp = new Map<string, any>()
+  if (appIds.length) {
+    const { data: logs } = await supabase
+      .from('activity_logs')
+      .select('target_id,details,created_at,action,target_type')
+      .eq('target_type', 'application')
+      .in('target_id', appIds)
+      .order('created_at', { ascending: false })
+    ;(logs || []).forEach((l: any) => {
+      const id = l.target_id as string
+      if (!lastLogByApp.has(id)) {
+        lastLogByApp.set(id, l)
+      }
+    })
+  }
+
+  return (applications || []).map((app: any) => {
+    const totalQuestions = questionsByJobForm.get(app.job_form_id) || 0
+    const answeredCount = (app.answers || []).length
+    const completionPercentage = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0
+    const lastActivity = app.updated_at || app.created_at
+    const timeSpentMinutes = Math.max(
+      1,
+      Math.round((new Date(lastActivity).getTime() - new Date(app.created_at).getTime()) / 60000)
+    )
+    const hasResume = Array.isArray(app.resumes) && app.resumes.length > 0
+    const hasPersonalInfo = !!(app.candidate_name && app.candidate_email)
     
+    const answeredTypes = {
+      text: false,
+      textarea: false,
+      voice: false,
+      file: false,
+      url: false
+    }
+    ;(app.answers || []).forEach((ans: any) => {
+      const t = questionTypeById.get(ans.question_id) || 'text'
+      if ((t === 'text' || t === 'short_text') && ans.value) answeredTypes.text = true
+      if ((t === 'textarea' || t === 'long_text') && ans.value) answeredTypes.textarea = true
+      if ((t === 'voice' || t === 'audio' || t === 'voice_recording') && ans.voice_data) answeredTypes.voice = true
+      if ((t === 'file' || t === 'file_upload') && (ans.value || hasResume)) answeredTypes.file = true
+      if ((t === 'url' || t === 'link') && ans.value) answeredTypes.url = true
+    })
+    
+    let stoppedAt = 'application-info'
+    const progressLog = lastLogByApp.get(app.id)
+    const loggedStep = progressLog?.details?.stepId || progressLog?.details?.step || null
+    if (loggedStep) {
+      stoppedAt = String(loggedStep)
+    } else {
+      if (answeredTypes.voice) stoppedAt = 'voice-recording'
+      else if (answeredTypes.file || hasResume) stoppedAt = 'file-upload'
+      else if (answeredTypes.url) stoppedAt = 'link-input'
+      else if (answeredTypes.text || answeredTypes.textarea) stoppedAt = 'text-questions'
+      else if (!hasPersonalInfo) stoppedAt = 'application-info'
+    }
+
     return {
       id: app.id,
       firstName: app.candidate_name?.split(' ')[0] || 'Unknown',
@@ -37,7 +112,7 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
       experience: 0,
       status: 'applied',
       appliedDate: app.created_at,
-      lastUpdate: app.updated_at || app.created_at,
+      lastUpdate: lastActivity,
       source: 'Website',
       notes: '',
       rating: 0,
@@ -48,15 +123,16 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
         nextAction: '',
         nextActionDate: ''
       },
-      lastActivity: app.updated_at || app.created_at,
-      completionPercentage: randomProgress,
-      timeSpent: Math.floor(Math.random() * 60) + 5,
+      lastActivity,
+      completionPercentage,
+      timeSpent: timeSpentMinutes,
       progress: {
-        personalInfo: true,
-        experience: randomProgress > 30,
-        documents: randomProgress > 60,
-        questionnaire: randomProgress > 80
-      }
+        personalInfo: hasPersonalInfo,
+        experience: completionPercentage >= 30,
+        documents: hasResume,
+        questionnaire: answeredCount > 0
+      },
+      stoppedAt
     }
   })
 }

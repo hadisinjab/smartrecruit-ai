@@ -30,7 +30,8 @@ export async function addHrEvaluation(
       .eq('id', applicationId)
       .single()
 
-    if (appOwnerError || appOwner?.job_forms?.created_by !== user.id) {
+    const ownerId = (appOwner as any)?.job_forms?.created_by
+    if (appOwnerError || ownerId !== user.id) {
       throw new Error('Access denied')
     }
   }

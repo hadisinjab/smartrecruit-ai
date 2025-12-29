@@ -67,6 +67,8 @@
     "addCandidate": "إضافة مرشح",
     "filters": "تصفية",
     "searchPlaceholder": "بحث عن مرشحين...",
+    "allJobs": "كل الوظائف",
+    "selectJob": "اختر الوظيفة",
     "count": "تم العثور على {count} مرشح",
     "stats": {
       "offersMade": "عروض مقدمة",
@@ -93,6 +95,15 @@
       "contactInfo": "معلومات الاتصال",
       "appliedDate": "تاريخ التقديم {date}"
     }
+  },
+  "Status": {
+    "new": "جديد",
+    "applied": "تم التقديم",
+    "screening": "فرز",
+    "interview": "مقابلة",
+    "offer": "عرض عمل",
+    "hired": "تم التوظيف",
+    "rejected": "مرفوض"
   },
   "Jobs": {
     "title": "الوظائف",
@@ -301,7 +312,25 @@
     "postedDate": "تاريخ النشر",
     "user": "المستخدم",
     "joined": "تاريخ الانضمام",
-    "createdBy": "تم الإنشاء بواسطة"
+    "createdBy": "تم الإنشاء بواسطة",
+    "stoppedAt": "أين توقف",
+    "stoppedVoice": "توقف عند التسجيل الصوتي",
+    "stoppedFile": "توقف عند رفع الملف",
+    "stoppedLink": "توقف عند إدخال الرابط",
+    "stoppedText": "توقف عند الأسئلة النصية",
+    "stoppedMedia": "توقف عند رفع الوسائط",
+    "stoppedCandidate": "توقف عند معلومات التقديم",
+    "unknown": "غير معروف",
+    "position": "الوظيفة",
+    "priority": "الأولوية",
+    "applied": "تاريخ التقديم",
+    "rating": "التقييم",
+    "nextAction": "الإجراء التالي",
+    "yearsExp": "سنوات خبرة",
+    "completionStatus": "حالة الاكتمال",
+    "incomplete": "غير مكتمل",
+    "completedResubmitted": "مكتمل لكنه أعاد الطلب",
+    "completedFirstTime": "مكتمل من أول مرة"
   },
   "Status": {
     "new": "جديد",
@@ -315,7 +344,8 @@
     "rejected": "مرفوض",
     "paused": "متوقف",
     "closed": "مغلق",
-    "draft": "مسودة"
+    "draft": "مسودة",
+    "duplicate": "مكرر"
   },
   "Progress": {
     "low": "منخفض",

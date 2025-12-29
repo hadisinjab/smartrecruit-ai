@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react'
 import { MultiStepForm } from '@/components/form/multi-step-form'
 import type { FormField, FormStep, FormData } from '@/types/form'
 import type { ApplyQuestion } from '@/actions/applications'
-import { submitApplication } from '@/actions/applications'
+import { submitApplication, beginApplication } from '@/actions/applications'
 import { createClient } from '@/utils/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -60,6 +60,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [applicationId, setApplicationId] = useState<string | null>(null)
 
   const steps: FormStep[] = useMemo(() => {
     const baseFields: FormField[] = [
@@ -85,9 +86,15 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
 
     const s: FormStep[] = [
       {
-        id: 'candidate',
+        id: 'job',
         title: job.title,
-        description: job.description || 'Complete the application form below.',
+        description: job.description || 'Review the job details, then click Apply.',
+        fields: []
+      },
+      {
+        id: 'candidate',
+        title: 'Application Information',
+        description: 'Provide your name and email.',
         fields: baseFields
       }
     ]
@@ -95,7 +102,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     if (textQuestions.length) {
       s.push({
         id: 'text-questions',
-        title: 'Questions',
+        title: 'Text Questions',
         description: 'Answer the following questions.',
         fields: textQuestions.map(toFormField)
       })
@@ -104,11 +111,18 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     if (mediaQuestions.length) {
       s.push({
         id: 'media-questions',
-        title: 'Uploads & links',
+        title: 'Uploads & Links',
         description: 'Provide any files, voice responses, or links requested.',
         fields: mediaQuestions.map(toFormField)
       })
     }
+
+    s.push({
+      id: 'review',
+      title: 'Review & Submit',
+      description: 'Please review your information before submitting.',
+      fields: []
+    })
 
     return s
   }, [job.title, job.description, textQuestions, mediaQuestions])
@@ -124,6 +138,14 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       if (!candidateName || !candidateEmail) {
         setSubmitError('Please provide your name and email.')
         return
+      }
+      if (!applicationId) {
+        const started = await beginApplication({ jobId, candidateName, candidateEmail })
+        if (started.error) {
+          setSubmitError(started.error)
+          return
+        }
+        setApplicationId(started.applicationId)
       }
 
       // Upload resume if any file-question provided a File
@@ -206,7 +228,24 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         </div>
       )}
 
-      <MultiStepForm steps={steps} onComplete={handleComplete} jobFormId={jobId} />
+      <MultiStepForm
+        steps={steps}
+        onComplete={handleComplete}
+        jobFormId={jobId}
+        applicationId={applicationId || undefined}
+        onFirstStepComplete={async (data) => {
+          try {
+            const name = String(data.candidate_name || '').trim()
+            const email = String(data.candidate_email || '').trim()
+            if (!applicationId && name && email) {
+              const res = await beginApplication({ jobId, candidateName: name, candidateEmail: email })
+              if (!res.error) {
+                setApplicationId(res.applicationId)
+              }
+            }
+          } catch {}
+        }}
+      />
 
       {submitting && (
         <div className='fixed inset-0 bg-black/30 flex items-center justify-center'>
@@ -219,4 +258,3 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     </div>
   )
 }
-

@@ -67,6 +67,8 @@
     "addCandidate": "Add Candidate",
     "filters": "Filters",
     "searchPlaceholder": "Search candidates...",
+    "allJobs": "All Jobs",
+    "selectJob": "Select Job",
     "count": "{count} candidates",
     "stats": {
       "totalCandidates": "Total Candidates",
@@ -94,6 +96,15 @@
       "contactInfo": "Contact Information",
       "appliedDate": "Applied {date}"
     }
+  },
+  "Status": {
+    "new": "New",
+    "applied": "Applied",
+    "screening": "Screening",
+    "interview": "Interview",
+    "offer": "Offer",
+    "hired": "Hired",
+    "rejected": "Rejected"
   },
   "Jobs": {
     "title": "Jobs",
@@ -302,7 +313,25 @@
     "postedDate": "Posted Date",
     "user": "User",
     "joined": "Joined",
-    "createdBy": "Created By"
+    "createdBy": "Created By",
+    "stoppedAt": "Stopped At",
+    "stoppedVoice": "Stopped at voice recording",
+    "stoppedFile": "Stopped at file upload",
+    "stoppedLink": "Stopped at link input",
+    "stoppedText": "Stopped at text questions",
+    "stoppedMedia": "Stopped at media questions",
+    "stoppedCandidate": "Stopped at application info",
+    "unknown": "Unknown",
+    "position": "Position",
+    "priority": "Priority",
+    "applied": "Applied",
+    "rating": "Rating",
+    "nextAction": "Next Action",
+    "yearsExp": "Years Experience",
+    "completionStatus": "Completion Status",
+    "incomplete": "Incomplete",
+    "completedResubmitted": "Completed but resubmitted",
+    "completedFirstTime": "Completed first time"
   },
   "Status": {
     "new": "New",
@@ -316,7 +345,8 @@
     "rejected": "Rejected",
     "paused": "Paused",
     "closed": "Closed",
-    "draft": "Draft"
+    "draft": "Draft",
+    "duplicate": "Duplicate"
   },
   "Progress": {
     "low": "Low",

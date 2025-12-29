@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { FormStep, FormData, FormValue } from '@/types/form';
+import { FormStep, FormData } from '@/types/form';
+type FormValue = string | number | boolean | File | null;
 import { TextQuestion, NumberQuestion, TextareaQuestion, VoiceQuestion, FileUploadQuestion, URLQuestion, SelectQuestion } from './questions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 

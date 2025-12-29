@@ -17,10 +17,9 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '@/components/admin/DataTable';
 import { Link } from '@/i18n/navigation';
-import { useFormatter, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 
 export default function AdminDashboard() {
-  const format = useFormatter();
   const t = useTranslations('Dashboard');
   const tCommon = useTranslations('Common');
   const tTable = useTranslations('Table');
@@ -102,11 +101,7 @@ export default function AdminDashboard() {
     {
       key: 'appliedDate',
       title: tTable('applied'),
-      render: (date) => format.dateTime(new Date(date), {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric'
-      })
+      render: (date) => new Date(date).toLocaleDateString()
     },
     {
       key: 'rating',
