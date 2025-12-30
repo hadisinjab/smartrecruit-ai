@@ -88,3 +88,4 @@ create trigger prevent_assignment_update_trigger
   for each row execute procedure public.prevent_assignment_update();
 
 
+

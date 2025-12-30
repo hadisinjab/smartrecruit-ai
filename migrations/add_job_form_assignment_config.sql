@@ -17,3 +17,4 @@ alter table public.job_forms
   check (assignment_type is null or assignment_type in ('text_only', 'text_and_links'));
 
 
+
