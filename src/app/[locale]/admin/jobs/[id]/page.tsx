@@ -19,7 +19,10 @@ import {
   Briefcase,
   Award,
   CheckCircle,
-  Building
+  Building,
+  Link as LinkIcon,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
@@ -27,8 +30,10 @@ export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
+  const locale = (params as any)?.locale || 'en'
   const [job, setJob] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [linkCopied, setLinkCopied] = useState(false)
   const { isReviewer, isSuperAdmin, isAdmin, user } = useUser();
 
   useEffect(() => {
@@ -238,6 +243,67 @@ export default function JobDetailsPage() {
 
           {/* Sidebar */}
           <div className='space-y-6'>
+            {/* Application Link */}
+            <Card className='p-6'>
+              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Application Link</h2>
+              <div className='space-y-3'>
+                <div className='flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border border-gray-200'>
+                  <LinkIcon className='w-5 h-5 text-gray-400 flex-shrink-0' />
+                  <input
+                    type='text'
+                    readOnly
+                    value={
+                      typeof window !== 'undefined'
+                        ? `${window.location.origin}/${locale}/apply/${jobId}`
+                        : `/${locale}/apply/${jobId}`
+                    }
+                    className='flex-1 bg-transparent border-none outline-none text-sm text-gray-700 font-mono'
+                  />
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={() => {
+                      const link =
+                        typeof window !== 'undefined'
+                          ? `${window.location.origin}/${locale}/apply/${jobId}`
+                          : `/${locale}/apply/${jobId}`
+                      navigator.clipboard.writeText(link)
+                      setLinkCopied(true)
+                      setTimeout(() => setLinkCopied(false), 2000)
+                    }}
+                    className='flex-shrink-0'
+                  >
+                    {linkCopied ? (
+                      <>
+                        <CheckCircle className='w-4 h-4 mr-1 text-green-600' />
+                        <span className='text-green-600'>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className='w-4 h-4 mr-1' />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <Button
+                  variant='outline'
+                  className='w-full'
+                  onClick={() => {
+                    const link =
+                      typeof window !== 'undefined'
+                        ? `${window.location.origin}/${locale}/apply/${jobId}`
+                        : `/${locale}/apply/${jobId}`
+                    window.open(link, '_blank')
+                  }}
+                >
+                  <ExternalLink className='w-4 h-4 mr-2' />
+                  Open Link
+                </Button>
+              </div>
+            </Card>
+
             {/* Job Stats */}
             <Card className='p-6'>
               <h2 className='text-lg font-semibold text-gray-900 mb-4'>Job Statistics</h2>

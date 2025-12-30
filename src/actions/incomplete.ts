@@ -44,21 +44,9 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
   }
   
   const appIds = (applications || []).map((a: any) => a.id)
-  let lastLogByApp = new Map<string, any>()
-  if (appIds.length) {
-    const { data: logs } = await supabase
-      .from('activity_logs')
-      .select('target_id,details,created_at,action,target_type')
-      .eq('target_type', 'application')
-      .in('target_id', appIds)
-      .order('created_at', { ascending: false })
-    ;(logs || []).forEach((l: any) => {
-      const id = l.target_id as string
-      if (!lastLogByApp.has(id)) {
-        lastLogByApp.set(id, l)
-      }
-    })
-  }
+  // NOTE: We no longer persist candidate progress steps in `activity_logs`.
+  // We compute a best-effort `stoppedAt` from existing application/answers data.
+  const lastLogByApp = new Map<string, any>()
 
   return (applications || []).map((app: any) => {
     const totalQuestions = questionsByJobForm.get(app.job_form_id) || 0

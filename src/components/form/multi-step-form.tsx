@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 type FormValue = string | number | boolean | File | null;
 import { recordProgress } from '@/actions/applications';
+import { AssignmentStep, type AssignmentConfig, type AssignmentData } from '@/components/applicant/AssignmentStep'
 
 export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   steps,
@@ -17,11 +18,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   jobFormId,
   onVoiceUploadComplete,
   onFileUploadComplete,
-  onFirstStepComplete
+  onFirstStepComplete,
+  assignmentConfig
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({});
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null)
 
   const progress = ((currentStep + 1) / steps.length) * 100;
 
@@ -51,6 +54,11 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
     const step = steps[currentStep];
     const newErrors: { [key: string]: string } = {};
     let isValid = true;
+
+    // Assignment step is validated inside AssignmentStep component
+    if (step.id === 'assignment') {
+      return true
+    }
 
     step.fields.forEach(field => {
       const value = formData[field.id];
@@ -134,7 +142,10 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
         setCurrentStep(prev => prev + 1);
       } else {
         // Form is complete
-        onComplete(formData);
+        onComplete({
+          ...formData,
+          ...(assignmentData ? { assignment: assignmentData as any } : {}),
+        });
       }
     }
   };
@@ -176,7 +187,24 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
         {/* Form Step / Review */}
         <div className='mb-8'>
-          {steps[currentStep].id !== 'review' ? (
+          {steps[currentStep].id === 'assignment' ? (
+            <AssignmentStep
+              assignmentConfig={
+                (assignmentConfig as AssignmentConfig) || {
+                  enabled: true,
+                  required: false,
+                  type: 'text_only',
+                  description: '',
+                }
+              }
+              initialData={assignmentData || undefined}
+              onPrevious={handlePrevious}
+              onNext={(data) => {
+                setAssignmentData(data)
+                setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1))
+              }}
+            />
+          ) : steps[currentStep].id !== 'review' ? (
             <FormStepComponent
               step={steps[currentStep]}
               formData={formData}
@@ -257,6 +285,33 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                       })}
                   </div>
                 </div>
+                {assignmentData && (
+                  <div>
+                    <h3 className='text-sm font-medium text-gray-700'>Assignment</h3>
+                    <div className='mt-2 space-y-2 text-sm text-gray-800'>
+                      <p className='text-gray-500'>Text</p>
+                      <p className='text-gray-900 whitespace-pre-wrap'>{assignmentData.text_fields || '—'}</p>
+                      {assignmentData.link_fields?.length > 0 && (
+                        <div className='pt-2'>
+                          <p className='text-gray-500'>Links</p>
+                          <div className='mt-1 space-y-1'>
+                            {assignmentData.link_fields.map((l) => (
+                              <a
+                                key={l}
+                                href={l}
+                                target='_blank'
+                                rel='noopener noreferrer'
+                                className='text-blue-600 hover:underline break-all'
+                              >
+                                {l}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -264,8 +319,14 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
         {/* Navigation */}
         <div className='flex justify-between items-center max-w-2xl mx-auto'>
-          {/* Previous button removed */}
-          <div className='w-24' />
+          <Button
+            variant='outline'
+            onClick={handlePrevious}
+            disabled={isFirstStep}
+          >
+            <ChevronLeft className='w-4 h-4 me-2 rtl:rotate-180' />
+            Previous
+          </Button>
 
           <div className='flex gap-2'>
             {steps.map((_, index) => (
@@ -282,7 +343,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
             ))}
           </div>
 
-          <Button onClick={handleNext}>
+          <Button onClick={handleNext} disabled={steps[currentStep].id === 'assignment'}>
             {steps[currentStep].id === 'job'
               ? 'Apply'
               : isLastStep

@@ -235,6 +235,38 @@ export default function ActivityLogPage() {
       )
     },
     {
+      key: 'entity',
+      title: tTable('entity'),
+      render: (_, record) => (
+        <div className='text-xs text-gray-700 space-y-1'>
+          <div><span className='font-semibold'>type:</span> {record.targetType}</div>
+          <div className='truncate max-w-[260px]' title={record.entityId || ''}>
+            <span className='font-semibold'>entity_id:</span> {record.entityId || '-'}
+          </div>
+          <div className='truncate max-w-[260px]' title={record.jobFormId || ''}>
+            <span className='font-semibold'>job_form_id:</span> {record.jobFormId || '-'}
+          </div>
+          <div className='truncate max-w-[260px]' title={record.applicationId || ''}>
+            <span className='font-semibold'>application_id:</span> {record.applicationId || '-'}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'metadata',
+      title: tTable('metadata'),
+      render: (_, record) => {
+        const raw = record.metadata
+        const text =
+          raw == null ? '' : typeof raw === 'string' ? raw : JSON.stringify(raw)
+        return (
+          <div className='text-xs text-gray-600 truncate max-w-[280px]' title={text}>
+            {text || '-'}
+          </div>
+        )
+      }
+    },
+    {
       key: 'timestamp',
       title: tTable('timestamp'),
       render: (timestamp) => {

@@ -36,6 +36,12 @@ export interface MultiStepFormProps {
   onVoiceUploadComplete?: (info: any) => void;
   onFileUploadComplete?: (info: any) => void;
   onFirstStepComplete?: (data: FormData) => void;
+  assignmentConfig?: {
+    enabled: boolean
+    required: boolean
+    type: 'text_only' | 'text_and_links'
+    description: string
+  } | null;
 }
 
 export interface QuestionComponentProps {

@@ -5,6 +5,7 @@ import { MultiStepForm } from '@/components/form/multi-step-form'
 import type { FormField, FormStep, FormData } from '@/types/form'
 import type { ApplyQuestion } from '@/actions/applications'
 import { submitApplication, beginApplication } from '@/actions/applications'
+import { createAssignment } from '@/actions/assignments'
 import { createClient } from '@/utils/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -117,6 +118,16 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       })
     }
 
+    const assignmentEnabled = !!(job as any)?.assignment_enabled
+    if (assignmentEnabled) {
+      s.push({
+        id: 'assignment',
+        title: 'Assignment',
+        description: 'Complete the assignment task.',
+        fields: []
+      })
+    }
+
     s.push({
       id: 'review',
       title: 'Review & Submit',
@@ -195,6 +206,44 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         return
       }
 
+      // Save assignment (optional)
+      const assignmentEnabled = !!(job as any)?.assignment_enabled
+      if (assignmentEnabled) {
+        const assignment = (data as any)?.assignment as any
+        const assignmentType = (job as any)?.assignment_type || 'text_only'
+        const required = !!(job as any)?.assignment_required
+
+        const textFields = String(assignment?.text_fields || '').trim()
+        const linkFields = Array.isArray(assignment?.link_fields) ? assignment.link_fields : []
+
+        if (required) {
+          if (!textFields) {
+            setSubmitError('Assignment is required')
+            return
+          }
+          if (assignmentType === 'text_and_links' && (!linkFields || linkFields.length === 0)) {
+            setSubmitError('Please provide at least one assignment link')
+            return
+          }
+        }
+
+        // Only create if user provided something OR required
+        const hasAny = !!textFields || (Array.isArray(linkFields) && linkFields.length > 0)
+        if (hasAny || required) {
+          const created = await createAssignment({
+            application_id: res.applicationId as string,
+            type: assignmentType,
+            text_fields: textFields || undefined,
+            link_fields: linkFields || undefined,
+          } as any)
+
+          if (!(created as any)?.ok) {
+            setSubmitError((created as any)?.error || 'Failed to save assignment')
+            return
+          }
+        }
+      }
+
       setSubmitted(true)
     } catch (e: any) {
       console.error(e)
@@ -233,6 +282,16 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         onComplete={handleComplete}
         jobFormId={jobId}
         applicationId={applicationId || undefined}
+        assignmentConfig={
+          (job as any)?.assignment_enabled
+            ? {
+                enabled: !!(job as any)?.assignment_enabled,
+                required: !!(job as any)?.assignment_required,
+                type: ((job as any)?.assignment_type || 'text_only') as any,
+                description: String((job as any)?.assignment_description || ''),
+              }
+            : null
+        }
         onFirstStepComplete={async (data) => {
           try {
             const name = String(data.candidate_name || '').trim()

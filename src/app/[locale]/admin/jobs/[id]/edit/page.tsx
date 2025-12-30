@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/admin-card';
+import { Switch } from '@/components/ui/switch'
 import { FormStep, FormField } from '@/types/form';
 import { 
   ArrowLeft, 
@@ -67,7 +68,12 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
     requirements: [''],
     benefits: [''],
     deadline: '',
-    hiringManager: ''
+    hiringManager: '',
+    assignment_enabled: false,
+    assignment_required: false,
+    assignment_type: 'text_only' as 'text_only' | 'text_and_links',
+    assignment_description: '',
+    assignment_weight: ''
   });
 
   const [formSteps, setFormSteps] = useState<FormStep[]>([
@@ -110,7 +116,12 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             requirements: job.requirements || [''],
             benefits: job.benefits || [''],
             deadline: job.deadline || '',
-            hiringManager: (job as any).hiring_manager_id || job.hiring_manager_name || ''
+            hiringManager: (job as any).hiring_manager_id || job.hiring_manager_name || '',
+            assignment_enabled: !!(job as any).assignment_enabled,
+            assignment_required: !!(job as any).assignment_required,
+            assignment_type: ((job as any).assignment_type || 'text_only') as any,
+            assignment_description: String((job as any).assignment_description || ''),
+            assignment_weight: String((job as any).assignment_weight ?? '')
         });
 
         // If there are questions, load them into formSteps
@@ -249,7 +260,12 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
         deadline: jobData.deadline || null,
         hiring_manager_name: jobData.hiringManager,
         questions: formSteps[0].fields,
-        evaluation_criteria: formSteps
+        evaluation_criteria: formSteps,
+        assignment_enabled: !!jobData.assignment_enabled,
+        assignment_required: !!jobData.assignment_required,
+        assignment_type: jobData.assignment_enabled ? jobData.assignment_type : null,
+        assignment_description: jobData.assignment_enabled ? jobData.assignment_description : null,
+        assignment_weight: jobData.assignment_enabled && jobData.assignment_weight !== '' ? parseInt(jobData.assignment_weight as any) : null
       };
 
       await updateJob(params.id, formData);
@@ -637,6 +653,68 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                 />
               </div>
             </div>
+          </Card>
+
+          {/* Assignment Configuration */}
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Assignment Configuration</h3>
+
+            <div className="flex items-center space-x-3 mb-4">
+              <Switch
+                checked={!!(jobData as any).assignment_enabled}
+                onCheckedChange={(checked) => setJobData({ ...(jobData as any), assignment_enabled: checked })}
+              />
+              <Label className="cursor-pointer">Enable Assignment for this job</Label>
+            </div>
+
+            {!!(jobData as any).assignment_enabled && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Assignment Task Description</Label>
+                  <Textarea
+                    placeholder="e.g., Build a REST API using Node.js..."
+                    value={(jobData as any).assignment_description}
+                    onChange={(e) => setJobData({ ...(jobData as any), assignment_description: e.target.value })}
+                    rows={4}
+                  />
+                </div>
+
+                <div>
+                  <Label>Assignment Type</Label>
+                  <Select
+                    value={(jobData as any).assignment_type}
+                    onValueChange={(value) => setJobData({ ...(jobData as any), assignment_type: value as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text_only">Text Only (explanation/code)</SelectItem>
+                      <SelectItem value="text_and_links">Text + Links (GitHub, Video, Demo)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <Switch
+                    checked={!!(jobData as any).assignment_required}
+                    onCheckedChange={(checked) => setJobData({ ...(jobData as any), assignment_required: checked })}
+                  />
+                  <Label className="cursor-pointer">Make assignment required</Label>
+                </div>
+
+                <div>
+                  <Label>Assignment Weight (optional)</Label>
+                  <Input
+                    type="number"
+                    value={(jobData as any).assignment_weight}
+                    onChange={(e) => setJobData({ ...(jobData as any), assignment_weight: e.target.value })}
+                    placeholder="e.g. 30"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Used later for AI scoring.</p>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Application Link Card */}

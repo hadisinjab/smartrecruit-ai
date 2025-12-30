@@ -31,7 +31,13 @@ function normalizeQuestionType(raw: string | null | undefined): ApplyQuestion['t
 }
 
 export async function getJobForApplication(jobId: string): Promise<{
-  job: ApplyJob | null
+  job: (ApplyJob & {
+    assignment_enabled?: boolean | null
+    assignment_required?: boolean | null
+    assignment_type?: 'text_only' | 'text_and_links' | null
+    assignment_description?: string | null
+    assignment_weight?: number | null
+  }) | null
   questions: ApplyQuestion[]
   error: string | null
 }> {
@@ -41,7 +47,7 @@ export async function getJobForApplication(jobId: string): Promise<{
     // Public can only see active jobs due to RLS policy.
     const { data: job, error: jobError } = await supabase
       .from('job_forms')
-      .select('id,title,description,status')
+      .select('id,title,description,status,assignment_enabled,assignment_required,assignment_type,assignment_description,assignment_weight')
       .eq('id', jobId)
       .single()
 
@@ -78,7 +84,20 @@ export async function getJobForApplication(jobId: string): Promise<{
       placeholder: q.config?.placeholder || undefined
     }))
 
-    return { job: { id: job.id, title: job.title, description: job.description }, questions: mapped, error: null }
+    return {
+      job: {
+        id: job.id,
+        title: job.title,
+        description: job.description,
+        assignment_enabled: (job as any).assignment_enabled ?? false,
+        assignment_required: (job as any).assignment_required ?? false,
+        assignment_type: (job as any).assignment_type ?? null,
+        assignment_description: (job as any).assignment_description ?? null,
+        assignment_weight: (job as any).assignment_weight ?? null,
+      },
+      questions: mapped,
+      error: null,
+    }
   } catch (e: any) {
     return { job: null, questions: [], error: e?.message || 'Unexpected error' }
   }
@@ -234,14 +253,6 @@ export async function recordProgress(applicationId: string, stepId: string): Pro
       .from('applications')
       .update({ updated_at: new Date().toISOString() } as any)
       .eq('id', applicationId)
-    await supabase
-      .from('activity_logs')
-      .insert({
-        action: 'application_progress',
-        target_type: 'application',
-        target_id: applicationId,
-        details: { stepId },
-      } as any)
     return { error: null }
   } catch (e: any) {
     return { error: e?.message || 'Unexpected error' }

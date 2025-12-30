@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 
 import { Job } from '@/types/admin';
 import { requireAdminOrSuper, requireJobOwnerOrSuper, requireStaff, getSessionInfo } from '@/utils/authz'
+import { logAdminEvent } from '@/actions/activity'
 
 // Get users from the same organization as the current user or job creator
 export async function getOrganizationUsers(jobCreatorId?: string) {
@@ -277,6 +278,11 @@ export async function createJob(formData: any) {
       hiring_manager_name: formData.hiring_manager_name,
       created_by: user.id,
       evaluation_criteria: formData.evaluation_criteria || {},
+      assignment_enabled: !!formData.assignment_enabled,
+      assignment_required: !!formData.assignment_required,
+      assignment_type: formData.assignment_type || null,
+      assignment_description: formData.assignment_description || null,
+      assignment_weight: formData.assignment_weight ?? null,
       organization_id: userRow.organization_id
     })
     .select()
@@ -328,6 +334,17 @@ export async function createJob(formData: any) {
       .eq('id', data.id);
   }
 
+  await logAdminEvent({
+    action: 'job.create',
+    entityType: 'job',
+    entityId: data.id,
+    jobFormId: data.id,
+    metadata: {
+      title: formData.title,
+      status: formData.status || 'draft',
+    },
+  })
+
   revalidatePath('/admin/jobs')
   return { data }
 }
@@ -353,6 +370,11 @@ export async function updateJob(id: string, formData: any) {
       deadline: formData.deadline,
       hiring_manager_name: formData.hiring_manager_name,
       evaluation_criteria: formData.evaluation_criteria,
+      assignment_enabled: !!formData.assignment_enabled,
+      assignment_required: !!formData.assignment_required,
+      assignment_type: formData.assignment_type || null,
+      assignment_description: formData.assignment_description || null,
+      assignment_weight: formData.assignment_weight ?? null,
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
@@ -400,6 +422,17 @@ export async function updateJob(id: string, formData: any) {
     }
   }
 
+  await logAdminEvent({
+    action: 'job.update',
+    entityType: 'job',
+    entityId: id,
+    jobFormId: id,
+    metadata: {
+      title: formData.title,
+      status: formData.status,
+    },
+  })
+
   revalidatePath('/admin/jobs')
   revalidatePath(`/admin/jobs/${id}`)
   return data
@@ -408,6 +441,12 @@ export async function updateJob(id: string, formData: any) {
 export async function deleteJob(id: string) {
   const supabase = createClient()
   await requireJobOwnerOrSuper(id)
+
+  const { data: jobBeforeDelete } = await supabase
+    .from('job_forms')
+    .select('title')
+    .eq('id', id)
+    .single()
 
   const { error } = await supabase
     .from('job_forms')
@@ -418,6 +457,16 @@ export async function deleteJob(id: string) {
     console.error('Error deleting job:', error)
     throw new Error('Failed to delete job')
   }
+
+  await logAdminEvent({
+    action: 'job.delete',
+    entityType: 'job',
+    entityId: id,
+    jobFormId: id,
+    metadata: {
+      title: jobBeforeDelete?.title ?? null,
+    },
+  })
 
   revalidatePath('/admin/jobs')
 }

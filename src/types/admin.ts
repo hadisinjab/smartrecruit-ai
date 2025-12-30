@@ -142,6 +142,10 @@ export interface ActivityLogEntry {
   targetType: 'candidate' | 'job' | 'user' | 'evaluation' | 'system';
   description: string;
   timestamp: string;
+  entityId?: string | null;
+  jobFormId?: string | null;
+  applicationId?: string | null;
+  metadata?: any;
   ipAddress?: string;
   userAgent?: string;
 }

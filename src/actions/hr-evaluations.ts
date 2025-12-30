@@ -4,6 +4,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireReviewerOrAdmin } from '@/utils/authz'
+import { logAdminEvent } from '@/actions/activity'
 
 export async function addHrEvaluation(
   applicationId: string, 
@@ -67,6 +68,24 @@ export async function addHrEvaluation(
     console.error('Error saving HR evaluation:', error)
     throw new Error('Failed to save HR evaluation')
   }
+
+  const { data: appRow } = await supabase
+    .from('applications')
+    .select('job_form_id')
+    .eq('id', applicationId)
+    .single()
+
+  await logAdminEvent({
+    action: existing ? 'evaluation.update' : 'evaluation.create',
+    entityType: 'evaluation',
+    entityId: applicationId,
+    jobFormId: appRow?.job_form_id ?? null,
+    applicationId,
+    metadata: {
+      decision: data.hr_decision,
+      score: data.hr_score,
+    },
+  })
 
   revalidatePath(`/admin/candidates/${applicationId}`)
   revalidatePath('/admin/evaluations')

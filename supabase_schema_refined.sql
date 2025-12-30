@@ -289,30 +289,62 @@ create policy "Staff can manage hr evaluations." on public.hr_evaluations
     )
   );
 
--- 12. Activity Logs Table
-create table public.activity_logs (
+-- 12b. Active Log (Admin Audit Log)
+-- Dedicated audit log for admin actions (jobs/users/evaluations/etc.).
+create table public.active_log (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references public.users(id),
-  action text not null,
-  target_type text, -- 'job', 'application', 'candidate'
-  target_id uuid,
-  details jsonb,
+  actor_id uuid references public.users(id),
+  actor_role text, -- 'super-admin' | 'admin' | 'reviewer' | 'system'
+  action text not null, -- e.g. 'job.create', 'job.update', 'user.delete'
+  entity_type text not null, -- e.g. 'job', 'candidate', 'user', 'evaluation', 'system'
+  entity_id uuid,
+  job_form_id uuid references public.job_forms(id) on delete set null,
+  application_id uuid references public.applications(id) on delete set null,
+  metadata jsonb default '{}'::jsonb,
   ip_address text,
+  user_agent text,
   created_at timestamptz default now()
 );
 
-alter table public.activity_logs enable row level security;
+alter table public.active_log enable row level security;
 
-create policy "Admins can view logs." on public.activity_logs
+-- Staff can read audit logs:
+-- - Super Admin: sees all organizations
+-- - Admin/Reviewer: sees only logs where actor belongs to the same organization
+create policy "Staff can view active log." on public.active_log
   for select using (
     exists (
-      select 1 from public.users
-      where users.id = auth.uid() and users.role in ('super-admin', 'admin')
+      select 1 from public.users viewer
+      where viewer.id = auth.uid()
+      and viewer.role = 'super-admin'
+    )
+    or exists (
+      select 1
+      from public.users viewer
+      join public.users actor on actor.id = active_log.actor_id
+      where viewer.id = auth.uid()
+      and viewer.role in ('admin', 'reviewer')
+      and viewer.organization_id is not null
+      and actor.organization_id = viewer.organization_id
     )
   );
 
-create policy "System can insert logs." on public.activity_logs
-  for insert with check (true);
+-- Staff can insert their own audit entries.
+create policy "Staff can insert active log." on public.active_log
+  for insert with check (
+    actor_id = auth.uid()
+    and exists (
+      select 1 from public.users
+      where users.id = auth.uid()
+      and users.role in ('super-admin', 'admin', 'reviewer')
+    )
+  );
+
+create index if not exists active_log_created_at_idx on public.active_log (created_at desc);
+create index if not exists active_log_actor_id_idx on public.active_log (actor_id);
+create index if not exists active_log_entity_idx on public.active_log (entity_type, entity_id);
+create index if not exists active_log_job_form_id_idx on public.active_log (job_form_id);
+create index if not exists active_log_application_id_idx on public.active_log (application_id);
 
 -- 13. Notifications Table
 create table public.notifications (

@@ -5,6 +5,7 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { AdminUser } from '@/types/admin'
 import { Database } from '@/types/supabase'
 import { getSessionInfo, requireAdminOrSuper, requireSuperAdmin, requireReviewerOrAbove } from '@/utils/authz'
+import { logAdminEvent } from '@/actions/activity'
 
 type UserUpdate = Database['public']['Tables']['users']['Update']
 
@@ -103,6 +104,15 @@ export async function toggleUserStatus(userId: string, currentStatus: boolean) {
     console.error('Error toggling user status:', error)
     throw new Error('Failed to update user status')
   }
+
+  await logAdminEvent({
+    action: !currentStatus ? 'user.activate' : 'user.deactivate',
+    entityType: 'user',
+    entityId: userId,
+    metadata: {
+      is_active: !currentStatus,
+    },
+  })
 }
 
 export async function updateUserRole(userId: string, newRole: string) {
@@ -148,6 +158,15 @@ export async function updateUserRole(userId: string, newRole: string) {
     console.error('Error updating user role:', error)
     throw new Error('Failed to update user role')
   }
+
+  await logAdminEvent({
+    action: 'user.role_update',
+    entityType: 'user',
+    entityId: userId,
+    metadata: {
+      role: newRole,
+    },
+  })
 }
 
 export async function getUser(userId: string): Promise<AdminUser | null> {
@@ -299,6 +318,16 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
     return { error: publicError.message }
   }
 
+  await logAdminEvent({
+    action: 'user.update',
+    entityType: 'user',
+    entityId: userId,
+    metadata: {
+      updatedFields: Object.keys(publicUpdate),
+      authFieldsUpdated: Object.keys(authUpdate),
+    },
+  })
+
   return { success: true }
 }
 
@@ -327,6 +356,12 @@ export async function deleteUser(userId: string) {
     }
   }
 
+  const { data: targetUserBeforeDelete } = await adminClient
+    .from('users')
+    .select('full_name,email,role')
+    .eq('id', userId)
+    .single()
+
   // Delete from Auth (which cascades to public.users because of the 'on delete cascade' foreign key)
   const { error } = await adminClient.auth.admin.deleteUser(userId)
   
@@ -334,6 +369,17 @@ export async function deleteUser(userId: string) {
     console.error('Error deleting user:', error)
     return { error: error.message }
   }
+
+  await logAdminEvent({
+    action: 'user.delete',
+    entityType: 'user',
+    entityId: userId,
+    metadata: {
+      name: (targetUserBeforeDelete as any)?.full_name ?? null,
+      email: (targetUserBeforeDelete as any)?.email ?? null,
+      role: (targetUserBeforeDelete as any)?.role ?? null,
+    },
+  })
 
   return { success: true }
 }
@@ -430,6 +476,18 @@ export async function createUser(input: CreateUserInput) {
     console.error('Error creating auth user:', authError)
     return { error: authError?.message || 'Failed to create auth user' }
   }
+
+  await logAdminEvent({
+    action: 'user.create',
+    entityType: 'user',
+    entityId: authData.user.id,
+    metadata: {
+      email: input.email,
+      role: input.role,
+      fullName: input.fullName,
+      organizationName: input.organizationName,
+    },
+  })
 
   return { data: authData.user }
 }

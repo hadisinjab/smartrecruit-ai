@@ -16,6 +16,7 @@ import { getCandidateById } from '@/actions/candidates';
 import { addHrEvaluation, getHrEvaluation } from '@/actions/hr-evaluations';
 import { Candidate, Evaluation } from '@/types/admin';
 import { useToast } from '@/context/ToastContext';
+import { getAssignmentsByApplication } from '@/actions/assignments'
 import {
   ArrowLeft,
   Edit3,
@@ -51,6 +52,8 @@ export default function CandidateDetailsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedCandidate, setEditedCandidate] = useState<Candidate | null>(null);
   const [answers, setAnswers] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   
   // HR Evaluation State
   const [hrEvaluation, setHrEvaluation] = useState<any>(null);
@@ -90,6 +93,31 @@ export default function CandidateDetailsPage() {
     }
     loadCandidate();
   }, [candidateId, addToast]);
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadAssignments() {
+      setAssignmentsLoading(true)
+      try {
+        const res: any = await getAssignmentsByApplication(candidateId)
+        if (!isMounted) return
+        if (res?.ok) {
+          setAssignments(res.data || [])
+        } else {
+          setAssignments([])
+        }
+      } catch (e) {
+        console.error(e)
+        if (isMounted) setAssignments([])
+      } finally {
+        if (isMounted) setAssignmentsLoading(false)
+      }
+    }
+    loadAssignments()
+    return () => {
+      isMounted = false
+    }
+  }, [candidateId])
 
   const handleSaveHrEvaluation = async () => {
     try {
@@ -401,7 +429,73 @@ export default function CandidateDetailsPage() {
                 )}
               </div>
             </Card>
-            
+
+            {/* Assignment Submissions */}
+            <Card className='p-6'>
+              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Assignment Submissions</h2>
+
+              {assignmentsLoading ? (
+                <p className='text-sm text-gray-600'>Loading assignments…</p>
+              ) : assignments.length === 0 ? (
+                <p className='text-sm text-gray-500 text-center'>No assignment submissions for this candidate</p>
+              ) : (
+                <div className='space-y-6'>
+                  {assignments.map((a: any, index: number) => (
+                    <div key={a.id} className='border border-gray-200 rounded-lg p-4'>
+                      {assignments.length > 1 && (
+                        <h4 className='font-medium mb-2'>Assignment {index + 1}</h4>
+                      )}
+
+                      <div className='mb-4'>
+                        <Label className='text-sm font-medium text-gray-700'>Solution:</Label>
+                        <div className='mt-2 p-4 bg-gray-50 rounded-md border'>
+                          <p className='whitespace-pre-wrap text-sm'>{a.text_fields || '—'}</p>
+                        </div>
+                        {a.text_fields && (
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            onClick={() => {
+                              navigator.clipboard.writeText(String(a.text_fields))
+                              addToast('success', 'Copied to clipboard')
+                            }}
+                            className='mt-2'
+                          >
+                            📋 Copy to Clipboard
+                          </Button>
+                        )}
+                      </div>
+
+                      {Array.isArray(a.link_fields) && a.link_fields.length > 0 && (
+                        <div>
+                          <Label className='text-sm font-medium text-gray-700'>Links:</Label>
+                          <div className='mt-2 space-y-2'>
+                            {a.link_fields.map((link: string, linkIndex: number) => (
+                              <div key={linkIndex} className='flex items-center gap-2'>
+                                <span className='text-sm text-gray-600'>🔗</span>
+                                <a
+                                  href={link}
+                                  target='_blank'
+                                  rel='noopener noreferrer'
+                                  className='text-sm text-blue-600 hover:underline break-all'
+                                >
+                                  {link}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className='mt-4 text-xs text-gray-500'>
+                        Submitted: {a.created_at ? new Date(a.created_at).toLocaleString() : '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
             <Card className='p-6'>
               <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.documents')}</h2>
               <div className='space-y-3'>

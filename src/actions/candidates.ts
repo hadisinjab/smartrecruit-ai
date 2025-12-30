@@ -238,17 +238,8 @@ export async function getCandidateById(id: string) {
     })
   } as any;
   
-  const { data: logs } = await supabase
-    .from('activity_logs')
-    .select('action,details,created_at,target_type,target_id')
-    .eq('target_type', 'application')
-    .eq('target_id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-  const lastProgressLog = (logs || [])[0]
-  if (lastProgressLog?.details?.stepId) {
-    base.lastProgressStep = String(lastProgressLog.details.stepId)
-  }
+  // NOTE: We removed `activity_logs` and no longer store candidate progress steps.
+  // `lastProgressStep` will remain unset and the UI should fall back gracefully.
 
   if (session.role === 'super-admin') {
     base.organizationName = app.job_form?.organizations?.name;

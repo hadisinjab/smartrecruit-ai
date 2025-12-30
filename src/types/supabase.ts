@@ -354,35 +354,47 @@ export interface Database {
           updated_at?: string
         }
       }
-      activity_logs: {
+      active_log: {
         Row: {
           id: string
-          user_id: string | null
+          actor_id: string | null
+          actor_role: string | null
           action: string
-          target_type: string | null
-          target_id: string | null
-          details: Json | null
+          entity_type: string
+          entity_id: string | null
+          job_form_id: string | null
+          application_id: string | null
+          metadata: Json | null
           ip_address: string | null
+          user_agent: string | null
           created_at: string
         }
         Insert: {
           id?: string
-          user_id?: string | null
+          actor_id?: string | null
+          actor_role?: string | null
           action: string
-          target_type?: string | null
-          target_id?: string | null
-          details?: Json | null
+          entity_type: string
+          entity_id?: string | null
+          job_form_id?: string | null
+          application_id?: string | null
+          metadata?: Json | null
           ip_address?: string | null
+          user_agent?: string | null
           created_at?: string
         }
         Update: {
           id?: string
-          user_id?: string | null
+          actor_id?: string | null
+          actor_role?: string | null
           action?: string
-          target_type?: string | null
-          target_id?: string | null
-          details?: Json | null
+          entity_type?: string
+          entity_id?: string | null
+          job_form_id?: string | null
+          application_id?: string | null
+          metadata?: Json | null
           ip_address?: string | null
+          user_agent?: string | null
           created_at?: string
         }
       }
