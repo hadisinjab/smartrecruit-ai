@@ -3,7 +3,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { requireReviewerOrAdmin } from '@/utils/authz'
+import { requireReviewerOrAbove } from '@/utils/authz'
 import { logAdminEvent } from '@/actions/activity'
 
 export async function addHrEvaluation(
@@ -12,10 +12,11 @@ export async function addHrEvaluation(
     hr_score: number;
     hr_notes: string;
     hr_decision: string;
+    next_action_date?: string | null;
   }
 ) {
   const supabase = createClient()
-  const role = await requireReviewerOrAdmin()
+  const session = await requireReviewerOrAbove()
 
   const {
     data: { user },
@@ -23,8 +24,21 @@ export async function addHrEvaluation(
 
   if (!user) throw new Error('Unauthorized')
 
+  // Enforce next_action_date for interview/offer decisions (date-only: YYYY-MM-DD)
+  const decision = String(data.hr_decision || '').toLowerCase()
+  const needsDate = decision === 'interview' || decision === 'approve'
+  if (needsDate) {
+    const v = data.next_action_date
+    if (!v || typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      throw new Error('Next action date is required for Interview/Offer decisions.')
+    }
+  } else {
+    // Keep DB clean: if decision doesn't need a date, clear it.
+    data.next_action_date = null
+  }
+
   // Admins can only evaluate applications for their own job forms
-  if (role === 'admin') {
+  if (session.role === 'admin') {
     const { data: appOwner, error: appOwnerError } = await supabase
       .from('applications')
       .select('job_forms!inner(created_by)')
@@ -93,7 +107,7 @@ export async function addHrEvaluation(
 
 export async function getHrEvaluation(applicationId: string) {
   const supabase = createClient()
-  await requireReviewerOrAdmin()
+  await requireReviewerOrAbove()
   
   const { data, error } = await supabase
     .from('hr_evaluations')

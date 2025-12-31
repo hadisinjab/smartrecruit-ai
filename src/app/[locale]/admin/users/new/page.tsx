@@ -12,6 +12,7 @@ import { useToast } from '@/context/ToastContext';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { createUser } from '@/actions/users';
+import { Switch } from '@/components/ui/switch';
 
 export default function NewUserPage() {
   const tUsers = useTranslations('Users');
@@ -26,6 +27,7 @@ export default function NewUserPage() {
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<'super-admin' | 'admin' | 'reviewer'>('reviewer');
   const [organizationName, setOrganizationName] = useState('');
+  const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,6 +45,7 @@ export default function NewUserPage() {
         password,
         role: selectedRole,
         organizationName,
+        isActive,
       });
 
       if ('error' in result && result.error) {
@@ -150,6 +153,16 @@ export default function NewUserPage() {
                   />
                 </div>
               )}
+            </div>
+
+            <div className='flex items-center justify-between rounded-lg border border-gray-200 p-4'>
+              <div className='space-y-1'>
+                <p className='text-sm font-medium text-gray-900'>{tUsers('form.activeLabel') || 'Active'}</p>
+                <p className='text-xs text-gray-500'>
+                  {tUsers('form.activeHint') || 'Disable to prevent access without deleting the account.'}
+                </p>
+              </div>
+              <Switch checked={isActive} onCheckedChange={setIsActive} />
             </div>
 
             <div className='flex justify-end'>

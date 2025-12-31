@@ -1,7 +1,7 @@
 
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient, createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 import { Job } from '@/types/admin';
@@ -442,19 +442,46 @@ export async function deleteJob(id: string) {
   const supabase = createClient()
   await requireJobOwnerOrSuper(id)
 
-  const { data: jobBeforeDelete } = await supabase
+  // Use admin client for the actual deletion to avoid RLS issues,
+  // but keep authorization via requireJobOwnerOrSuper above.
+  const admin = createAdminClient()
+
+  const { data: jobBeforeDelete } = await admin
     .from('job_forms')
     .select('title')
     .eq('id', id)
     .single()
 
-  const { error } = await supabase
+  // IMPORTANT: applications.job_form_id is NOT cascade-deleting in our schema,
+  // so delete applications first. application children are cascade-deleted.
+  const { error: appsErr } = await admin
+    .from('applications')
+    .delete()
+    .eq('job_form_id', id)
+
+  if (appsErr) {
+    console.error('Error deleting job applications:', appsErr)
+    throw new Error('Failed to delete job applications')
+  }
+
+  // Questions are cascade-deleted with job_forms, but deleting explicitly is safe.
+  const { error: qErr } = await admin
+    .from('questions')
+    .delete()
+    .eq('job_form_id', id)
+
+  if (qErr) {
+    console.error('Error deleting job questions:', qErr)
+    throw new Error('Failed to delete job questions')
+  }
+
+  const { error: jobErr } = await admin
     .from('job_forms')
     .delete()
     .eq('id', id)
 
-  if (error) {
-    console.error('Error deleting job:', error)
+  if (jobErr) {
+    console.error('Error deleting job:', jobErr)
     throw new Error('Failed to delete job')
   }
 
@@ -469,4 +496,40 @@ export async function deleteJob(id: string) {
   })
 
   revalidatePath('/admin/jobs')
+}
+
+export async function closeJob(id: string) {
+  const supabase = createClient()
+  await requireJobOwnerOrSuper(id)
+
+  const { data: jobBeforeClose } = await supabase
+    .from('job_forms')
+    .select('title,status')
+    .eq('id', id)
+    .single()
+
+  const { error } = await supabase
+    .from('job_forms')
+    .update({ status: 'closed', updated_at: new Date().toISOString() } as any)
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error closing job:', error)
+    throw new Error('Failed to close job')
+  }
+
+  await logAdminEvent({
+    action: 'job.close',
+    entityType: 'job',
+    entityId: id,
+    jobFormId: id,
+    metadata: {
+      title: jobBeforeClose?.title ?? null,
+      previous_status: jobBeforeClose?.status ?? null,
+      status: 'closed',
+    },
+  })
+
+  revalidatePath('/admin/jobs')
+  revalidatePath(`/admin/jobs/${id}`)
 }

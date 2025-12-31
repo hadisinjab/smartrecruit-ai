@@ -10,7 +10,6 @@ import {
   Users,
   Briefcase,
   FileText,
-  TrendingUp,
   Clock,
   CheckCircle,
   XCircle
@@ -132,20 +131,6 @@ export default function AdminDashboard() {
       icon: Briefcase,
       href: '/admin/jobs',
       color: 'green' as const
-    },
-    {
-      title: t('scheduleInterviews'),
-      description: t('scheduleInterviewsDesc'),
-      icon: Clock,
-      href: '/admin/evaluations',
-      color: 'purple' as const
-    },
-    {
-      title: t('viewReports'),
-      description: t('viewReportsDesc'),
-      icon: TrendingUp,
-      href: '/admin/reports',
-      color: 'yellow' as const
     }
   ];
 
@@ -190,7 +175,7 @@ export default function AdminDashboard() {
         {/* Quick Actions */}
         <div>
           <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('quickActions')}</h2>
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4'>
             {quickActions.map((action) => (
               <Link key={action.title} href={action.href}>
                 <Card className='p-6 hover:shadow-md transition-shadow cursor-pointer'>
@@ -198,7 +183,6 @@ export default function AdminDashboard() {
                     <div className={`p-2 rounded-lg ${
                       action.color === 'blue' ? 'bg-blue-50 text-blue-600' :
                       action.color === 'green' ? 'bg-green-50 text-green-600' :
-                      action.color === 'purple' ? 'bg-purple-50 text-purple-600' :
                       'bg-yellow-50 text-yellow-600'
                     }`}>
                       <action.icon className='w-5 h-5' />

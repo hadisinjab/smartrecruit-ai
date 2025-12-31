@@ -97,7 +97,7 @@ export async function getCandidates(jobId?: string) {
         priority: 'medium', // Default
         notes: latestHrEval.hr_notes || '',
         nextAction: latestHrEval.hr_decision || 'Review',
-        nextActionDate: new Date().toISOString() // Placeholder
+        nextActionDate: latestHrEval.next_action_date || null
       }
     } as any;
 
@@ -209,7 +209,7 @@ export async function getCandidateById(id: string) {
       priority: 'medium',
       notes: latestHrEval.hr_notes || '',
       nextAction: latestHrEval.hr_decision || 'Review',
-      nextActionDate: new Date().toISOString()
+      nextActionDate: latestHrEval.next_action_date || null
     },
     answers: (app.answers || []).map((ans: any) => {
       const q = qMap.get(ans.question_id)

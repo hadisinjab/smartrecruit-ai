@@ -31,6 +31,7 @@
     "candidates": "Candidates",
     "jobs": "Jobs",
     "incomplete": "Incomplete",
+    "notifications": "Notifications",
     "evaluations": "Evaluations",
     "userManagement": "User Management",
     "activityLog": "Activity Log",
@@ -261,6 +262,11 @@
     },
     "deleteUserConfirmation": "Delete User",
     "deleteUserWarning": "Are you sure you want to delete {userName}? This action cannot be undone and will remove the user from the system."
+    ,
+    "form": {
+      "activeLabel": "Active",
+      "activeHint": "Disable to prevent access without deleting the account."
+    }
   },
   "Activity": {
     "title": "Activity Log",
@@ -289,6 +295,35 @@
       "month": "Past Month"
     },
     "empty": "No activities found",
+    "metadataHelp": {
+      "title": "What is metadata?",
+      "desc": "Metadata is extra context saved with each activity (e.g., which fields changed, previous values, decision/score). It helps with auditing and troubleshooting."
+    },
+    "metadata": {
+      "none": "No metadata",
+      "view": "View details",
+      "detailsTitle": "Metadata details",
+      "detailsDesc": "Structured details associated with this activity log entry.",
+      "labels": {
+        "decision": "Decision",
+        "score": "Score",
+        "status": "Status",
+        "previous_status": "Previous status",
+        "role": "Role",
+        "is_active": "Active",
+        "updatedFields": "Updated fields",
+        "title": "Title",
+        "email": "Email",
+        "fullName": "Full name"
+      },
+      "key": "Key",
+      "value": "Value"
+    },
+    "entityFields": {
+      "entityId": "Entity ID",
+      "jobFormId": "Job ID",
+      "applicationId": "Application ID"
+    },
     "time": {
       "minutesAgo": "{count} minutes ago",
       "hoursAgo": "{count} hours ago",
@@ -298,6 +333,7 @@
   "Table": {
     "candidate": "Candidate",
     "status": "Status",
+    "active": "Active",
     "role": "Role",
     "name": "Name",
     "email": "Email",
@@ -310,6 +346,8 @@
     "location": "Location",
     "type": "Type",
     "applicants": "Applicants",
+    "salaryRange": "Salary Range",
+    "posted": "Posted",
     "postedDate": "Posted Date",
     "user": "User",
     "target": "Target",
@@ -337,7 +375,11 @@
     "completionStatus": "Completion Status",
     "incomplete": "Incomplete",
     "completedResubmitted": "Completed but resubmitted",
-    "completedFirstTime": "Completed first time"
+    "completedFirstTime": "Completed first time",
+    "timeSpent": "Time Spent",
+    "contact": "Contact",
+    "progress": "Progress",
+    "remind": "Remind"
   },
   "Status": {
     "new": "New",

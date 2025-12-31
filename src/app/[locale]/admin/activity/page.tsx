@@ -18,12 +18,165 @@ import {
   FileText,
   Settings,
   Shield,
-  Globe,
-  Monitor,
   Eye
 } from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+
+function formatMetaValue(value: any): string {
+  if (value == null) return '—'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return value.length ? `${value.length} items` : '—'
+  if (typeof value === 'object') return 'Object'
+  return String(value)
+}
+
+function getMetaSummary(meta: any): Array<{ k: string; v: string }> {
+  if (!meta || typeof meta !== 'object') return []
+  const entries = Object.entries(meta).filter(([k, v]) => v != null && v !== '' && k !== 'description')
+  const preferred = ['updatedFields', 'is_active', 'role', 'status', 'previous_status', 'decision', 'score', 'email', 'fullName', 'organizationName']
+  const sorted = entries.sort(([a], [b]) => {
+    const ai = preferred.indexOf(a)
+    const bi = preferred.indexOf(b)
+    if (ai === -1 && bi === -1) return a.localeCompare(b)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+  return sorted.slice(0, 3).map(([k, v]) => ({
+    k,
+    v: Array.isArray(v) ? (v.length ? v.join(', ') : '—') : formatMetaValue(v),
+  }))
+}
+
+function buildInlineMetaText(meta: any): string {
+  if (!meta || typeof meta !== 'object') return ''
+  const pairs: Array<[string, any]> = []
+  const pick = (k: string) => {
+    if (meta[k] != null && meta[k] !== '') pairs.push([k, meta[k]])
+  }
+  ;['decision', 'score', 'status', 'previous_status', 'role', 'is_active', 'updatedFields', 'title', 'email', 'fullName'].forEach(pick)
+  if (!pairs.length) return ''
+
+  return pairs
+    .slice(0, 4)
+    .map(([k, v]) => {
+      const vv = Array.isArray(v) ? (v.length ? v.join(', ') : '—') : formatMetaValue(v)
+      return `${k}: ${vv}`
+    })
+    .join(' • ')
+}
+
+const MetadataCell: React.FC<{ meta: any; t: any }> = ({ meta, t }) => {
+  const keyLabels: Record<string, string> = {
+    decision: t('metadata.labels.decision'),
+    score: t('metadata.labels.score'),
+    status: t('metadata.labels.status'),
+    previous_status: t('metadata.labels.previous_status'),
+    role: t('metadata.labels.role'),
+    is_active: t('metadata.labels.is_active'),
+    updatedFields: t('metadata.labels.updatedFields'),
+    title: t('metadata.labels.title'),
+    email: t('metadata.labels.email'),
+    fullName: t('metadata.labels.fullName'),
+  }
+
+  const summary = getMetaSummary(meta)
+  const hasData = meta && typeof meta === 'object' && Object.keys(meta).length > 0
+
+  if (!hasData) {
+    return <span className='text-xs text-gray-500'>—</span>
+  }
+
+  return (
+    <div className='flex items-center gap-2'>
+      <div className='flex flex-wrap gap-1 max-w-[220px]'>
+        {summary.length ? (
+          summary.map((item) => (
+            <span
+              key={item.k}
+              className='inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-[11px]'
+              title={`${item.k}: ${item.v}`}
+            >
+              <span className='font-medium'>{item.k}</span>
+              <span className='mx-1 text-gray-400'>·</span>
+              <span className='truncate max-w-[140px]'>{item.v}</span>
+            </span>
+          ))
+        ) : (
+          <span className='text-xs text-gray-500'>{t('metadata.none')}</span>
+        )}
+      </div>
+
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant='ghost' size='sm' className='h-8 w-8 p-0' title={t('metadata.view')}>
+            <Eye className='w-4 h-4' />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className='max-w-2xl'>
+          <DialogHeader>
+            <DialogTitle>{t('metadata.detailsTitle')}</DialogTitle>
+            <DialogDescription>{t('metadata.detailsDesc')}</DialogDescription>
+          </DialogHeader>
+
+          <div className='max-h-[60vh] overflow-auto border rounded-lg'>
+            <table className='w-full text-sm'>
+              <thead className='bg-gray-50 border-b'>
+                <tr>
+                  <th className='text-start px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                    {t('metadata.key')}
+                  </th>
+                  <th className='text-start px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider'>
+                    {t('metadata.value')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(meta || {}).map(([k, v]) => (
+                  <tr key={k} className='border-b last:border-b-0'>
+                    <td className='px-4 py-2 font-mono text-xs text-gray-700 align-top whitespace-nowrap'>
+                      {keyLabels[k] || k}
+                    </td>
+                    <td className='px-4 py-2 text-gray-900 align-top'>
+                      {Array.isArray(v) ? (
+                        v.length ? (
+                          <ul className='list-disc list-inside space-y-1'>
+                            {v.slice(0, 20).map((x, i) => (
+                              <li key={i}>{typeof x === 'string' ? x : formatMetaValue(x)}</li>
+                            ))}
+                            {v.length > 20 && <li>…</li>}
+                          </ul>
+                        ) : (
+                          '—'
+                        )
+                      ) : typeof v === 'object' && v != null ? (
+                        <pre className='text-xs bg-gray-50 border rounded p-2 overflow-auto'>
+                          {JSON.stringify(v, null, 2)}
+                        </pre>
+                      ) : (
+                        <span>{formatMetaValue(v)}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
 
 export default function ActivityLogPage() {
   const t = useTranslations('Activity');
@@ -230,7 +383,12 @@ export default function ActivityLogPage() {
       render: (_, record) => (
         <div>
           <p className='font-medium text-gray-900 text-sm'>{record.target}</p>
-          <p className='text-xs text-gray-500 mt-1'>{record.description}</p>
+          {(() => {
+            const metaText = buildInlineMetaText(record.metadata)
+            const desc = record.description
+            const line = metaText || desc
+            return line ? <p className='text-xs text-gray-500 mt-1'>{line}</p> : null
+          })()}
         </div>
       )
     },
@@ -238,16 +396,35 @@ export default function ActivityLogPage() {
       key: 'entity',
       title: tTable('entity'),
       render: (_, record) => (
-        <div className='text-xs text-gray-700 space-y-1'>
-          <div><span className='font-semibold'>type:</span> {record.targetType}</div>
-          <div className='truncate max-w-[260px]' title={record.entityId || ''}>
-            <span className='font-semibold'>entity_id:</span> {record.entityId || '-'}
+        <div className='space-y-2'>
+          <div className='flex items-center gap-2'>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getTargetTypeColor(record.targetType)}`}>
+              {tTarget(record.targetType)}
+            </span>
           </div>
-          <div className='truncate max-w-[260px]' title={record.jobFormId || ''}>
-            <span className='font-semibold'>job_form_id:</span> {record.jobFormId || '-'}
-          </div>
-          <div className='truncate max-w-[260px]' title={record.applicationId || ''}>
-            <span className='font-semibold'>application_id:</span> {record.applicationId || '-'}
+
+          <div className='text-xs text-gray-700 space-y-1'>
+            {record.entityId ? (
+              <div className='truncate max-w-[260px]' title={record.entityId}>
+                <span className='font-medium text-gray-500'>{t('entityFields.entityId')}:</span>{' '}
+                <span className='font-mono'>{record.entityId}</span>
+              </div>
+            ) : null}
+            {record.jobFormId ? (
+              <div className='truncate max-w-[260px]' title={record.jobFormId}>
+                <span className='font-medium text-gray-500'>{t('entityFields.jobFormId')}:</span>{' '}
+                <span className='font-mono'>{record.jobFormId}</span>
+              </div>
+            ) : null}
+            {record.applicationId ? (
+              <div className='truncate max-w-[260px]' title={record.applicationId}>
+                <span className='font-medium text-gray-500'>{t('entityFields.applicationId')}:</span>{' '}
+                <span className='font-mono'>{record.applicationId}</span>
+              </div>
+            ) : null}
+            {!record.entityId && !record.jobFormId && !record.applicationId ? (
+              <div className='text-gray-500'>—</div>
+            ) : null}
           </div>
         </div>
       )
@@ -255,16 +432,7 @@ export default function ActivityLogPage() {
     {
       key: 'metadata',
       title: tTable('metadata'),
-      render: (_, record) => {
-        const raw = record.metadata
-        const text =
-          raw == null ? '' : typeof raw === 'string' ? raw : JSON.stringify(raw)
-        return (
-          <div className='text-xs text-gray-600 truncate max-w-[280px]' title={text}>
-            {text || '-'}
-          </div>
-        )
-      }
+      render: (_, record) => <MetadataCell meta={record.metadata} t={t} />
     },
     {
       key: 'timestamp',
@@ -295,39 +463,6 @@ export default function ActivityLogPage() {
         );
       }
     },
-    {
-      key: 'location',
-      title: tTable('location'),
-      render: (_, record) => (
-        <div className='text-sm text-gray-600'>
-          {record.ipAddress && (
-            <div className='flex items-center space-x-1'>
-              <Globe className='w-3 h-3' />
-              <span>{record.ipAddress}</span>
-            </div>
-          )}
-          {record.userAgent && (
-            <div className='flex items-center space-x-1 mt-1'>
-              <Monitor className='w-3 h-3' />
-              <span className="text-xs truncate max-w-[120px]" title={record.userAgent}>
-                {record.userAgent.split(' ')[0]}
-              </span>
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'actions',
-      title: tTable('actions'),
-      render: (_, record) => (
-        <div className='flex items-center space-x-2'>
-          <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
-            <Eye className='w-4 h-4' />
-          </Button>
-        </div>
-      )
-    }
   ];
 
   const stats = {
@@ -371,6 +506,11 @@ export default function ActivityLogPage() {
       }
     >
       <div className='space-y-6'>
+        <Card className='p-4 border-blue-100 bg-blue-50'>
+          <div className='text-sm text-blue-900 font-medium'>{t('metadataHelp.title')}</div>
+          <div className='text-xs text-blue-800 mt-1'>{t('metadataHelp.desc')}</div>
+        </Card>
+
         {/* Stats */}
         <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
           <Card className='p-4'>

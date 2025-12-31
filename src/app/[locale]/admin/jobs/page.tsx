@@ -8,13 +8,23 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/admin/DataTable';
 import { Column } from '@/components/admin/DataTable';
 import { Card } from '@/components/ui/admin-card';
-import { getJobs } from '@/actions/jobs';
+import { deleteJob, getJobs } from '@/actions/jobs';
 import { Job } from '@/types/admin';
-import { Plus, Search, MapPin, Calendar, Users, Loader2 } from 'lucide-react';
+import { Plus, Search, MapPin, Calendar, Users, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { exportToCSV } from '@/utils/exportUtils';
 import { useUser } from '@/context/UserContext';
 import { useSearch } from '@/context/SearchContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function JobsPage() {
   const t = useTranslations('Jobs');
@@ -27,6 +37,8 @@ export default function JobsPage() {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -52,9 +64,17 @@ export default function JobsPage() {
     job.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const isJobExpired = (job: Job) => {
+    if (!job.deadline) return false
+    const ts = new Date(job.deadline).getTime()
+    if (Number.isNaN(ts)) return false
+    return ts <= Date.now()
+  }
+
   const getStatusColor = (status: string) => {
     const colors = {
       active: 'bg-green-100 text-green-800',
+      inactive: 'bg-red-100 text-red-800',
       paused: 'bg-yellow-100 text-yellow-800',
       closed: 'bg-red-100 text-red-800'
     };
@@ -125,11 +145,18 @@ export default function JobsPage() {
     {
       key: 'status',
       title: tTable('status'),
-      render: (status) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
-          {tStatus(status as any)}
-        </span>
-      )
+      render: (status, record) => {
+        const displayStatus =
+          status === 'active' && isJobExpired(record)
+            ? 'inactive' // deadline passed => treat as not active for admin UI
+            : (status as any)
+
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(displayStatus)}`}>
+            {tStatus(displayStatus as any)}
+          </span>
+        )
+      }
     },
     ...(!isReviewer ? [{
       key: 'salary',
@@ -189,6 +216,16 @@ export default function JobsPage() {
                Edit
              </Button>
            )}
+           {!isReviewer && (
+             <Button
+               variant='ghost'
+               size='sm'
+               onClick={() => setJobToDelete(job)}
+               className='text-red-600 hover:text-red-700 hover:bg-red-50'
+             >
+               <Trash2 className='w-4 h-4' />
+             </Button>
+           )}
         </div>
       )
     }
@@ -197,7 +234,7 @@ export default function JobsPage() {
   // Calculate stats
   const stats = {
     totalJobs: jobs.length,
-    activeJobs: jobs.filter(job => job.status === 'active').length,
+    activeJobs: jobs.filter(job => job.status === 'active' && !isJobExpired(job)).length,
     totalApplicants: jobs.reduce((sum, job) => sum + job.applicantsCount, 0),
     avgApplicantsPerJob: jobs.length > 0 
       ? Math.round(jobs.reduce((sum, job) => sum + job.applicantsCount, 0) / jobs.length) 
@@ -274,6 +311,45 @@ export default function JobsPage() {
           />
         )}
       </div>
+
+      <AlertDialog open={!!jobToDelete} onOpenChange={(open) => !open && setJobToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tCommon('delete')} {jobToDelete?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the job and all related data (applications, answers, uploads, etc). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>{tCommon('cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async (e) => {
+                e.preventDefault()
+                if (!jobToDelete) return
+                try {
+                  setIsDeleting(true)
+                  await deleteJob(jobToDelete.id)
+                  addToast('success', 'Job deleted successfully')
+                  // Reload list
+                  setIsLoading(true)
+                  const data = await getJobs()
+                  setJobs(data)
+                  setJobToDelete(null)
+                } catch (err: any) {
+                  addToast('error', err?.message || 'Failed to delete job')
+                } finally {
+                  setIsDeleting(false)
+                  setIsLoading(false)
+                }
+              }}
+            >
+              {isDeleting ? tCommon('loading') : tCommon('delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

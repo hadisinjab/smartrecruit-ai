@@ -16,8 +16,6 @@ import {
   Calendar,
   Phone,
   MapPin,
-  Eye,
-  MoreVertical
 } from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';
@@ -87,12 +85,6 @@ export default function IncompleteApplicationsPage() {
     return matchesSearch && matchesJob && matchesDate && matchesProgress;
   });
 
-  const getProgressColor = (percentage: number) => {
-    if (percentage < 50) return 'text-red-600 bg-red-50';
-    if (percentage < 80) return 'text-yellow-600 bg-yellow-50';
-    return 'text-green-600 bg-green-50';
-  };
-
   const getProgressBadgeColor = (percentage: number) => {
     if (percentage < 50) return 'bg-red-100 text-red-800';
     if (percentage < 80) return 'bg-yellow-100 text-yellow-800';
@@ -104,7 +96,7 @@ export default function IncompleteApplicationsPage() {
       key: 'candidate',
       title: tTable('candidate'),
       render: (_, record) => (
-        <div className='flex items-center space-x-3'>
+        <div className='flex items-center gap-3'>
           <div className='w-10 h-10 bg-orange-600 rounded-full flex items-center justify-center'>
             <span className='text-white text-sm font-medium'>
               {record.firstName[0]}{record.lastName[0]}
@@ -115,7 +107,7 @@ export default function IncompleteApplicationsPage() {
               {record.firstName} {record.lastName}
             </p>
             <p className='text-sm text-gray-500'>{record.position}</p>
-            <div className='flex items-center space-x-1 mt-1'>
+            <div className='flex items-center gap-1 mt-1'>
               <MapPin className='w-3 h-3 text-gray-400' />
               <span className='text-xs text-gray-500'>{record.location}</span>
             </div>
@@ -143,11 +135,11 @@ export default function IncompleteApplicationsPage() {
       title: tTable('contact'),
       render: (_, record) => (
         <div className='space-y-1'>
-          <div className='flex items-center space-x-1'>
+          <div className='flex items-center gap-1'>
             <Phone className='w-3 h-3 text-gray-400' />
             <span className='text-sm text-gray-600'>{record.phone}</span>
           </div>
-          <div className='flex items-center space-x-1'>
+          <div className='flex items-center gap-1'>
             <Calendar className='w-3 h-3 text-gray-400' />
             <span className='text-sm text-gray-600'>
               {tTable('applied')} {new Date(record.appliedDate).toLocaleDateString()}
@@ -159,27 +151,31 @@ export default function IncompleteApplicationsPage() {
     {
       key: 'progress',
       title: tTable('progress'),
-      render: (_, record) => (
+      render: (_, record) => {
+        const displayPct = Number(record.completionPercentage ?? 0)
+        const safePct = Number.isFinite(displayPct) ? Math.max(0, Math.min(100, displayPct)) : 0
+
+        return (
         <div className='space-y-2'>
           <div className='flex items-center justify-between'>
             <span className='text-sm font-medium text-gray-900'>
-              {record.completionPercentage}%
+              {displayPct}%
             </span>
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getProgressBadgeColor(record.completionPercentage)}`}>
               {record.completionPercentage < 50 ? tProgress('low') : 
                record.completionPercentage < 80 ? tProgress('medium') : tProgress('high')}
             </span>
           </div>
-          <div className='w-full bg-gray-200 rounded-full h-2'>
+          <div className='w-full bg-gray-200 rounded-full h-2 overflow-hidden'>
             <div 
               className={`h-2 rounded-full ${
                 record.completionPercentage < 50 ? 'bg-red-500' :
                 record.completionPercentage < 80 ? 'bg-yellow-500' : 'bg-green-500'
               }`}
-              style={{ width: `${record.completionPercentage}%` }}
+              style={{ width: `${safePct}%` }}
             ></div>
           </div>
-          <div className='flex space-x-2 text-xs text-gray-500'>
+          <div className='flex flex-wrap gap-2 text-xs text-gray-500'>
             <span className={record.progress.personalInfo ? 'text-green-600' : 'text-gray-400'}>
               {tProgress('personal')}
             </span>
@@ -194,14 +190,15 @@ export default function IncompleteApplicationsPage() {
             </span>
           </div>
         </div>
-      )
+        )
+      }
     },
     {
       key: 'timeSpent',
       title: tTable('timeSpent'),
       render: (_, record) => (
         <div className='text-center'>
-          <div className='flex items-center justify-center space-x-1 text-gray-600'>
+          <div className='flex items-center justify-center gap-1 text-gray-600'>
             <Clock className='w-4 h-4' />
             <span className='text-sm'>{record.timeSpent}{tCommon('min')}</span>
           </div>
@@ -211,31 +208,6 @@ export default function IncompleteApplicationsPage() {
         </div>
       )
     },
-    {
-      key: 'actions',
-      title: tTable('actions'),
-      render: (_, record) => (
-        <div className='flex items-center space-x-2'>
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center space-x-1'
-            onClick={() => {
-              addToast('success', `Reminder sent to ${record.firstName} ${record.lastName}`);
-            }}
-          >
-            <Mail className='w-3 h-3' />
-            <span>{tTable('remind')}</span>
-          </Button>
-          <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
-            <Eye className='w-4 h-4' />
-          </Button>
-          <Button variant='ghost' size='sm' className='h-8 w-8 p-0'>
-            <MoreVertical className='w-4 h-4' />
-          </Button>
-        </div>
-      )
-    }
   ];
 
   const getUniqueJobs = () => {

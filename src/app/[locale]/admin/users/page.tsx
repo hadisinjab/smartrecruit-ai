@@ -212,7 +212,7 @@ export default function UsersPage() {
     },
     {
       key: 'status',
-      title: tTable('status'),
+      title: tTable('active'),
       render: (_, record) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(record.isActive)}`}>
           {record.isActive ? (

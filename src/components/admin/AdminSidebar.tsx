@@ -8,8 +8,7 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  FileText,
-  BarChart3,
+  Bell,
   Settings,
   LogOut,
   AlertCircle,
@@ -55,7 +54,7 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
   
   // Get current user role
   const userRole = user?.role || 'viewer';
-  const currentUser = user || { name: 'Guest', role: 'viewer' } as any;
+  const currentUser = user;
 
   // Permission-based navigation items
   const getNavigationItems = () => {
@@ -91,10 +90,10 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         allowedRoles: ['admin', 'super-admin'] as const
       },
       {
-        icon: <FileText className='w-5 h-5' />,
-        label: t('evaluations'),
-        href: '/admin/evaluations',
-        requiredRole: null // All roles can access
+        icon: <Bell className='w-5 h-5' />,
+        label: t('notifications'),
+        href: '/admin/notifications',
+        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const
       },
       {
         icon: <UserCog className='w-5 h-5' />,
@@ -107,12 +106,6 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         label: t('activityLog'),
         href: '/admin/activity',
         requiredRole: 'super-admin' // Only super-admin can access
-      },
-      {
-        icon: <BarChart3 className='w-5 h-5' />,
-        label: t('reports'),
-        href: '/admin/reports',
-        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <Settings className='w-5 h-5' />,
@@ -174,11 +167,11 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         <div className='flex items-center space-x-3 mb-3'>
           <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
             <span className='text-white text-sm font-medium'>
-              {(currentUser?.name || 'Guest').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              {(currentUser?.name || '?').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
             </span>
           </div>
           <div>
-            <p className='text-sm font-medium text-gray-900'>{currentUser.name}</p>
+            <p className='text-sm font-medium text-gray-900'>{currentUser?.name || '...'}</p>
             <p className='text-xs text-gray-600'>{getRoleDisplayName(userRole)}</p>
           </div>
         </div>

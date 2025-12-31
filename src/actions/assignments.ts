@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { requireAdminOrSuper, requireStaff } from '@/utils/authz'
 import { createAssignmentSchema } from '@/lib/validations/assignment'
 import type { AssignmentResponse, CreateAssignmentInput } from '@/types/assignment'
+import { createNotification, getRecipientsForApplication } from '@/lib/notifications'
 
 type ActionOk<T> = { ok: true; status: number; data: T }
 type ActionErr = { ok: false; status: number; error: string }
@@ -77,6 +78,31 @@ export async function createAssignment(input: CreateAssignmentInput): Promise<Ac
       // RLS violations show up as PostgREST errors; map to 403
       if ((error as any)?.code === '42501') return toForbidden()
       return { ok: false, status: 500, error: error?.message || 'Internal server error' }
+    }
+
+    // Notification: assignment submitted (treated as a submission event in current schema)
+    try {
+      const { recipients, app, job } = await getRecipientsForApplication(parsed.data.application_id)
+      const actionUrl = `/admin/candidates/${parsed.data.application_id}`
+      await Promise.all(
+        recipients.map((userId) =>
+          createNotification({
+            user_id: userId,
+            type: 'assignment_submitted',
+            title: 'Assignment submitted',
+            content: `${app?.candidate_name || 'A candidate'} submitted an assignment for ${job?.title || 'a job'}.`,
+            metadata: {
+              application_id: parsed.data.application_id,
+              candidate_name: app?.candidate_name || null,
+              job_id: app?.job_form_id || null,
+              job_title: job?.title || null,
+              action_url: actionUrl,
+            } as any,
+          })
+        )
+      )
+    } catch (e) {
+      console.error('[notifications] createAssignment:', e)
     }
 
     return {

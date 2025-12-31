@@ -6,8 +6,10 @@ import { useRouter } from '@/i18n/navigation';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/admin-card';
-import { getJob } from '@/actions/jobs';
+import { closeJob, getJob } from '@/actions/jobs';
 import { useUser } from '@/context/UserContext';
+import type { Job } from '@/types/admin';
+import { useToast } from '@/context/ToastContext';
 import {
   ArrowLeft,
   Edit3,
@@ -16,7 +18,6 @@ import {
   DollarSign,
   Users,
   Calendar,
-  Briefcase,
   Award,
   CheckCircle,
   Building,
@@ -25,16 +26,29 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
   const locale = (params as any)?.locale || 'en'
-  const [job, setJob] = useState<any | null>(null);
+  const [job, setJob] = useState<Job | any | null>(null);
   const [loading, setLoading] = useState(true);
   const [linkCopied, setLinkCopied] = useState(false)
+  const [closeOpen, setCloseOpen] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   const { isReviewer, isSuperAdmin, isAdmin, user } = useUser();
+  const { addToast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -98,6 +112,7 @@ export default function JobDetailsPage() {
       active: 'bg-green-100 text-green-800',
       paused: 'bg-yellow-100 text-yellow-800',
       closed: 'bg-red-100 text-red-800',
+      inactive: 'bg-red-100 text-red-800',
       draft: 'bg-gray-100 text-gray-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
@@ -119,6 +134,20 @@ export default function JobDetailsPage() {
 
   const status = job.status || 'draft';
   const type = job.type || 'full-time';
+  const salaryMin =
+    (job?.salary?.min ?? job?.salary_min ?? 0) as number
+  const salaryMax =
+    (job?.salary?.max ?? job?.salary_max ?? 0) as number
+  const salaryCurrency =
+    (job?.salary?.currency ?? job?.salary_currency ?? 'USD') as string
+  const deadlineTs = job?.deadline ? new Date(job.deadline).getTime() : Number.NaN
+  const isExpired = Number.isFinite(deadlineTs) && deadlineTs <= Date.now()
+  const isApplyDisabled = status !== 'active' || isExpired
+  const displayStatus = status === 'active' && isExpired ? 'inactive' : status
+  const displayStatusLabel =
+    displayStatus === 'inactive'
+      ? 'Inactive'
+      : displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)
 
   return (
     <AdminLayout
@@ -132,7 +161,7 @@ export default function JobDetailsPage() {
               Edit Job
             </Button>
           )}
-          <Button variant='outline'>
+          <Button variant='outline' onClick={() => router.push(`/admin/candidates?jobId=${jobId}`)}>
             View Applications
           </Button>
         </div>
@@ -162,8 +191,8 @@ export default function JobDetailsPage() {
                   <p className='text-lg text-gray-600'>{job.department}</p>
                 </div>
                 <div className='flex space-x-2'>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(displayStatus)}`}>
+                    {displayStatusLabel}
                   </span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(type)}`}>
                     {type.split('-').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
@@ -179,7 +208,7 @@ export default function JobDetailsPage() {
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Clock className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>Posted {job.created_at ? new Date(job.created_at).toLocaleDateString() : 'N/A'}</span>
+                  <span className='text-gray-700'>Posted {job.postedDate ? new Date(job.postedDate).toLocaleDateString() : (job.created_at ? new Date(job.created_at).toLocaleDateString() : 'N/A')}</span>
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Calendar className='w-5 h-5 text-gray-400' />
@@ -187,7 +216,7 @@ export default function JobDetailsPage() {
                 </div>
                 <div className='flex items-center space-x-3'>
                   <Users className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>0 applicants</span>
+                  <span className='text-gray-700'>{job.applicantsCount ?? 0} applicants</span>
                 </div>
               </div>
 
@@ -196,7 +225,7 @@ export default function JobDetailsPage() {
                 <div className='flex items-center space-x-3 mb-2'>
                   <DollarSign className='w-5 h-5 text-gray-400' />
                   <span className='text-lg font-semibold text-gray-900'>
-                    ${(job.salary_min || 0).toLocaleString()} - ${(job.salary_max || 0).toLocaleString()} {job.salary_currency || 'USD'}
+                    ${Number(salaryMin || 0).toLocaleString()} - ${Number(salaryMax || 0).toLocaleString()} {salaryCurrency || 'USD'}
                   </span>
                 </div>
               </div>
@@ -272,6 +301,7 @@ export default function JobDetailsPage() {
                       setTimeout(() => setLinkCopied(false), 2000)
                     }}
                     className='flex-shrink-0'
+                    disabled={isApplyDisabled}
                   >
                     {linkCopied ? (
                       <>
@@ -297,10 +327,17 @@ export default function JobDetailsPage() {
                         : `/${locale}/apply/${jobId}`
                     window.open(link, '_blank')
                   }}
+                  disabled={isApplyDisabled}
                 >
                   <ExternalLink className='w-4 h-4 mr-2' />
-                  Open Link
+                  {isApplyDisabled ? 'Link Disabled' : 'Open Link'}
                 </Button>
+
+                {isApplyDisabled && (
+                  <p className='text-xs text-gray-500'>
+                    {status !== 'active' ? 'This job is not active.' : 'The application deadline has passed.'}
+                  </p>
+                )}
               </div>
             </Card>
 
@@ -358,19 +395,24 @@ export default function JobDetailsPage() {
             <Card className='p-6'>
               <h2 className='text-lg font-semibold text-gray-900 mb-4'>Quick Actions</h2>
               <div className='space-y-2'>
-                <Button variant='outline' className='w-full justify-start'>
+                <Button
+                  variant='outline'
+                  className='w-full justify-start'
+                  onClick={() => router.push(`/admin/candidates?jobId=${jobId}`)}
+                >
                   <Users className='w-4 h-4 mr-2' />
                   View All Applications
                 </Button>
-                <Button variant='outline' className='w-full justify-start'>
+                <Button variant='outline' className='w-full justify-start' onClick={() => router.push(`/admin/jobs/${jobId}/edit`)}>
                   <Edit3 className='w-4 h-4 mr-2' />
                   Edit Job Details
                 </Button>
-                <Button variant='outline' className='w-full justify-start'>
-                  <Briefcase className='w-4 h-4 mr-2' />
-                  Duplicate Job
-                </Button>
-                <Button variant='outline' className='w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50'>
+                <Button
+                  variant='outline'
+                  className='w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50'
+                  onClick={() => setCloseOpen(true)}
+                  disabled={!canEdit || status === 'closed' || isClosing}
+                >
                   Close Job
                 </Button>
               </div>
@@ -378,6 +420,40 @@ export default function JobDetailsPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={closeOpen} onOpenChange={setCloseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will close the job and prevent anyone from applying, even if they have the direct link.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClosing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isClosing}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async (e) => {
+                e.preventDefault()
+                try {
+                  setIsClosing(true)
+                  await closeJob(jobId)
+                  addToast('success', 'Job closed successfully')
+                  setJob((prev: any) => ({ ...(prev || {}), status: 'closed' }))
+                  setCloseOpen(false)
+                } catch (err: any) {
+                  addToast('error', err?.message || 'Failed to close job')
+                } finally {
+                  setIsClosing(false)
+                }
+              }}
+            >
+              {isClosing ? 'Closing...' : 'Close Job'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }

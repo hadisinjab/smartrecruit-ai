@@ -74,3 +74,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Fix Radix Switch thumb direction in RTL.
+   Default Tailwind classes move the thumb to the right when checked.
+   In RTL we need the thumb to move left. */
+[dir="rtl"] .sr-switch .sr-switch-thumb[data-state="checked"] {
+  transform: translateX(-1.25rem) !important;
+}

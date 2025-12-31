@@ -19,14 +19,14 @@ export default function ErrorPage({ error }: ErrorPageProps) {
           <p className="text-gray-700 mb-4">
             {error || 'The job you are looking for does not exist or is not available for applications.'}
           </p>
-          <p className="text-sm text-gray-500 mb-4">
-            Possible reasons:
+          <div className="text-sm text-gray-500 mb-4">
+            <p>Possible reasons:</p>
             <ul className="list-disc list-inside mt-2 space-y-1">
               <li>The job status is not &quot;active&quot;</li>
               <li>The job ID is incorrect</li>
               <li>The application deadline has passed</li>
             </ul>
-          </p>
+          </div>
           <a href="/">
             <Button>Return to Home</Button>
           </a>
@@ -35,6 +35,7 @@ export default function ErrorPage({ error }: ErrorPageProps) {
     </div>
   )
 }
+
 
 
 

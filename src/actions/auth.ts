@@ -30,6 +30,11 @@ export async function getCurrentUser(): Promise<AdminUser | null> {
     }
   }
 
+  // Block inactive accounts at the server layer as well
+  if (userData.is_active === false) {
+    return null
+  }
+
   return {
     id: user.id,
     name: userData.full_name || user.email?.split('@')[0] || 'User',
@@ -37,7 +42,7 @@ export async function getCurrentUser(): Promise<AdminUser | null> {
     role: (userData.role === 'viewer' ? 'reviewer' : userData.role) || 'reviewer',
     avatar: userData.avatar_url,
     lastLogin: new Date().toISOString(),
-    isActive: true,
+    isActive: userData.is_active !== false,
     createdAt: user.created_at
   }
 }

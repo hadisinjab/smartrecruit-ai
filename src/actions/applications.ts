@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createNotification, getRecipientsForJob } from '@/lib/notifications'
 
 type ApplyJob = {
   id: string
@@ -47,7 +48,7 @@ export async function getJobForApplication(jobId: string): Promise<{
     // Public can only see active jobs due to RLS policy.
     const { data: job, error: jobError } = await supabase
       .from('job_forms')
-      .select('id,title,description,status,assignment_enabled,assignment_required,assignment_type,assignment_description,assignment_weight')
+      .select('id,title,description,status,deadline,assignment_enabled,assignment_required,assignment_type,assignment_description,assignment_weight')
       .eq('id', jobId)
       .single()
 
@@ -55,9 +56,12 @@ export async function getJobForApplication(jobId: string): Promise<{
       return { job: null, questions: [], error: jobError?.message || 'Job not found' }
     }
 
-    // If policy changes or staff sees non-active jobs, enforce active here for apply UX.
+    // If policy changes or staff sees non-active jobs, enforce active/deadline here for apply UX.
     if ((job as any).status && (job as any).status !== 'active') {
       return { job: null, questions: [], error: 'Job is not available for applications' }
+    }
+    if ((job as any).deadline && new Date((job as any).deadline).getTime() <= Date.now()) {
+      return { job: null, questions: [], error: 'The application deadline has passed' }
     }
 
     const { data: questions, error: qError } = await supabase
@@ -137,6 +141,32 @@ export async function beginApplication(payload: {
     if (error || !app?.id) {
       return { applicationId: null, error: error?.message || 'Failed to begin application' }
     }
+
+    // Notification: new application started (low signal; keep title minimal)
+    try {
+      const { recipients, job } = await getRecipientsForJob(payload.jobId)
+      const actionUrl = `/admin/candidates/${app.id}`
+      await Promise.all(
+        recipients.map((userId) =>
+          createNotification({
+            user_id: userId,
+            type: 'new_application',
+            title: 'New application started',
+            content: `${payload.candidateName || 'A candidate'} started applying for ${job?.title || 'a job'}.`,
+            metadata: {
+              application_id: app.id,
+              candidate_name: payload.candidateName || null,
+              job_id: payload.jobId,
+              job_title: job?.title || null,
+              action_url: actionUrl,
+            } as any,
+          })
+        )
+      )
+    } catch (e) {
+      console.error('[notifications] beginApplication:', e)
+    }
+
     return { applicationId: app.id, error: null }
   } catch (e: any) {
     return { applicationId: null, error: e?.message || 'Unexpected error' }
@@ -238,6 +268,51 @@ export async function submitApplication(payload: {
       if (resumeError) {
         return { applicationId: appId, error: resumeError.message || 'Failed to save resume' }
       }
+    }
+
+    // Notifications:
+    // - application_completed (always)
+    // - duplicate_application (if flagged)
+    try {
+      const { recipients, job } = await getRecipientsForJob(payload.jobId)
+      const actionUrl = `/admin/candidates/${appId}`
+
+      const baseMeta = {
+        application_id: appId,
+        candidate_name: payload.candidateName,
+        job_id: payload.jobId,
+        job_title: job?.title || null,
+        action_url: actionUrl,
+      } as any
+
+      await Promise.all(
+        recipients.map((userId) =>
+          createNotification({
+            user_id: userId,
+            type: 'application_completed',
+            title: 'Application completed',
+            content: `${payload.candidateName} submitted an application for ${job?.title || 'a job'}.`,
+            metadata: baseMeta,
+          })
+        )
+      )
+
+      const isDuplicate = !!completed
+      if (isDuplicate) {
+        await Promise.all(
+          recipients.map((userId) =>
+            createNotification({
+              user_id: userId,
+              type: 'duplicate_application',
+              title: 'Duplicate application detected',
+              content: `${payload.candidateName} submitted a duplicate application for ${job?.title || 'a job'}.`,
+              metadata: baseMeta,
+            })
+          )
+        )
+      }
+    } catch (e) {
+      console.error('[notifications] submitApplication:', e)
     }
 
     return { applicationId: appId, error: null }

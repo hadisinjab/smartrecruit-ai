@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ export default function CandidatesPage() {
   const tTable = useTranslations('Table');
   const tStatus = useTranslations('Status');
   const { addToast } = useToast();
+  const searchParams = useSearchParams();
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -44,6 +46,14 @@ export default function CandidatesPage() {
     experience: { min: 0, max: 20 }
   });
   const router = useRouter();
+
+  // Support deep-linking: /admin/candidates?jobId=<id>
+  useEffect(() => {
+    const jobIdFromQuery = searchParams?.get('jobId')
+    if (jobIdFromQuery) {
+      setSelectedJobId(jobIdFromQuery)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     async function loadJobs() {

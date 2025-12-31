@@ -2,10 +2,11 @@
 'use client';
 
 import React from 'react';
-import { Bell, Search, User } from 'lucide-react';
+import { Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
 import { useSearch } from '@/context/SearchContext';
+import { NotificationBell } from '@/components/admin/notifications/NotificationBell';
 
 interface AdminHeaderProps {
   title: string;
@@ -43,10 +44,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             />
           </div>
           
-          <Button variant='ghost' size='icon' className='relative'>
-            <Bell className='w-5 h-5' />
-            <span className='absolute -top-1 -end-1 w-3 h-3 bg-red-500 rounded-full'></span>
-          </Button>
+          <NotificationBell />
           
           <Button variant='ghost' size='icon'>
             <User className='w-5 h-5' />

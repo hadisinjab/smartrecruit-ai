@@ -12,6 +12,7 @@ import { useToast } from '@/context/ToastContext';
 import { Save, ArrowLeft, Loader2 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { getUser, updateUser } from '@/actions/users';
+import { Switch } from '@/components/ui/switch';
 
 export default function EditUserPage({ params }: { params: { id: string } }) {
   const userId = params.id;
@@ -28,6 +29,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'super-admin' | 'admin' | 'reviewer'>('reviewer');
   const [organizationName, setOrganizationName] = useState('');
+  const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -41,6 +43,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
           setEmail(user.email);
           setRole(user.role);
           setOrganizationName(user.organizationName || '');
+          setIsActive(!!user.isActive);
         } else {
           addToast('error', 'User not found');
           router.push('/admin/users');
@@ -69,6 +72,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         password: password || undefined, // Only send if not empty
         role,
         organizationName,
+        isActive,
       });
 
       if ('error' in result && result.error) {
@@ -184,6 +188,16 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
                   onChange={(e) => setOrganizationName(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className='flex items-center justify-between rounded-lg border border-gray-200 p-4'>
+              <div className='space-y-1'>
+                <p className='text-sm font-medium text-gray-900'>{tUsers('form.activeLabel') || 'Active'}</p>
+                <p className='text-xs text-gray-500'>
+                  {tUsers('form.activeHint') || 'Disable to prevent access without deleting the account.'}
+                </p>
+              </div>
+              <Switch checked={isActive} onCheckedChange={setIsActive} />
             </div>
 
             <div className='flex justify-end'>

@@ -123,12 +123,8 @@ export async function getActivityLogs(filters?: {
       (log.entity_id ? `${log.entity_type}:${log.entity_id}` : String(log.entity_type || 'system'))
 
     const meta = log.metadata ?? {}
-    const description =
-      typeof meta?.description === 'string'
-        ? meta.description
-        : meta && Object.keys(meta).length > 0
-          ? JSON.stringify(meta)
-          : ''
+    // Keep description human-readable. Metadata is shown separately in the UI.
+    const description = typeof meta?.description === 'string' ? meta.description : ''
 
     return {
       id: log.id,

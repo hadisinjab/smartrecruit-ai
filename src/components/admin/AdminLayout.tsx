@@ -5,8 +5,6 @@ import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { useUser } from '@/context/UserContext';
 import { useRouter } from '@/i18n/navigation';
-import { AdminUser } from '@/types/admin';
-import { getCurrentUser } from '@/actions/auth';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -21,13 +19,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   subtitle,
   actions
 }) => {
-  const { role, isLoading } = useUser();
+  const { role, isLoading, user } = useUser();
   const router = useRouter();
-  const [user, setUser] = React.useState<AdminUser | null>(null);
-
-  React.useEffect(() => {
-    getCurrentUser().then(setUser);
-  }, []);
 
   React.useEffect(() => {
     if (!isLoading && !role) {

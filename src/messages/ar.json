@@ -31,6 +31,7 @@
     "candidates": "المرشحون",
     "jobs": "الوظائف",
     "incomplete": "طلبات غير مكتملة",
+    "notifications": "الإشعارات",
     "evaluations": "التقييمات",
     "userManagement": "إدارة المستخدمين",
     "activityLog": "سجل النشاطات",
@@ -259,7 +260,11 @@
       "daysAgo": "منذ {count} يوم"
     },
     "deleteUserConfirmation": "حذف المستخدم",
-    "deleteUserWarning": "هل أنت متأكد من رغبتك في حذف {userName}؟ لا يمكن التراجع عن هذا الإجراء وسيتم إزالة المستخدم نهائياً من النظام."
+    "deleteUserWarning": "هل أنت متأكد من رغبتك في حذف {userName}؟ لا يمكن التراجع عن هذا الإجراء وسيتم إزالة المستخدم نهائياً من النظام.",
+    "form": {
+      "activeLabel": "نشط",
+      "activeHint": "عطّل الحساب لمنع الدخول بدون حذف المستخدم."
+    }
   },
   "Activity": {
     "title": "سجل النشاطات",
@@ -288,6 +293,35 @@
       "month": "الشهر الماضي"
     },
     "empty": "لم يتم العثور على نشاطات",
+    "metadataHelp": {
+      "title": "ما هي البيانات الإضافية (Metadata)؟",
+      "desc": "البيانات الإضافية هي تفاصيل تُحفظ مع كل نشاط (مثل الحقول التي تغيرت، القيم السابقة، القرار/الدرجة). هدفها التدقيق وتتبع التغييرات وحل المشاكل."
+    },
+    "metadata": {
+      "none": "لا توجد بيانات إضافية",
+      "view": "عرض التفاصيل",
+      "detailsTitle": "تفاصيل البيانات الإضافية",
+      "detailsDesc": "تفاصيل منظّمة مرتبطة بهذا السجل.",
+      "labels": {
+        "decision": "القرار",
+        "score": "الدرجة",
+        "status": "الحالة",
+        "previous_status": "الحالة السابقة",
+        "role": "الدور",
+        "is_active": "نشط",
+        "updatedFields": "الحقول المعدّلة",
+        "title": "العنوان",
+        "email": "البريد الإلكتروني",
+        "fullName": "الاسم الكامل"
+      },
+      "key": "الحقل",
+      "value": "القيمة"
+    },
+    "entityFields": {
+      "entityId": "معرّف الكيان",
+      "jobFormId": "معرّف الوظيفة",
+      "applicationId": "معرّف الطلب"
+    },
     "time": {
       "minutesAgo": "منذ {count} دقيقة",
       "hoursAgo": "منذ {count} ساعة",
@@ -297,6 +331,7 @@
   "Table": {
     "candidate": "المرشح",
     "status": "الحالة",
+    "active": "نشط",
     "role": "الدور",
     "name": "الاسم",
     "email": "البريد الإلكتروني",
@@ -309,6 +344,8 @@
     "location": "الموقع",
     "type": "النوع",
     "applicants": "المتقدمين",
+    "salaryRange": "نطاق الراتب",
+    "posted": "تاريخ النشر",
     "postedDate": "تاريخ النشر",
     "user": "المستخدم",
     "target": "المستهدف",
@@ -336,7 +373,11 @@
     "completionStatus": "حالة الاكتمال",
     "incomplete": "غير مكتمل",
     "completedResubmitted": "مكتمل لكنه أعاد الطلب",
-    "completedFirstTime": "مكتمل من أول مرة"
+    "completedFirstTime": "مكتمل من أول مرة",
+    "timeSpent": "الوقت المستغرق",
+    "contact": "التواصل",
+    "progress": "التقدم",
+    "remind": "تذكير"
   },
   "Status": {
     "new": "جديد",

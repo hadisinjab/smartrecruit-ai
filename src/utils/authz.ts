@@ -29,13 +29,14 @@ export async function getSessionInfo(): Promise<SessionInfo | null> {
 
   const { data, error } = await supabase
     .from('users')
-    .select('role, organization_id')
+    .select('role, organization_id, is_active')
     .eq('id', user.id)
     .single()
 
-  console.log('[Authz] User:', user.id, 'DB Role:', data?.role, 'DB Error:', error?.message);
+  console.log('[Authz] User:', user.id, 'DB Role:', data?.role, 'Active:', data?.is_active, 'DB Error:', error?.message);
 
   if (error || !data?.role) return null
+  if (data.is_active === false) return null
 
   return {
     id: user.id,

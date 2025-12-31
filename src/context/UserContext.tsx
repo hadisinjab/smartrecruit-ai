@@ -45,8 +45,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('Failed to load user role:', error);
-        setRole(null);
-        setUser(null);
+        // If this fails due to a transient network issue, keep the last known user/role
+        // to avoid showing "Guest" or forcing a logout.
       } finally {
         setIsLoading(false);
       }

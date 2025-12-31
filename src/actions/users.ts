@@ -15,6 +15,7 @@ interface CreateUserInput {
   password: string
   role: 'super-admin' | 'admin' | 'reviewer'
   organizationName: string
+  isActive?: boolean
 }
 
 export async function getUsers(): Promise<AdminUser[]> {
@@ -307,6 +308,7 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
   if (input.email) publicUpdate.email = input.email
   if (input.role) publicUpdate.role = input.role
   if (organizationId) publicUpdate.organization_id = organizationId
+  if (typeof input.isActive === 'boolean') publicUpdate.is_active = input.isActive
 
   const { error: publicError } = await adminClient
     .from('users')
@@ -469,12 +471,26 @@ export async function createUser(input: CreateUserInput) {
       full_name: input.fullName,
       role: input.role,
       organization_id: organizationId,
+      is_active: typeof input.isActive === 'boolean' ? input.isActive : true,
     },
   })
 
   if (authError || !authData?.user) {
     console.error('Error creating auth user:', authError)
     return { error: authError?.message || 'Failed to create auth user' }
+  }
+
+  // Ensure public.users.is_active matches UI selection (trigger inserts row with default true).
+  if (typeof input.isActive === 'boolean') {
+    const { error: activeErr } = await adminClient
+      .from('users')
+      .update({ is_active: input.isActive } as any)
+      .eq('id', authData.user.id)
+
+    if (activeErr) {
+      console.error('Error setting is_active on public user:', activeErr)
+      // Don't fail user creation for this; admin can toggle later.
+    }
   }
 
   await logAdminEvent({
@@ -486,6 +502,7 @@ export async function createUser(input: CreateUserInput) {
       role: input.role,
       fullName: input.fullName,
       organizationName: input.organizationName,
+      is_active: typeof input.isActive === 'boolean' ? input.isActive : true,
     },
   })
 

@@ -17,6 +17,7 @@ export interface Database {
           organization_id: string | null
           full_name: string | null
           avatar_url: string | null
+          is_active: boolean
           created_at: string
           updated_at: string
         }
@@ -27,6 +28,7 @@ export interface Database {
           organization_id?: string | null
           full_name?: string | null
           avatar_url?: string | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -37,6 +39,7 @@ export interface Database {
           organization_id?: string | null
           full_name?: string | null
           avatar_url?: string | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -65,6 +68,7 @@ export interface Database {
           title: string
           description: string | null
           status: 'draft' | 'active' | 'paused' | 'closed' | 'archived'
+          deadline: string | null
           evaluation_criteria: Json | null
           created_by: string | null
           created_at: string
@@ -76,6 +80,7 @@ export interface Database {
           title: string
           description?: string | null
           status?: 'draft' | 'active' | 'paused' | 'closed' | 'archived'
+          deadline?: string | null
           evaluation_criteria?: Json | null
           created_by?: string | null
           created_at?: string
@@ -87,6 +92,7 @@ export interface Database {
           title?: string
           description?: string | null
           status?: 'draft' | 'active' | 'paused' | 'closed' | 'archived'
+          deadline?: string | null
           evaluation_criteria?: Json | null
           created_by?: string | null
           created_at?: string
@@ -329,6 +335,7 @@ export interface Database {
           evaluator_id: string | null
           hr_score: number | null
           hr_decision: 'approve' | 'reject' | 'hold' | 'interview' | null
+          next_action_date: string | null
           hr_notes: string | null
           created_at: string
           updated_at: string
@@ -339,6 +346,7 @@ export interface Database {
           evaluator_id?: string | null
           hr_score?: number | null
           hr_decision?: 'approve' | 'reject' | 'hold' | 'interview' | null
+          next_action_date?: string | null
           hr_notes?: string | null
           created_at?: string
           updated_at?: string
@@ -349,6 +357,7 @@ export interface Database {
           evaluator_id?: string | null
           hr_score?: number | null
           hr_decision?: 'approve' | 'reject' | 'hold' | 'interview' | null
+          next_action_date?: string | null
           hr_notes?: string | null
           created_at?: string
           updated_at?: string
@@ -406,6 +415,7 @@ export interface Database {
           title: string | null
           content: string | null
           is_read: boolean
+          metadata: Json | null
           created_at: string
         }
         Insert: {
@@ -415,6 +425,7 @@ export interface Database {
           title?: string | null
           content?: string | null
           is_read?: boolean
+          metadata?: Json | null
           created_at?: string
         }
         Update: {
@@ -424,6 +435,7 @@ export interface Database {
           title?: string | null
           content?: string | null
           is_read?: boolean
+          metadata?: Json | null
           created_at?: string
         }
       }

@@ -10,6 +10,7 @@ create table public.users (
   organization_id uuid, -- For future multi-tenancy or specific org grouping
   full_name text,
   avatar_url text,
+  is_active boolean not null default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -46,6 +47,7 @@ create table public.job_forms (
   title text not null,
   description text,
   status text check (status in ('draft', 'active', 'paused', 'closed', 'archived')) default 'draft',
+  deadline timestamptz,
   evaluation_criteria jsonb, -- JSON for storing criteria weights/rules
   created_by uuid references public.users(id),
   created_at timestamptz default now(),
@@ -56,7 +58,7 @@ alter table public.job_forms enable row level security;
 
 -- Public read for active jobs (for applicants)
 create policy "Active jobs are viewable by everyone." on public.job_forms
-  for select using (status = 'active');
+  for select using (status = 'active' and (deadline is null or deadline > now()));
 
 -- Staff read all
 create policy "Staff can view all jobs." on public.job_forms
@@ -96,7 +98,9 @@ create policy "Questions for active jobs are public." on public.questions
   for select using (
     exists (
       select 1 from public.job_forms
-      where job_forms.id = questions.job_form_id and job_forms.status = 'active'
+      where job_forms.id = questions.job_form_id
+        and job_forms.status = 'active'
+        and (job_forms.deadline is null or job_forms.deadline > now())
     )
   );
 
@@ -137,7 +141,15 @@ create policy "Staff can view all applications." on public.applications
 -- Allow insert for public (applicants submitting forms)
 -- Note: You might want to restrict this via an edge function or anon key with limits
 create policy "Anyone can create application." on public.applications
-  for insert with check (true);
+  for insert with check (
+    exists (
+      select 1
+      from public.job_forms
+      where job_forms.id = applications.job_form_id
+        and job_forms.status = 'active'
+        and (job_forms.deadline is null or job_forms.deadline > now())
+    )
+  );
 
 
 -- 5. Answers Table (الإجابات)
@@ -274,6 +286,7 @@ create table public.hr_evaluations (
   evaluator_id uuid references public.users(id),
   hr_score numeric,
   hr_decision text check (hr_decision in ('approve', 'reject', 'hold', 'interview')),
+  next_action_date date,
   hr_notes text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()

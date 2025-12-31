@@ -46,7 +46,7 @@ export default function AdminLogin() {
       console.log('Step 2: Checking public.users table...');
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('role')
+        .select('role, is_active')
         .eq('id', authData.user.id)
         .single();
       
@@ -57,6 +57,12 @@ export default function AdminLogin() {
         // If user not found in public table, sign them out immediately
         await supabase.auth.signOut();
         throw new Error('Access denied: User record not found.');
+      }
+
+      // 2b. Block inactive accounts
+      if (userData.is_active === false) {
+        await supabase.auth.signOut();
+        throw new Error('Account is inactive. Please contact your administrator.');
       }
 
       // 3. Verify Role

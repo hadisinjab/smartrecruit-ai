@@ -17,6 +17,7 @@ import { addHrEvaluation, getHrEvaluation } from '@/actions/hr-evaluations';
 import { Candidate, Evaluation } from '@/types/admin';
 import { useToast } from '@/context/ToastContext';
 import { getAssignmentsByApplication } from '@/actions/assignments'
+import { InterviewsList } from '@/components/admin/interviews/InterviewsList'
 import {
   ArrowLeft,
   Edit3,
@@ -28,8 +29,8 @@ import {
   Mail,
   Globe,
   FileText,
+  Download,
   Star,
-  MessageSquare,
   Clock,
   User,
   Bot
@@ -61,7 +62,8 @@ export default function CandidateDetailsPage() {
   const [editedHrEval, setEditedHrEval] = useState({
     hr_score: 0,
     hr_notes: '',
-    hr_decision: 'Review'
+    hr_decision: 'Review',
+    next_action_date: ''
   });
 
   useEffect(() => {
@@ -81,8 +83,37 @@ export default function CandidateDetailsPage() {
           setEditedHrEval({
             hr_score: hrData.hr_score || 0,
             hr_notes: hrData.hr_notes || '',
-            hr_decision: hrData.hr_decision || 'Review'
+            hr_decision: hrData.hr_decision || 'Review',
+            next_action_date: hrData.next_action_date || ''
           });
+
+          // Keep HR Fields in sync with DB-backed HR evaluation fields
+          setCandidate((prev) =>
+            prev
+              ? ({
+                  ...prev,
+                  hrFields: {
+                    ...(prev as any).hrFields,
+                    nextAction: hrData.hr_decision || (prev as any).hrFields?.nextAction,
+                    nextActionDate: hrData.next_action_date || (prev as any).hrFields?.nextActionDate || null,
+                    notes: hrData.hr_notes || (prev as any).hrFields?.notes,
+                  },
+                } as any)
+              : prev
+          )
+          setEditedCandidate((prev) =>
+            prev
+              ? ({
+                  ...prev,
+                  hrFields: {
+                    ...(prev as any).hrFields,
+                    nextAction: hrData.hr_decision || (prev as any).hrFields?.nextAction,
+                    nextActionDate: hrData.next_action_date || (prev as any).hrFields?.nextActionDate || null,
+                    notes: hrData.hr_notes || (prev as any).hrFields?.notes,
+                  },
+                } as any)
+              : prev
+          )
         }
       } catch (error) {
         console.error('Failed to load candidate:', error);
@@ -121,6 +152,13 @@ export default function CandidateDetailsPage() {
 
   const handleSaveHrEvaluation = async () => {
     try {
+      // UI validation for date-only field when needed
+      const decision = String(editedHrEval.hr_decision || '').toLowerCase()
+      const needsDate = decision === 'interview' || decision === 'approve'
+      if (needsDate && !editedHrEval.next_action_date) {
+        addToast('error', 'يرجى تحديد تاريخ الإجراء')
+        return
+      }
       await addHrEvaluation(candidateId, editedHrEval);
       setHrEvaluation({ ...hrEvaluation, ...editedHrEval });
       setIsHrEditing(false);
@@ -128,7 +166,36 @@ export default function CandidateDetailsPage() {
       
       // Reload to get fresh data
       const hrData = await getHrEvaluation(candidateId);
-      if (hrData) setHrEvaluation(hrData);
+      if (hrData) {
+        setHrEvaluation(hrData);
+        // Sync HR Fields card with DB
+        setCandidate((prev) =>
+          prev
+            ? ({
+                ...prev,
+                hrFields: {
+                  ...(prev as any).hrFields,
+                  nextAction: hrData.hr_decision || (prev as any).hrFields?.nextAction,
+                  nextActionDate: hrData.next_action_date || (prev as any).hrFields?.nextActionDate || null,
+                  notes: hrData.hr_notes || (prev as any).hrFields?.notes,
+                },
+              } as any)
+            : prev
+        )
+        setEditedCandidate((prev) =>
+          prev
+            ? ({
+                ...prev,
+                hrFields: {
+                  ...(prev as any).hrFields,
+                  nextAction: hrData.hr_decision || (prev as any).hrFields?.nextAction,
+                  nextActionDate: hrData.next_action_date || (prev as any).hrFields?.nextActionDate || null,
+                  notes: hrData.hr_notes || (prev as any).hrFields?.notes,
+                },
+              } as any)
+            : prev
+        )
+      }
       
     } catch (error) {
       console.error('Failed to save HR evaluation:', error);
@@ -190,7 +257,8 @@ export default function CandidateDetailsPage() {
       const payload = {
         hr_score: scoreFromPriority(priority),
         hr_decision: normalizeDecision(nextActionRaw),
-        hr_notes: notes
+        hr_notes: notes,
+        next_action_date: editedCandidate.hrFields?.nextActionDate || null
       };
       
       await addHrEvaluation(candidateId, payload);
@@ -371,23 +439,7 @@ export default function CandidateDetailsPage() {
                   </span>
                 </div>
               </div>
-              <div className='border-t border-gray-200 pt-4'>
-                <h3 className='text-lg font-semibold text-gray-900 mb-2'>{t('details.experience')}</h3>
-                <p className='text-gray-700'>{t('details.yearsOfExperience', { years: candidate.experience })}</p>
-              </div>
-              <div className='border-t border-gray-200 pt-4 mt-4'>
-                <h3 className='text-lg font-semibold text-gray-900 mb-2'>{t('details.skillsAndTags')}</h3>
-                <div className='flex flex-wrap gap-2'>
-                  {candidate.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800'
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              {/* Experience + Skills/Tags removed (not stored in DB) */}
             </Card>
             
             <Card className='p-6'>
@@ -496,45 +548,68 @@ export default function CandidateDetailsPage() {
               )}
             </Card>
 
+            {/* Interviews */}
+            <Card className='p-6'>
+              <InterviewsList applicationId={candidateId} />
+            </Card>
+
             <Card className='p-6'>
               <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.documents')}</h2>
-              <div className='space-y-3'>
-                {candidate.resumeUrl && (
-                  <a
-                    href={candidate.resumeUrl}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
-                  >
-                    <FileText className='w-5 h-5 text-gray-400' />
-                    <span className='text-sm text-gray-700 hover:text-blue-600'>
-                      {candidate.resumeUrl.split('/').pop() || 'Resume.pdf'}
-                    </span>
-                  </a>
-                )}
-                {candidate.portfolioUrl && (
-                  <a
-                    href={candidate.portfolioUrl}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
-                  >
-                    <Globe className='w-5 h-5 text-gray-400' />
-                    <span className='text-sm text-gray-700 hover:text-blue-600'>Portfolio</span>
-                  </a>
-                )}
-                {candidate.linkedinUrl && (
-                  <a
-                    href={candidate.linkedinUrl}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors'
-                  >
-                    <User className='w-5 h-5 text-gray-400' />
-                    <span className='text-sm text-gray-700 hover:text-blue-600'>LinkedIn Profile</span>
-                  </a>
-                )}
-              </div>
+              {(() => {
+                const extractName = (url: string) => {
+                  try {
+                    const last = url.split('?')[0].split('#')[0].split('/').pop() || ''
+                    return decodeURIComponent(last) || 'file'
+                  } catch {
+                    return url.split('/').pop() || 'file'
+                  }
+                }
+
+                const docs = [
+                  ...(candidate.resumeUrl
+                    ? [{ url: candidate.resumeUrl as string, name: extractName(candidate.resumeUrl as string) }]
+                    : []),
+                  ...((answers || []) as any[])
+                    .filter((a) => a?.type === 'file' && typeof a?.value === 'string' && a.value)
+                    .map((a) => ({
+                      url: a.value as string,
+                      name: (a.fileName as string) || extractName(a.value as string) || (a.label as string) || 'file',
+                    })),
+                ].filter((d) => d.url)
+
+                const seen = new Set<string>()
+                const unique = docs.filter((d) => {
+                  if (seen.has(d.url)) return false
+                  seen.add(d.url)
+                  return true
+                })
+
+                if (unique.length === 0) {
+                  return <p className='text-sm text-gray-500'>No documents uploaded</p>
+                }
+
+                return (
+                  <div className='space-y-2'>
+                    {unique.map((doc) => (
+                      <div
+                        key={doc.url}
+                        className='flex items-center justify-between gap-3 p-3 border border-gray-200 rounded-lg'
+                      >
+                        <span className='text-sm text-gray-700 truncate'>{doc.name}</span>
+                        <a
+                          href={doc.url}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='inline-flex items-center text-blue-600 hover:text-blue-700'
+                          title='Download'
+                        >
+                          <Download className='w-5 h-5' />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </Card>
           </Tabs.Content>
           
@@ -634,6 +709,18 @@ export default function CandidateDetailsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {(String(editedHrEval.hr_decision || '').toLowerCase() === 'interview' ||
+                    String(editedHrEval.hr_decision || '').toLowerCase() === 'approve') && (
+                    <div>
+                      <Label htmlFor='nextActionDate'>{t('details.nextActionDate')}</Label>
+                      <Input
+                        type='date'
+                        value={editedHrEval.next_action_date || ''}
+                        onChange={(e) => setEditedHrEval({ ...editedHrEval, next_action_date: e.target.value })}
+                        className='max-w-[200px]'
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor='hrNotes'>{tEval('notes')}</Label>
                     <Textarea 
@@ -671,6 +758,14 @@ export default function CandidateDetailsPage() {
                       {hrEvaluation?.hr_notes || tEval('empty')}
                     </p>
                   </div>
+                  {(hrEvaluation?.hr_decision === 'approve' || hrEvaluation?.hr_decision === 'interview') && (
+                    <div className='p-3 bg-gray-50 rounded-lg'>
+                      <p className='text-xs text-gray-500 mb-1'>{t('details.nextActionDate')}</p>
+                      <p className='text-sm text-gray-700'>
+                        {hrEvaluation?.next_action_date ? String(hrEvaluation.next_action_date) : '—'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
@@ -716,8 +811,7 @@ export default function CandidateDetailsPage() {
                     <Label htmlFor='nextActionDate'>{t('details.nextActionDate')}</Label>
                     <Input
                       type='date'
-                      value={currentCandidate?.hrFields.nextActionDate ? 
-                        new Date(currentCandidate.hrFields.nextActionDate).toISOString().split('T')[0] : ''}
+                      value={currentCandidate?.hrFields.nextActionDate ? String(currentCandidate.hrFields.nextActionDate) : ''}
                       onChange={(e) =>
                         setEditedCandidate(prev => prev ? {
                           ...prev,
@@ -755,7 +849,9 @@ export default function CandidateDetailsPage() {
                   <div>
                     <Label className='text-sm font-medium text-gray-500'>{t('details.nextActionDate')}</Label>
                     <p className='text-sm text-gray-900'>
-                      {new Date(candidate.hrFields.nextActionDate).toLocaleDateString()}
+                      {(hrEvaluation?.next_action_date || candidate.hrFields.nextActionDate)
+                        ? String(hrEvaluation?.next_action_date || candidate.hrFields.nextActionDate)
+                        : '—'}
                     </p>
                   </div>
                   <div>
@@ -766,23 +862,7 @@ export default function CandidateDetailsPage() {
               )}
             </Card>
             
-            <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.quickActions')}</h2>
-              <div className='space-y-2'>
-                <Button variant='outline' className='w-full justify-start'>
-                  <MessageSquare className='w-4 h-4 mr-2' />
-                  {t('details.sendEmail')}
-                </Button>
-                <Button variant='outline' className='w-full justify-start'>
-                  <Calendar className='w-4 h-4 mr-2' />
-                  {t('details.scheduleInterview')}
-                </Button>
-                <Button variant='outline' className='w-full justify-start'>
-                  <Clock className='w-4 h-4 mr-2' />
-                  {t('details.setReminder')}
-                </Button>
-              </div>
-            </Card>
+            {/* Quick Actions removed */}
           </Tabs.Content>
         </Tabs.Root>
       </div>

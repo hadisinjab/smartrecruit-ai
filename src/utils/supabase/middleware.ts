@@ -84,17 +84,17 @@ export async function updateSession(request: NextRequest, response?: NextRespons
     return redirectToLogin()
   }
 
-  // Check role in database
+  // Check role + active flag in database
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .single()
 
-  console.log('[Middleware] User:', user.id, 'Role:', userData?.role, 'Error:', userError?.message);
+  console.log('[Middleware] User:', user.id, 'Role:', userData?.role, 'Active:', userData?.is_active, 'Error:', userError?.message);
 
   // If user is not found in database, or has no role, or role is not allowed
-  if (userError || !userData || !userData.role || !allowedAdminRoles.has(userData.role)) {
+  if (userError || !userData || !userData.role || !allowedAdminRoles.has(userData.role) || userData.is_active === false) {
     console.log('[Middleware] Access Denied. Redirecting to login.');
     await supabase.auth.signOut()
     return redirectToLogin()
