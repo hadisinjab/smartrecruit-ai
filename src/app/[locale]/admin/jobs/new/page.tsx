@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -27,7 +27,7 @@ import {
 import { useToast } from '@/context/ToastContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useUser } from '@/context/UserContext';
-import { createJob } from '@/actions/jobs';
+import { createJob, getOrganizationUsers } from '@/actions/jobs';
 
 export default function CreateJobPage() {
   const t = useTranslations('Jobs');
@@ -38,6 +38,8 @@ export default function CreateJobPage() {
   const { isReviewer, isSuperAdmin, isAdmin } = useUser();
 
   const [loading, setLoading] = useState(false);
+  const [organizationUsers, setOrganizationUsers] = useState<Array<{id: string, name: string, email: string, role: string}>>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   
   // Protect page: Redirect Reviewers to Jobs list
   if (isReviewer) {
@@ -47,6 +49,23 @@ export default function CreateJobPage() {
     }, [router]);
     return null; // Or show Access Denied message
   }
+
+  useEffect(() => {
+    async function fetchUsers() {
+      try {
+        setUsersLoading(true);
+        const users = await getOrganizationUsers();
+        setOrganizationUsers(users);
+      } catch (e) {
+        console.error('Error fetching organization users:', e);
+        setOrganizationUsers([]);
+      } finally {
+        setUsersLoading(false);
+      }
+    }
+    fetchUsers();
+  }, []);
+
   const [jobData, setJobData, clearJobData] = useAutoSave('create-job-data', {
     title: '',
     department: '',
@@ -78,6 +97,14 @@ export default function CreateJobPage() {
       fields: []
     }
   ]);
+
+  const toDeadlineTimestamp = (dateInput: string): string | null => {
+    if (!dateInput) return null;
+    // Store as end-of-day UTC so the job stays active through the selected date.
+    const d = new Date(`${dateInput}T23:59:59.999Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString();
+  };
 
   const handleRequirementChange = (index: number, value: string) => {
     const newRequirements = [...jobData.requirements];
@@ -175,7 +202,7 @@ export default function CreateJobPage() {
         description: jobData.description,
         requirements: jobData.requirements.filter(r => r.trim() !== ''),
         benefits: jobData.benefits.filter(b => b.trim() !== ''),
-        deadline: jobData.deadline || null,
+        deadline: toDeadlineTimestamp(jobData.deadline),
         hiring_manager_name: jobData.hiringManager,
         // Send questions separately to be inserted into the questions table
         questions: formSteps[0].fields,
@@ -554,8 +581,17 @@ export default function CreateJobPage() {
                       <SelectValue placeholder={tCreate('selectManager')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="manager1">John Doe</SelectItem>
-                      <SelectItem value="manager2">Sarah Smith</SelectItem>
+                      {usersLoading ? (
+                        <div className="px-2 py-1.5 text-sm text-gray-500">Loading users...</div>
+                      ) : organizationUsers.length > 0 ? (
+                        organizationUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name} ({user.role})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-gray-500">No users found.</div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

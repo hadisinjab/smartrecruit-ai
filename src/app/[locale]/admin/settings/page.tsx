@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
+import { useUser } from '@/context/UserContext';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
@@ -38,6 +39,7 @@ export default function SettingsPage() {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
+  const { isSuperAdmin, isLoading: isUserLoading } = useUser();
 
   useEffect(() => {
     let isMounted = true;
@@ -69,6 +71,10 @@ export default function SettingsPage() {
   };
 
   const handleSettingChange = (section: keyof SystemSettings, field: string, value: any) => {
+    if (!isSuperAdmin) {
+      addToast('info', 'Read-only mode: only Super Admin can change settings.');
+      return;
+    }
     if (!settings) return;
     setSettings(prev => {
       if (!prev) return null;
@@ -84,6 +90,10 @@ export default function SettingsPage() {
   };
 
   const handleNestedSettingChange = (section: keyof SystemSettings, subsection: string, field: string, value: any) => {
+    if (!isSuperAdmin) {
+      addToast('info', 'Read-only mode: only Super Admin can change settings.');
+      return;
+    }
     if (!settings) return;
     setSettings(prev => {
       if (!prev) return null;
@@ -103,6 +113,10 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     if (!settings) return;
+    if (!isSuperAdmin) {
+      addToast('error', 'Access denied: Settings are read-only for Admin.');
+      return;
+    }
     
     setLoading(true);
     try {
@@ -122,6 +136,10 @@ export default function SettingsPage() {
   };
 
   const handleReset = async () => {
+    if (!isSuperAdmin) {
+      addToast('info', 'Read-only mode: no changes to discard.');
+      return;
+    }
     setLoading(true);
     try {
       const data = await getSystemSettings();
@@ -456,7 +474,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading && !settings) {
+  if ((loading && !settings) || isUserLoading) {
     return (
       <AdminLayout
         title="Settings"
@@ -489,6 +507,12 @@ export default function SettingsPage() {
      subtitle="Manage system configuration and preferences"
    >
      <div className='space-y-6'>
+      {!isSuperAdmin && (
+        <Card className='p-4 border-yellow-200 bg-yellow-50'>
+          <div className='text-sm text-yellow-900 font-medium'>Read-only</div>
+          <div className='text-xs text-yellow-800 mt-1'>Admins can view settings, but only Super Admin can modify them.</div>
+        </Card>
+      )}
        <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
          {/* Settings Navigation */}
          <div className='lg:col-span-1'>
@@ -535,10 +559,10 @@ export default function SettingsPage() {
                </div>
                {hasUnsavedChanges && (
                  <div className='flex items-center space-x-2'>
-                   <Button variant='outline' onClick={handleReset} disabled={loading}>
+                  <Button variant='outline' onClick={handleReset} disabled={loading || !isSuperAdmin}>
                      Reset
                    </Button>
-                   <Button onClick={handleSave} disabled={loading}>
+                  <Button onClick={handleSave} disabled={loading || !isSuperAdmin}>
                      {loading ? (
                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                      ) : (

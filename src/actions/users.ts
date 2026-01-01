@@ -18,6 +18,13 @@ interface CreateUserInput {
   isActive?: boolean
 }
 
+function assertAdminHasOrg(session: Awaited<ReturnType<typeof getSessionInfo>>) {
+  if (!session) throw new Error('Access denied')
+  if ((session.role === 'admin' || session.role === 'reviewer') && !session.organizationId) {
+    throw new Error('Admin has no organization assigned')
+  }
+}
+
 export async function getUsers(): Promise<AdminUser[]> {
   await requireReviewerOrAbove()
   const supabase = createClient()
@@ -35,6 +42,7 @@ export async function getUsers(): Promise<AdminUser[]> {
   // فلترة إضافية في الكود للتأكيد (زيادة أمان)
   if (session.role === 'admin' || session.role === 'reviewer') {
     if (!session.organizationId) {
+      // Admin/Reviewer without org should not manage anything.
       return []
     }
     query = query.eq('organization_id', session.organizationId)
@@ -72,6 +80,7 @@ export async function toggleUserStatus(userId: string, currentStatus: boolean) {
   if (!session) {
     throw new Error('Access denied')
   }
+  assertAdminHasOrg(session)
 
   const { data: targetUser, error: fetchError } = await supabase
     .from('users')
@@ -124,6 +133,7 @@ export async function updateUserRole(userId: string, newRole: string) {
   if (!session) {
     throw new Error('Access denied')
   }
+  assertAdminHasOrg(session)
 
   // Check permissions
   if (session.role === 'admin') {
@@ -142,9 +152,13 @@ export async function updateUserRole(userId: string, newRole: string) {
       throw new Error('Access denied')
     }
 
-    // Admins cannot promote to super-admin
-    if (newRole === 'super-admin') {
-      throw new Error('Access denied: Cannot promote to Super Admin')
+    // Admins can only manage reviewers (cannot change roles of admins).
+    if (targetUser.role !== 'reviewer') {
+      throw new Error('Access denied: Admins can only manage reviewers')
+    }
+    // Admins cannot change roles (reviewer stays reviewer).
+    if (newRole !== 'reviewer') {
+      throw new Error('Access denied: Admins cannot change user roles')
     }
   } else if (session.role !== 'super-admin') {
     throw new Error('Access denied')
@@ -176,6 +190,7 @@ export async function getUser(userId: string): Promise<AdminUser | null> {
   const session = await getSessionInfo()
   
   if (!session) return null
+  assertAdminHasOrg(session)
 
   const { data: rawUser, error } = await adminSupabase
     .from('users')
@@ -194,6 +209,10 @@ export async function getUser(userId: string): Promise<AdminUser | null> {
   if (session.role === 'admin') {
     if (user.organization_id !== session.organizationId) {
       throw new Error('Access denied')
+    }
+    // Admins can only edit reviewers (they may view list, but edit access is restricted).
+    if (user.role !== 'reviewer') {
+      throw new Error('Access denied: Admins can only manage reviewers')
     }
   }
 
@@ -215,6 +234,7 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
   const session = await getSessionInfo()
   
   if (!session) throw new Error('Access denied')
+  assertAdminHasOrg(session)
 
   // Access check for Admins
   if (session.role === 'admin') {
@@ -235,7 +255,15 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
       throw new Error('Access denied')
     }
 
-    // Admins cannot promote to super-admin
+    // Admins can only manage reviewers (not admins/super-admins).
+    if (targetUser.role !== 'reviewer') {
+      throw new Error('Access denied: Admins can only manage reviewers')
+    }
+
+    // Admins cannot change roles.
+    if (input.role && input.role !== 'reviewer') {
+      throw new Error('Access denied: Admins cannot change user roles')
+    }
     if (input.role === 'super-admin') {
       throw new Error('Access denied')
     }
@@ -339,6 +367,7 @@ export async function deleteUser(userId: string) {
   const session = await getSessionInfo()
 
   if (!session) throw new Error('Access denied')
+  assertAdminHasOrg(session)
   
   if (session.role === 'admin') {
     const { data: rawTargetUser } = await adminClient
@@ -355,6 +384,10 @@ export async function deleteUser(userId: string) {
       targetUser.role === 'super-admin'
     ) {
       throw new Error('Access denied')
+    }
+
+    if (targetUser.role !== 'reviewer') {
+      throw new Error('Access denied: Admins can only manage reviewers')
     }
   }
 

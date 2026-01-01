@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { useUser } from '@/context/UserContext';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -17,6 +18,7 @@ export default function AdminLogin() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+  const { refreshUser } = useUser();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +78,8 @@ export default function AdminLogin() {
 
       // 4. Redirect to Dashboard
       console.log('Step 4: Redirecting to dashboard...');
-      router.push('/admin/dashboard');
+      await refreshUser().catch(() => {});
+      router.replace('/admin/dashboard');
       router.refresh(); // Ensure server components re-fetch data
     } catch (err: any) {
       console.error('Login error caught:', err);

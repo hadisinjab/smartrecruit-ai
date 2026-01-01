@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { SystemSettings } from '@/types/admin'
-import { requireSuperAdmin } from '@/utils/authz'
+import { requireStaff, requireSuperAdmin } from '@/utils/authz'
 
 const DEFAULT_SETTINGS: SystemSettings = {
   email: {
@@ -39,7 +39,8 @@ const DEFAULT_SETTINGS: SystemSettings = {
 
 export async function getSystemSettings(): Promise<SystemSettings> {
   const supabase = createClient()
-  await requireSuperAdmin()
+  // Staff (super-admin/admin/reviewer) can view settings; only super-admin can update.
+  await requireStaff()
 
   try {
     const { data, error } = await supabase

@@ -104,7 +104,9 @@ export default function JobDetailsPage() {
   }
 
   // Determine if user can edit
-  const canEdit = isSuperAdmin || (isAdmin && job.created_by === user?.id) || (isAdmin && !job.created_by); // Allow edit if owner or if no owner set (legacy) but ideally strictly check org
+  // Backend enforces same-organization for admins (and super-admin always allowed),
+  // so if the admin can view the job, they can also edit it.
+  const canEdit = isSuperAdmin || isAdmin
 
   // Helper functions for safe rendering
   const getStatusColor = (status: string) => {

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUser } from '@/actions/auth';
+import { createClient } from '@/utils/supabase/client';
 
 export type UserRole = 'super-admin' | 'admin' | 'reviewer';
 
@@ -12,6 +13,7 @@ interface UserContextType {
   isReviewer: boolean;
   isSuperAdmin: boolean;
   isLoading: boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -30,7 +32,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadRole = async () => {
+    const supabase = createClient();
+
+    const loadUser = async () => {
+      setIsLoading(true);
       try {
         const userData = await getCurrentUser();
         setUser(userData);
@@ -45,14 +50,45 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('Failed to load user role:', error);
-        // If this fails due to a transient network issue, keep the last known user/role
-        // to avoid showing "Guest" or forcing a logout.
+        // If we can't resolve the current user, do NOT keep stale user/role.
+        // Stale state causes "switching back" to a previous account after logout/login.
+        setUser(null);
+        setRole(null);
       } finally {
         setIsLoading(false);
       }
     };
-    loadRole();
+
+    // Initial load
+    loadUser();
+
+    // Keep state in sync with Supabase auth changes (login/logout/token refresh).
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setRole(null);
+        setIsLoading(false);
+        return;
+      }
+      // SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED
+      loadUser();
+    });
+
+    return () => {
+      sub?.subscription?.unsubscribe();
+    };
   }, []);
+
+  const refreshUser = async () => {
+    const userData = await getCurrentUser();
+    setUser(userData);
+    const userRole = userData?.role?.trim().toLowerCase();
+    if (userRole === 'super-admin' || userRole === 'admin' || userRole === 'reviewer') {
+      setRole(userRole as UserRole);
+    } else {
+      setRole(null);
+    }
+  };
 
   const value: UserContextType = {
     role,
@@ -61,6 +97,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isSuperAdmin: role === 'super-admin',
     isReviewer: role === 'reviewer',
     isLoading,
+    refreshUser,
   };
 
   return (

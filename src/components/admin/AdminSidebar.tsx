@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AdminUser } from '@/types/admin';
 import { createClient } from '@/utils/supabase/client';
+import { useUser } from '@/context/UserContext';
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -51,6 +52,7 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
   const router = useRouter();
   const t = useTranslations('Sidebar');
   const tCommon = useTranslations('Common');
+  const { refreshUser } = useUser();
   
   // Get current user role
   const userRole = user?.role || 'viewer';
@@ -81,13 +83,13 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         icon: <Briefcase className='w-5 h-5' />,
         label: t('jobs'),
         href: '/admin/jobs',
-        allowedRoles: ['admin', 'super-admin'] as const // Super Admin يستطيع إدارة كل الوظائف
+        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const // Reviewer read-only
       },
       {
         icon: <Clock className='w-5 h-5' />,
         label: t('incomplete'),
         href: '/admin/incomplete',
-        allowedRoles: ['admin', 'super-admin'] as const
+        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const
       },
       {
         icon: <Bell className='w-5 h-5' />,
@@ -99,19 +101,19 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         icon: <UserCog className='w-5 h-5' />,
         label: t('userManagement'),
         href: '/admin/users',
-        requiredRole: 'super-admin' // Only super-admin can access
+        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const
       },
       {
         icon: <Activity className='w-5 h-5' />,
         label: t('activityLog'),
         href: '/admin/activity',
-        requiredRole: 'super-admin' // Only super-admin can access
+        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const
       },
       {
         icon: <Settings className='w-5 h-5' />,
         label: t('settings'),
         href: '/admin/settings',
-        allowedRoles: ['super-admin'] as const // Reviewers/Admin ممنوع
+        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const
       }
     ];
 
@@ -192,8 +194,11 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
             try {
               const supabase = createClient();
               await supabase.auth.signOut();
+              // Ensure in-memory user state is cleared immediately.
+              await refreshUser().catch(() => {});
             } catch {}
-            router.push('/admin/login');
+            router.replace('/admin/login');
+            router.refresh();
           }}
         >
           <LogOut className='w-5 h-5' />

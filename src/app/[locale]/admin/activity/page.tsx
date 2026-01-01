@@ -18,7 +18,8 @@ import {
   FileText,
   Settings,
   Shield,
-  Eye
+  Eye,
+  Monitor
 } from 'lucide-react';
 import { DataTable } from '@/components/admin/DataTable';
 import type { Column } from '@/components/admin/DataTable';

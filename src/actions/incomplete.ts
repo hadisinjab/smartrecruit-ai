@@ -3,11 +3,30 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { IncompleteApplication } from '@/types/admin'
+import { requireStaff } from '@/utils/authz'
 
 export async function getIncompleteApplications(): Promise<IncompleteApplication[]> {
   const supabase = createClient()
+  const session = await requireStaff()
   
-  const { data: applications, error } = await supabase
+  // Enforce org scoping for non-super-admin (applications table itself isn't org-scoped).
+  let allowedJobFormIds: string[] | null = null
+  if (session.role !== 'super-admin') {
+    if (!session.organizationId) return []
+    const { data: jobs, error: jobsErr } = await supabase
+      .from('job_forms')
+      .select('id')
+      .eq('organization_id', session.organizationId)
+
+    if (jobsErr) {
+      console.error('Error fetching org job forms for incomplete apps:', jobsErr)
+      return []
+    }
+    allowedJobFormIds = (jobs || []).map((j: any) => j.id).filter(Boolean)
+    if (!allowedJobFormIds.length) return []
+  }
+
+  let query = supabase
     .from('applications')
     .select(`
       *,
@@ -19,6 +38,12 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
     .eq('status', 'new')
     .is('submitted_at', null)
     .order('created_at', { ascending: false })
+
+  if (allowedJobFormIds) {
+    query = query.in('job_form_id', allowedJobFormIds)
+  }
+
+  const { data: applications, error } = await query
 
   if (error) {
     console.error('Error fetching incomplete applications:', error)

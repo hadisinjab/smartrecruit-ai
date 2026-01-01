@@ -133,12 +133,32 @@ export async function requireJobOwnerOrSuper(jobId: string) {
 
   const { data: job, error } = await supabase
     .from('job_forms')
-    .select('created_by')
+    .select('created_by, organization_id')
     .eq('id', jobId)
     .single()
 
-  if (error || !job || job.created_by !== session.id) {
+  if (error || !job) {
+    throw new Error('Access denied: Job not found.')
+  }
+
+  // Admins can manage any job inside their own organization.
+  // This includes updating the Hiring Manager.
+  if (session.role === 'admin') {
+    // If the job has an organization, enforce same-organization.
+    if (job.organization_id) {
+      if (!session.organizationId || job.organization_id !== session.organizationId) {
+        throw new Error('Access denied: Organization admin only.')
+      }
+      return
+    }
+
+    // Legacy jobs without organization_id: fall back to strict ownership.
+    if (job.created_by === session.id) {
+      return
+    }
     throw new Error('Access denied: Job owner only.')
   }
+
+  throw new Error('Access denied: Staff cannot manage jobs.')
 }
 

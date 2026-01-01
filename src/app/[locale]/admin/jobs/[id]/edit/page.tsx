@@ -44,6 +44,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
   const [loading, setLoading] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [organizationUsers, setOrganizationUsers] = useState<Array<{id: string, name: string, email: string, role: string}>>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   
   // Protect page: Redirect Reviewers to Jobs list
   if (isReviewer) {
@@ -85,6 +86,22 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
     }
   ]);
 
+  const toDateInputValue = (value: any): string => {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    // HTML date input expects YYYY-MM-DD
+    return d.toISOString().slice(0, 10);
+  };
+
+  const toDeadlineTimestamp = (dateInput: string): string | null => {
+    if (!dateInput) return null;
+    // Store as end-of-day UTC so the job stays active through the selected date.
+    const d = new Date(`${dateInput}T23:59:59.999Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString();
+  };
+
   useEffect(() => {
     async function fetchJob() {
       try {
@@ -97,8 +114,10 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
         
         // Load organization users based on job creator
         const jobCreatorId = (job as any).created_by;
+        setUsersLoading(true);
         const users = await getOrganizationUsers(jobCreatorId);
         setOrganizationUsers(users);
+        setUsersLoading(false);
         
         // Transform fetched data to state format
         setJobData({
@@ -115,7 +134,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             description: job.description || '',
             requirements: job.requirements || [''],
             benefits: job.benefits || [''],
-            deadline: job.deadline || '',
+            deadline: toDateInputValue(job.deadline),
             hiringManager: (job as any).hiring_manager_id || job.hiring_manager_name || '',
             assignment_enabled: !!(job as any).assignment_enabled,
             assignment_required: !!(job as any).assignment_required,
@@ -145,6 +164,8 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
       } catch (error) {
         console.error('Error fetching job:', error);
         addToast('error', 'Failed to load job details');
+        setOrganizationUsers([]);
+        setUsersLoading(false);
       } finally {
         setInitialLoading(false);
       }
@@ -257,7 +278,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
         description: jobData.description,
         requirements: jobData.requirements.filter(r => r.trim() !== ''),
         benefits: jobData.benefits.filter(b => b.trim() !== ''),
-        deadline: jobData.deadline || null,
+        deadline: toDeadlineTimestamp(jobData.deadline),
         hiring_manager_name: jobData.hiringManager,
         questions: formSteps[0].fields,
         evaluation_criteria: formSteps,
@@ -631,14 +652,16 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                       <SelectValue placeholder={tCreate('selectManager')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {organizationUsers.length > 0 ? (
+                      {usersLoading ? (
+                        <div className="px-2 py-1.5 text-sm text-gray-500">Loading users...</div>
+                      ) : organizationUsers.length > 0 ? (
                         organizationUsers.map((user) => (
                           <SelectItem key={user.id} value={user.id}>
                             {user.name} ({user.role})
                           </SelectItem>
                         ))
                       ) : (
-                        <div className="px-2 py-1.5 text-sm text-gray-500">Loading users...</div>
+                        <div className="px-2 py-1.5 text-sm text-gray-500">No users found.</div>
                       )}
                     </SelectContent>
                   </Select>

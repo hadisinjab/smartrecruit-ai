@@ -70,8 +70,8 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
         fullName,
         email,
         password: password || undefined, // Only send if not empty
-        role,
-        organizationName,
+        // Only super-admin can change role/org. Admin can only manage reviewers.
+        ...(isSuperAdmin ? { role, organizationName } : {}),
         isActive,
       });
 
@@ -164,30 +164,38 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
             </div>
 
             <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>Role</label>
-                <Select
-                  value={role}
-                  onValueChange={(value) => setRole(value as 'super-admin' | 'admin' | 'reviewer')}
-                >
-                  <SelectTrigger className='w-full'>
-                    <SelectValue placeholder={tUsers('filters.role')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='super-admin'>{tRole('super-admin')}</SelectItem>
-                    <SelectItem value='admin'>{tRole('admin')}</SelectItem>
-                    <SelectItem value='reviewer'>{tRole('reviewer')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-1'>Company Name</label>
-                <Input
-                  placeholder='Company name'
-                  value={organizationName}
-                  onChange={(e) => setOrganizationName(e.target.value)}
-                />
-              </div>
+              {isSuperAdmin ? (
+                <>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Role</label>
+                    <Select
+                      value={role}
+                      onValueChange={(value) => setRole(value as 'super-admin' | 'admin' | 'reviewer')}
+                    >
+                      <SelectTrigger className='w-full'>
+                        <SelectValue placeholder={tUsers('filters.role')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='super-admin'>{tRole('super-admin')}</SelectItem>
+                        <SelectItem value='admin'>{tRole('admin')}</SelectItem>
+                        <SelectItem value='reviewer'>{tRole('reviewer')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-1'>Company Name</label>
+                    <Input
+                      placeholder='Company name'
+                      value={organizationName}
+                      onChange={(e) => setOrganizationName(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className='md:col-span-2 text-sm text-gray-600'>
+                  {tCommon('note') || 'Note'}: Admin can edit reviewer name/email/password and active status only.
+                </div>
+              )}
             </div>
 
             <div className='flex items-center justify-between rounded-lg border border-gray-200 p-4'>

@@ -3,15 +3,49 @@
 
 import { createAdminClient, createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { unstable_noStore as noStore } from 'next/cache'
 
 import { Job } from '@/types/admin';
 import { requireAdminOrSuper, requireJobOwnerOrSuper, requireStaff, getSessionInfo } from '@/utils/authz'
 import { logAdminEvent } from '@/actions/activity'
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+function isTransientSupabaseFetchError(err: any): boolean {
+  const msg = String(err?.message || '')
+  const details = String(err?.details || '')
+  // When node fetch fails (e.g. ECONNRESET), supabase-js often surfaces it like this.
+  return (
+    msg.includes('fetch failed') ||
+    details.includes('ECONNRESET') ||
+    details.includes('ETIMEDOUT') ||
+    details.includes('ENOTFOUND') ||
+    details.includes('EAI_AGAIN')
+  )
+}
+
+async function withRetries<T>(fn: () => Promise<{ data: T | null; error: any }>, attempts = 3) {
+  let last: any = null
+  for (let i = 0; i < attempts; i++) {
+    const res = await fn()
+    if (!res.error) return res
+    last = res.error
+    if (!isTransientSupabaseFetchError(res.error) || i === attempts - 1) {
+      return res
+    }
+    await sleep(250 * (i + 1))
+  }
+  return { data: null, error: last }
+}
+
 // Get users from the same organization as the current user or job creator
 export async function getOrganizationUsers(jobCreatorId?: string) {
+  // Ensure this is never cached across users/tenants.
+  // If Next caches server action responses in any way, this prevents cross-org leakage.
+  noStore()
+
   const supabase = createClient()
-  const session = await getSessionInfo()
+  const session = await requireStaff()
 
   if (!session) {
     return []
@@ -21,14 +55,30 @@ export async function getOrganizationUsers(jobCreatorId?: string) {
 
   // If jobCreatorId is provided, get the organization of the job creator
   if (jobCreatorId) {
-    const { data: jobCreator } = await supabase
-      .from('users')
-      .select('organization_id')
-      .eq('id', jobCreatorId)
-      .single()
+    // Super Admin is allowed to resolve org from the job creator (cross-org access).
+    // For Admin/Reviewer, we only accept a jobCreatorId that matches their own org.
+    if (session.role === 'super-admin') {
+      const admin = createAdminClient()
+      const { data: jobCreator } = await admin
+        .from('users')
+        .select('organization_id')
+        .eq('id', jobCreatorId)
+        .single()
 
-    if (jobCreator?.organization_id) {
-      organizationId = jobCreator.organization_id
+      if (jobCreator?.organization_id) {
+        organizationId = jobCreator.organization_id
+      }
+    } else {
+      // Resolve via RLS-scoped client and ensure it matches the caller's org.
+      const { data: jobCreator } = await supabase
+        .from('users')
+        .select('organization_id')
+        .eq('id', jobCreatorId)
+        .single()
+
+      if (jobCreator?.organization_id && jobCreator.organization_id === session.organizationId) {
+        organizationId = jobCreator.organization_id
+      }
     }
   }
 
@@ -36,11 +86,17 @@ export async function getOrganizationUsers(jobCreatorId?: string) {
     return []
   }
 
+  // IMPORTANT: Always query the staff list via the admin client (service role),
+  // but only after we have securely resolved/validated organizationId above.
+  // This prevents any accidental cross-tenant leakage from RLS/caching quirks.
+  const admin = createAdminClient()
+
   // Get all users from the same organization (super-admin, admin, reviewer)
-  const { data: users, error } = await supabase
+  const { data: users, error } = await admin
     .from('users')
     .select('id, full_name, email, role')
     .eq('organization_id', organizationId)
+    .eq('is_active', true)
     .in('role', ['super-admin', 'admin', 'reviewer'])
     .order('full_name', { ascending: true })
 
@@ -67,7 +123,7 @@ export async function getJobs(): Promise<Job[]> {
 
   let query = supabase
     .from('job_forms')
-    .select('*, creator:users!created_by(full_name), organization:organizations(name)')
+    .select('*, organization:organizations(name)')
     .order('created_at', { ascending: false })
 
   // Super Admin: sees everything (no filter needed)
@@ -89,6 +145,31 @@ export async function getJobs(): Promise<Job[]> {
   if (error) {
     console.error('Error fetching jobs:', error)
     throw new Error('Failed to fetch jobs')
+  }
+
+  // Resolve creator names (avoid relying on embedded join relationship naming).
+  const creatorIds = Array.from(
+    new Set((data || []).map((job: any) => job.created_by).filter(Boolean))
+  ) as string[]
+
+  const creatorNameById = new Map<string, string>()
+  if (creatorIds.length) {
+    // Use admin client so we can still resolve creator names even if the creator is a super-admin
+    // (who may not belong to the viewer's organization). This is safe because `creatorIds` are
+    // derived from the already org-scoped `job_forms` result above.
+    const admin = createAdminClient()
+    const { data: users, error: usersErr } = await admin
+      .from('users')
+      .select('id, full_name, email')
+      .in('id', creatorIds)
+    if (usersErr) {
+      console.error('Error fetching job creators:', usersErr)
+    } else {
+      ;(users || []).forEach((u: any) => {
+        const name = u.full_name || u.email
+        if (u.id && name) creatorNameById.set(u.id, name)
+      })
+    }
   }
 
   // Fetch applicant counts for all jobs
@@ -123,7 +204,9 @@ export async function getJobs(): Promise<Job[]> {
     deadline: job.deadline || '',
     applicantsCount: counts[job.id] || 0,
     hiringManager: job.hiring_manager_name || 'Admin',
-    creatorName: job.creator?.full_name || 'Unknown',
+    creatorName:
+      creatorNameById.get(job.created_by) ||
+      (job.created_by ? `User ${String(job.created_by).slice(0, 8)}` : 'Unknown'),
     organizationName: job.organization?.name || 'Unknown'
   }))
 }
@@ -257,6 +340,23 @@ export async function createJob(formData: any) {
     throw new Error('Missing organization for current user')
   }
 
+  // If hiring_manager_name looks like a user UUID, enforce it belongs to the same organization.
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (formData.hiring_manager_name && uuidRegex.test(formData.hiring_manager_name)) {
+    const { data: managerRow, error: managerErr } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('id', formData.hiring_manager_name)
+      .single()
+
+    if (managerErr || !managerRow) {
+      throw new Error('Invalid hiring manager')
+    }
+    if (managerRow.organization_id !== userRow.organization_id) {
+      throw new Error('Hiring manager must belong to the same organization')
+    }
+  }
+
   // Generate application link - will be set after job creation
   // For now, we'll generate it after getting the job ID
   
@@ -353,37 +453,71 @@ export async function updateJob(id: string, formData: any) {
   const supabase = createClient()
   await requireJobOwnerOrSuper(id)
 
-  const { data, error } = await supabase
-    .from('job_forms')
-    .update({
-      title: formData.title,
-      description: formData.description,
-      department: formData.department,
-      location: formData.location,
-      type: formData.type,
-      status: formData.status,
-      salary_min: formData.salary_min,
-      salary_max: formData.salary_max,
-      salary_currency: formData.salary_currency,
-      requirements: formData.requirements,
-      benefits: formData.benefits,
-      deadline: formData.deadline,
-      hiring_manager_name: formData.hiring_manager_name,
-      evaluation_criteria: formData.evaluation_criteria,
-      assignment_enabled: !!formData.assignment_enabled,
-      assignment_required: !!formData.assignment_required,
-      assignment_type: formData.assignment_type || null,
-      assignment_description: formData.assignment_description || null,
-      assignment_weight: formData.assignment_weight ?? null,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', id)
-    .select()
-    .single()
+  // Enforce: Hiring manager (if provided as UUID) must belong to the same organization as the job.
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (formData.hiring_manager_name && uuidRegex.test(formData.hiring_manager_name)) {
+    const { data: jobOrgRow, error: jobOrgErr } = await supabase
+      .from('job_forms')
+      .select('organization_id')
+      .eq('id', id)
+      .single()
+
+    if (jobOrgErr || !jobOrgRow?.organization_id) {
+      throw new Error('Job not found')
+    }
+
+    const { data: managerRow, error: managerErr } = await supabase
+      .from('users')
+      .select('organization_id')
+      .eq('id', formData.hiring_manager_name)
+      .single()
+
+    if (managerErr || !managerRow) {
+      throw new Error('Invalid hiring manager')
+    }
+    if (managerRow.organization_id !== jobOrgRow.organization_id) {
+      throw new Error('Hiring manager must belong to the same organization')
+    }
+  }
+
+  const { data, error } = await withRetries(
+    () =>
+      supabase
+        .from('job_forms')
+        .update({
+          title: formData.title,
+          description: formData.description,
+          department: formData.department,
+          location: formData.location,
+          type: formData.type,
+          status: formData.status,
+          salary_min: formData.salary_min,
+          salary_max: formData.salary_max,
+          salary_currency: formData.salary_currency,
+          requirements: formData.requirements,
+          benefits: formData.benefits,
+          deadline: formData.deadline,
+          hiring_manager_name: formData.hiring_manager_name,
+          evaluation_criteria: formData.evaluation_criteria,
+          assignment_enabled: !!formData.assignment_enabled,
+          assignment_required: !!formData.assignment_required,
+          assignment_type: formData.assignment_type || null,
+          assignment_description: formData.assignment_description || null,
+          assignment_weight: formData.assignment_weight ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single(),
+    3
+  )
 
   if (error) {
     console.error('Error updating job:', error)
-    throw new Error('Failed to update job')
+    // Surface a more actionable message to the UI for debugging.
+    const msg = error?.message || 'Failed to update job'
+    const details = error?.details ? ` (${String(error.details).slice(0, 200)})` : ''
+    throw new Error(`${msg}${details}`)
   }
 
   // Update questions if provided
