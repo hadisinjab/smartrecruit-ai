@@ -285,8 +285,8 @@ export default function JobDetailsPage() {
                     readOnly
                     value={
                       typeof window !== 'undefined'
-                        ? `${window.location.origin}/${locale}/apply/${jobId}`
-                        : `/${locale}/apply/${jobId}`
+                        ? `${window.location.origin}/apply/${jobId}`
+                        : `/apply/${jobId}`
                     }
                     className='flex-1 bg-transparent border-none outline-none text-sm text-gray-700 font-mono'
                   />
@@ -296,8 +296,8 @@ export default function JobDetailsPage() {
                     onClick={() => {
                       const link =
                         typeof window !== 'undefined'
-                          ? `${window.location.origin}/${locale}/apply/${jobId}`
-                          : `/${locale}/apply/${jobId}`
+                          ? `${window.location.origin}/apply/${jobId}`
+                          : `/apply/${jobId}`
                       navigator.clipboard.writeText(link)
                       setLinkCopied(true)
                       setTimeout(() => setLinkCopied(false), 2000)
@@ -325,8 +325,8 @@ export default function JobDetailsPage() {
                   onClick={() => {
                     const link =
                       typeof window !== 'undefined'
-                        ? `${window.location.origin}/${locale}/apply/${jobId}`
-                        : `/${locale}/apply/${jobId}`
+                        ? `${window.location.origin}/apply/${jobId}`
+                        : `/apply/${jobId}`
                     window.open(link, '_blank')
                   }}
                   disabled={isApplyDisabled}

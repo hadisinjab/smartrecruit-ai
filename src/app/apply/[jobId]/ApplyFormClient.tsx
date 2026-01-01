@@ -122,7 +122,6 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       if (!v) return []
       if (Array.isArray(v)) return v.map(String).map((s) => s.trim()).filter(Boolean)
       if (typeof v === 'string') {
-        // allow comma/newline separated
         return v
           .split(/\r?\n|,/g)
           .map((s) => s.trim())
@@ -435,3 +434,5 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     </div>
   )
 }
+
+

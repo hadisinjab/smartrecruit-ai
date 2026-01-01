@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export interface FormField {
   id: string;
   type: 'text' | 'number' | 'textarea' | 'voice' | 'file' | 'url' | 'select';
@@ -20,6 +22,8 @@ export interface FormStep {
   id: string;
   title: string;
   description?: string;
+  // Optional custom content for steps (used by apply "Job Overview" step).
+  content?: ReactNode;
   fields: FormField[];
 }
 
@@ -35,7 +39,7 @@ export interface MultiStepFormProps {
   jobFormId?: string;
   onVoiceUploadComplete?: (info: any) => void;
   onFileUploadComplete?: (info: any) => void;
-  onFirstStepComplete?: (data: FormData) => void;
+  onFirstStepComplete?: (data: FormData) => string | null | void | Promise<string | null | void>;
   assignmentConfig?: {
     enabled: boolean
     required: boolean

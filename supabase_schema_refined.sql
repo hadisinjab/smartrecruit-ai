@@ -122,6 +122,11 @@ create table public.applications (
   status text check (status in ('new', 'screening', 'interview', 'offer', 'hired', 'rejected', 'duplicate')) default 'new',
   is_duplicate boolean default false,
   submitted_at timestamptz,
+  -- Progress tracking (exact "where did the candidate stop?" visibility)
+  last_progress_step text,
+  last_progress_event text, -- e.g. 'enter', 'next', 'upload', etc.
+  last_progress_at timestamptz,
+  last_progress_meta jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -150,6 +155,30 @@ create policy "Anyone can create application." on public.applications
         and (job_forms.deadline is null or job_forms.deadline > now())
     )
   );
+
+-- Application progress events (history)
+create table public.application_progress_events (
+  id uuid default gen_random_uuid() primary key,
+  application_id uuid references public.applications(id) on delete cascade,
+  step_id text not null,
+  event_type text not null, -- 'enter' | 'next' | 'voice_started' | ...
+  meta jsonb,
+  created_at timestamptz default now()
+);
+
+alter table public.application_progress_events enable row level security;
+
+create policy "Staff can view application progress events." on public.application_progress_events
+  for select using (
+    exists (
+      select 1 from public.users
+      where users.id = auth.uid()
+    )
+  );
+
+-- Allow insert for public (applicants) so we can track progress even without auth.
+create policy "Anyone can insert application progress events." on public.application_progress_events
+  for insert with check (true);
 
 
 -- 5. Answers Table (الإجابات)

@@ -109,6 +109,33 @@ export async function getCandidates(jobId?: string) {
     return base;
   });
 
+  // Backfill duplicate display for older rows where is_duplicate/status weren't persisted yet.
+  // Group by job + email (preferred) or job + name.
+  const keyFor = (c: any) => {
+    const jobKey = String((applications as any[]).find((a: any) => a.id === c.id)?.job_form_id || '')
+    const email = String(c.email || '').trim().toLowerCase()
+    const name = `${String(c.firstName || '').trim().toLowerCase()} ${String(c.lastName || '').trim().toLowerCase()}`.trim()
+    return email ? `${jobKey}|email|${email}` : `${jobKey}|name|${name}`
+  }
+
+  const byKey = new Map<string, any[]>()
+  candidates.forEach((c: any) => {
+    const k = keyFor(c)
+    const arr = byKey.get(k) || []
+    arr.push(c)
+    byKey.set(k, arr)
+  })
+  byKey.forEach((arr) => {
+    if (arr.length <= 1) return
+    // Sort by appliedDate (created_at) ascending so the first stays non-duplicate.
+    arr.sort((a, b) => new Date(a.appliedDate).getTime() - new Date(b.appliedDate).getTime())
+    arr.forEach((c, idx) => {
+      if (idx === 0) return
+      c.isDuplicate = true
+      if (c.status === 'new') c.status = 'duplicate'
+    })
+  })
+
   return candidates;
 }
 
@@ -162,6 +189,15 @@ export async function getCandidateById(id: string) {
   }
   // Reviewer: allowed to view; salary fields are not exposed in this mapper
 
+  // Pull the most recent progress event for precise stopped-at tracking.
+  const { data: lastEvent } = await supabase
+    .from('application_progress_events')
+    .select('step_id,event_type,meta,created_at')
+    .eq('application_id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   // Fetch question metadata to enrich answers with labels and types
   const { data: questions } = await supabase
     .from('questions')
@@ -185,11 +221,62 @@ export async function getCandidateById(id: string) {
     qMap.set(q.id, { label: q.label, type: normalizeType(q.type) })
   })
 
+  // Best-effort progress inference (we no longer persist step logs).
+  // This powers "Stopped At" in the candidate details UI.
+  const hasResume = Array.isArray(app.resumes) && app.resumes.length > 0
+  const hasPersonalInfo = !!(app.candidate_name && app.candidate_email)
+  const answeredTypes = {
+    text: false,
+    textarea: false,
+    voice: false,
+    file: false,
+    url: false
+  }
+  ;(app.answers || []).forEach((ans: any) => {
+    const t = qMap.get(ans.question_id)?.type || 'text'
+    if (t === 'text' && ans.value) answeredTypes.text = true
+    if (t === 'textarea' && ans.value) answeredTypes.textarea = true
+    if (t === 'voice' && ans.voice_data) answeredTypes.voice = true
+    if (t === 'file' && (ans.value || hasResume)) answeredTypes.file = true
+    if (t === 'url' && ans.value) answeredTypes.url = true
+  })
+
+  // Prefer persisted progress from DB/event log (exact), fallback to best-effort inference.
+  let lastProgressStep: string | undefined =
+    (app as any)?.last_progress_step ||
+    (lastEvent as any)?.step_id ||
+    undefined
+  const lastProgressEvent: string | undefined =
+    (app as any)?.last_progress_event ||
+    (lastEvent as any)?.event_type ||
+    undefined
+  const lastProgressAt: string | undefined =
+    (app as any)?.last_progress_at ||
+    (lastEvent as any)?.created_at ||
+    undefined
+  const lastProgressMeta: any =
+    (app as any)?.last_progress_meta ||
+    (lastEvent as any)?.meta ||
+    null
+  if (!lastProgressStep) {
+    if (app.submitted_at) {
+      lastProgressStep = 'submitted'
+    } else {
+      if (answeredTypes.voice) lastProgressStep = 'voice-recording'
+      else if (answeredTypes.file || hasResume) lastProgressStep = 'file-upload'
+      else if (answeredTypes.url) lastProgressStep = 'link-input'
+      else if (answeredTypes.text || answeredTypes.textarea) lastProgressStep = 'text-questions'
+      else if (!hasPersonalInfo) lastProgressStep = 'application-info'
+      else lastProgressStep = 'application-info'
+    }
+  }
+
   // Get latest HR evaluation if exists
   const latestHrEval = app.hr_evaluations?.[0] || {};
 
   const base = {
     id: app.id,
+    submittedAt: app.submitted_at || null,
     firstName: app.candidate_name?.split(' ')[0] || 'Unknown',
     lastName: app.candidate_name?.split(' ').slice(1).join(' ') || '',
     email: app.candidate_email || '',
@@ -205,6 +292,10 @@ export async function getCandidateById(id: string) {
     portfolioUrl: app.external_profiles?.find((p: any) => p.type === 'portfolio')?.url || '',
     tags: [], // Placeholder
     phone: '', // Placeholder
+    lastProgressStep,
+    lastProgressEvent,
+    lastProgressAt: lastProgressAt || null,
+    lastProgressMeta,
     hrFields: {
       priority: 'medium',
       notes: latestHrEval.hr_notes || '',
@@ -239,7 +330,7 @@ export async function getCandidateById(id: string) {
   } as any;
   
   // NOTE: We removed `activity_logs` and no longer store candidate progress steps.
-  // `lastProgressStep` will remain unset and the UI should fall back gracefully.
+  // We infer `lastProgressStep` best-effort from existing data above.
 
   if (session.role === 'super-admin') {
     base.organizationName = app.job_form?.organizations?.name;

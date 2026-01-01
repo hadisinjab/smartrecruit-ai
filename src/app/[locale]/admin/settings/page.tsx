@@ -303,19 +303,6 @@ export default function SettingsPage() {
 
   const renderAISettings = () => (
     <div className='space-y-6'>
-      <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4'>
-        <div className='flex items-start space-x-3'>
-          <AlertTriangle className='w-5 h-5 text-yellow-600 mt-0.5' />
-          <div>
-            <h3 className='text-sm font-medium text-yellow-900'>AI Features (Currently Disabled)</h3>
-            <p className='text-sm text-yellow-800 mt-1'>
-              These AI-powered features are currently disabled in your subscription plan. 
-              Contact your account manager to enable advanced AI capabilities.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className='space-y-4'>
         {[
           { key: 'resumeParsing', title: 'Resume Parsing', description: 'Automatically extract candidate information from resumes' },
@@ -329,11 +316,14 @@ export default function SettingsPage() {
               <p className='text-sm text-gray-500'>{feature.description}</p>
             </div>
             <Button
-              variant='outline'
-              disabled
+              variant={(settings as any)?.ai?.[feature.key] ? 'default' : 'outline'}
+              onClick={() =>
+                handleSettingChange('ai', feature.key as any, !(settings as any)?.ai?.[feature.key])
+              }
+              disabled={!isSuperAdmin}
               className='min-w-[80px]'
             >
-              Disabled
+              {(settings as any)?.ai?.[feature.key] ? 'Enabled' : 'Disabled'}
             </Button>
           </div>
         ))}
@@ -353,22 +343,64 @@ export default function SettingsPage() {
               type='number'
               value={settings?.security.passwordPolicy.minLength || 8}
               onChange={(e) => handleNestedSettingChange('security', 'passwordPolicy', 'minLength', parseInt(e.target.value))}
-              readOnly
+              readOnly={!isSuperAdmin}
             />
-            <p className='text-xs text-gray-500 mt-1'>Read-only in demo mode</p>
+            {!isSuperAdmin && <p className='text-xs text-gray-500 mt-1'>Read-only</p>}
           </div>
           <div className='space-y-3'>
             <div className='flex items-center justify-between'>
               <Label>Require Uppercase Letters</Label>
-              <CheckCircle className='w-5 h-5 text-green-500' />
+              <Button
+                variant={settings?.security.passwordPolicy.requireUppercase ? 'default' : 'outline'}
+                onClick={() =>
+                  handleNestedSettingChange(
+                    'security',
+                    'passwordPolicy',
+                    'requireUppercase',
+                    !settings?.security.passwordPolicy.requireUppercase
+                  )
+                }
+                disabled={!isSuperAdmin}
+                className='min-w-[80px]'
+              >
+                {settings?.security.passwordPolicy.requireUppercase ? 'On' : 'Off'}
+              </Button>
             </div>
             <div className='flex items-center justify-between'>
               <Label>Require Numbers</Label>
-              <CheckCircle className='w-5 h-5 text-green-500' />
+              <Button
+                variant={settings?.security.passwordPolicy.requireNumbers ? 'default' : 'outline'}
+                onClick={() =>
+                  handleNestedSettingChange(
+                    'security',
+                    'passwordPolicy',
+                    'requireNumbers',
+                    !settings?.security.passwordPolicy.requireNumbers
+                  )
+                }
+                disabled={!isSuperAdmin}
+                className='min-w-[80px]'
+              >
+                {settings?.security.passwordPolicy.requireNumbers ? 'On' : 'Off'}
+              </Button>
             </div>
             <div className='flex items-center justify-between'>
               <Label>Require Special Characters</Label>
-              <AlertTriangle className='w-5 h-5 text-yellow-500' />
+              <Button
+                variant={settings?.security.passwordPolicy.requireSymbols ? 'default' : 'outline'}
+                onClick={() =>
+                  handleNestedSettingChange(
+                    'security',
+                    'passwordPolicy',
+                    'requireSymbols',
+                    !settings?.security.passwordPolicy.requireSymbols
+                  )
+                }
+                disabled={!isSuperAdmin}
+                className='min-w-[80px]'
+              >
+                {settings?.security.passwordPolicy.requireSymbols ? 'On' : 'Off'}
+              </Button>
             </div>
           </div>
         </div>
@@ -383,16 +415,23 @@ export default function SettingsPage() {
               type='number'
               value={settings?.security.sessionTimeout || 30}
               onChange={(e) => handleSettingChange('security', 'sessionTimeout', parseInt(e.target.value))}
-              readOnly
+              readOnly={!isSuperAdmin}
             />
-            <p className='text-xs text-gray-500 mt-1'>Read-only in demo mode</p>
+            {!isSuperAdmin && <p className='text-xs text-gray-500 mt-1'>Read-only</p>}
           </div>
           <div className='flex items-center justify-between p-4 border border-gray-200 rounded-lg'>
             <div>
               <Label>Two-Factor Authentication</Label>
               <p className='text-sm text-gray-500'>Require 2FA for all admin users</p>
             </div>
-            <AlertTriangle className='w-5 h-5 text-yellow-500' />
+            <Button
+              variant={settings?.security.twoFactorRequired ? 'default' : 'outline'}
+              onClick={() => handleSettingChange('security', 'twoFactorRequired', !settings?.security.twoFactorRequired)}
+              disabled={!isSuperAdmin}
+              className='min-w-[80px]'
+            >
+              {settings?.security.twoFactorRequired ? 'On' : 'Off'}
+            </Button>
           </div>
         </div>
       </div>
@@ -438,7 +477,14 @@ export default function SettingsPage() {
             <Label>Anonymize Data</Label>
             <p className='text-sm text-gray-500'>Automatically anonymize personal identifiers in exports</p>
           </div>
-          <CheckCircle className='w-5 h-5 text-green-500' />
+          <Button
+            variant={settings?.export.anonymizeData ? 'default' : 'outline'}
+            onClick={() => handleSettingChange('export', 'anonymizeData', !settings?.export.anonymizeData)}
+            disabled={!isSuperAdmin}
+            className='min-w-[80px]'
+          >
+            {settings?.export.anonymizeData ? 'Enabled' : 'Disabled'}
+          </Button>
         </div>
       </div>
 

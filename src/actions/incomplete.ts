@@ -35,7 +35,8 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
       resumes(*),
       external_profiles(*)
     `)
-    .eq('status', 'new')
+    // Include duplicates as "incomplete" too if they are not submitted yet.
+    .in('status', ['new', 'duplicate'])
     .is('submitted_at', null)
     .order('created_at', { ascending: false })
 
@@ -68,10 +69,24 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
     questionsByJobForm = new Map(Object.entries(counts))
   }
   
-  const appIds = (applications || []).map((a: any) => a.id)
-  // NOTE: We no longer persist candidate progress steps in `activity_logs`.
-  // We compute a best-effort `stoppedAt` from existing application/answers data.
-  const lastLogByApp = new Map<string, any>()
+  const appIds = (applications || []).map((a: any) => a.id).filter(Boolean) as string[]
+
+  // Prefer exact tracking via application_progress_events / last_progress_step.
+  const lastEventByApp = new Map<string, any>()
+  if (appIds.length) {
+    const { data: events } = await supabase
+      .from('application_progress_events')
+      .select('application_id,step_id,event_type,meta,created_at')
+      .in('application_id', appIds)
+      .order('created_at', { ascending: false })
+      .limit(5000)
+
+    ;(events || []).forEach((e: any) => {
+      if (!lastEventByApp.has(e.application_id)) {
+        lastEventByApp.set(e.application_id, e)
+      }
+    })
+  }
 
   return (applications || []).map((app: any) => {
     const totalQuestions = questionsByJobForm.get(app.job_form_id) || 0
@@ -101,17 +116,19 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
       if ((t === 'url' || t === 'link') && ans.value) answeredTypes.url = true
     })
     
-    let stoppedAt = 'application-info'
-    const progressLog = lastLogByApp.get(app.id)
-    const loggedStep = progressLog?.details?.stepId || progressLog?.details?.step || null
-    if (loggedStep) {
-      stoppedAt = String(loggedStep)
-    } else {
+    let stoppedAt =
+      (app as any)?.last_progress_step ||
+      lastEventByApp.get(app.id)?.step_id ||
+      'application-info'
+
+    // Fallback to heuristic only if we have no tracked step.
+    if (!stoppedAt) {
       if (answeredTypes.voice) stoppedAt = 'voice-recording'
       else if (answeredTypes.file || hasResume) stoppedAt = 'file-upload'
       else if (answeredTypes.url) stoppedAt = 'link-input'
       else if (answeredTypes.text || answeredTypes.textarea) stoppedAt = 'text-questions'
       else if (!hasPersonalInfo) stoppedAt = 'application-info'
+      else stoppedAt = 'application-info'
     }
 
     return {

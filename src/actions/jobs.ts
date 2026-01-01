@@ -172,6 +172,35 @@ export async function getJobs(): Promise<Job[]> {
     }
   }
 
+  // Resolve hiring manager names (jobs may store hiring_manager_name as a user UUID).
+  // Use the admin client so Reviewers (who may not have RLS access to other users) still see names.
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const hiringManagerIds = Array.from(
+    new Set(
+      (data || [])
+        .map((job: any) => job.hiring_manager_name)
+        .filter((v: any) => typeof v === 'string' && uuidRegex.test(v))
+    )
+  ) as string[]
+
+  const hiringManagerById = new Map<string, { name: string; organizationId?: string | null }>()
+  if (hiringManagerIds.length) {
+    const admin = createAdminClient()
+    const { data: users, error: usersErr } = await admin
+      .from('users')
+      .select('id, full_name, email, organization_id')
+      .in('id', hiringManagerIds)
+
+    if (usersErr) {
+      console.error('Error fetching hiring managers:', usersErr)
+    } else {
+      ;(users || []).forEach((u: any) => {
+        const name = u.full_name || u.email
+        if (u.id && name) hiringManagerById.set(u.id, { name, organizationId: u.organization_id })
+      })
+    }
+  }
+
   // Fetch applicant counts for all jobs
   // This is a simplified approach; for large datasets, use a view or RPC
   const { data: appCounts, error: countError } = await supabase
@@ -203,7 +232,19 @@ export async function getJobs(): Promise<Job[]> {
     postedDate: job.created_at,
     deadline: job.deadline || '',
     applicantsCount: counts[job.id] || 0,
-    hiringManager: job.hiring_manager_name || 'Admin',
+    hiringManager: (() => {
+      const raw = job.hiring_manager_name
+      if (!raw) return 'Admin'
+      if (typeof raw === 'string' && uuidRegex.test(raw)) {
+        const resolved = hiringManagerById.get(raw)
+        // Extra safety: only show the resolved name if it matches the job's org.
+        if (resolved && (!resolved.organizationId || resolved.organizationId === job.organization_id)) {
+          return resolved.name
+        }
+        return 'Unknown'
+      }
+      return raw
+    })(),
     creatorName:
       creatorNameById.get(job.created_by) ||
       (job.created_by ? `User ${String(job.created_by).slice(0, 8)}` : 'Unknown'),
@@ -265,29 +306,41 @@ export async function getJobById(id: string): Promise<Job | null> {
   }
 
   // Get hiring manager name if hiring_manager_name is a user ID
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  let hiringManagerName = jobData.hiring_manager_name || '';
-  let hiringManagerId: string | undefined = undefined;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  let hiringManagerName = jobData.hiring_manager_name || ''
+  let hiringManagerId: string | undefined = undefined
   
   if (jobData.hiring_manager_name) {
     // Check if it's a UUID (user ID)
     if (uuidRegex.test(jobData.hiring_manager_name)) {
       // It's a user ID, get the user's name
-      hiringManagerId = jobData.hiring_manager_name;
-      const { data: hiringManager } = await supabase
+      hiringManagerId = jobData.hiring_manager_name
+
+      // Use admin client to bypass RLS safely; the job is already org-scoped above.
+      const admin = createAdminClient()
+      const { data: hiringManager, error: hmErr } = await admin
         .from('users')
-        .select('full_name, email')
+        .select('full_name, email, organization_id')
         .eq('id', jobData.hiring_manager_name)
-        .single();
+        .single()
       
-      if (hiringManager) {
-        hiringManagerName = hiringManager.full_name || hiringManager.email || jobData.hiring_manager_name;
+      if (hmErr) {
+        console.error('Error fetching hiring manager:', hmErr)
+      }
+
+      // Extra safety: only reveal name if the hiring manager belongs to the same organization as the job.
+      if (hiringManager && (!hiringManager.organization_id || hiringManager.organization_id === jobData.organization_id)) {
+        hiringManagerName = hiringManager.full_name || hiringManager.email || 'Unknown'
+      } else if (!hiringManager) {
+        hiringManagerName = 'Unknown'
       }
     }
   }
 
   // Map to Job interface
   return {
+    // Keep raw DB columns for compatibility with existing UI (edit page reads snake_case fields).
+    ...(jobData as any),
     id: jobData.id,
     title: jobData.title,
     department: jobData.department,

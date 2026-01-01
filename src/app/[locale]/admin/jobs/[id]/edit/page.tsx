@@ -749,14 +749,14 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                 <input
                   type="text"
                   readOnly
-                  value={typeof window !== 'undefined' ? `${window.location.origin}/${locale}/apply/${params.id}` : `/${locale}/apply/${params.id}`}
+                  value={typeof window !== 'undefined' ? `${window.location.origin}/apply/${params.id}` : `/apply/${params.id}`}
                   className="flex-1 bg-transparent border-none outline-none text-sm text-gray-700 font-mono"
                 />
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    const link = typeof window !== 'undefined' ? `${window.location.origin}/${locale}/apply/${params.id}` : `/${locale}/apply/${params.id}`;
+                    const link = typeof window !== 'undefined' ? `${window.location.origin}/apply/${params.id}` : `/apply/${params.id}`;
                     navigator.clipboard.writeText(link);
                     setLinkCopied(true);
                     setTimeout(() => setLinkCopied(false), 2000);
@@ -780,7 +780,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                 variant="outline"
                 className="w-full"
                 onClick={() => {
-                  const link = typeof window !== 'undefined' ? `${window.location.origin}/${locale}/apply/${params.id}` : `/${locale}/apply/${params.id}`;
+                  const link = typeof window !== 'undefined' ? `${window.location.origin}/apply/${params.id}` : `/apply/${params.id}`;
                   window.open(link, '_blank');
                 }}
               >

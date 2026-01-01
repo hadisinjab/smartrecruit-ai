@@ -81,6 +81,7 @@ export const FormStepComponent: React.FC<FormStepComponentProps> = ({
         )}
       </CardHeader>
       <CardContent className='space-y-6'>
+        {step.content}
         {step.fields.map(renderQuestion)}
       </CardContent>
     </Card>

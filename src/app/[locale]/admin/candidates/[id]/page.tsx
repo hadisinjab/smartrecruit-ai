@@ -42,6 +42,7 @@ export default function CandidateDetailsPage() {
   const tCommon = useTranslations('Common');
   const tRec = useTranslations('Recommendation');
   const tStatus = useTranslations('Status');
+  const tTable = useTranslations('Table');
 
   const params = useParams();
   const router = useRouter();
@@ -414,13 +415,19 @@ export default function CandidateDetailsPage() {
                   <span className='text-gray-700'>
                     {(() => {
                       const s = (candidate as any)?.lastProgressStep
-                      if (s === 'voice-recording') return 'توقف عند التسجيل الصوتي'
-                      if (s === 'file-upload') return 'توقف عند رفع الملف'
-                      if (s === 'link-input') return 'توقف عند إدخال الرابط'
-                      if (s === 'text-questions') return 'توقف عند الأسئلة النصية'
-                      if (s === 'media-questions') return 'توقف عند رفع الوسائط'
-                      if (s === 'candidate' || s === 'application-info') return 'توقف عند معلومات التقديم'
-                      return s ? String(s) : 'أين توقف: غير معروف'
+                      if (s === 'submitted') return tTable('stoppedSubmitted')
+                      // legacy inferred values:
+                      if (s === 'voice-recording') return tTable('stoppedVoice')
+                      if (s === 'file-upload') return tTable('stoppedFile')
+                      if (s === 'link-input') return tTable('stoppedLink')
+                      if (s === 'application-info') return tTable('stoppedCandidate')
+                      // apply-flow step ids:
+                      if (s === 'candidate') return tTable('stoppedCandidate')
+                      if (s === 'text-questions') return tTable('stoppedText')
+                      if (s === 'media-questions') return tTable('stoppedMedia')
+                      if (s === 'assignment') return tTable('stoppedAssignment')
+                      if (s === 'review') return tTable('stoppedReview')
+                      return s ? String(s) : `${tTable('stoppedAt')}: ${tTable('unknown')}`
                     })()}
                   </span>
                 </div>

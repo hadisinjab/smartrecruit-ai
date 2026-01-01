@@ -39,6 +39,10 @@ export interface Candidate {
   id: string;
   submittedAt?: string | null;
   isDuplicate?: boolean;
+  lastProgressStep?: string;
+  lastProgressAt?: string | null;
+  lastProgressEvent?: string;
+  lastProgressMeta?: any;
   firstName: string;
   lastName: string;
   email: string;
@@ -46,7 +50,8 @@ export interface Candidate {
   location: string;
   position: string;
   experience: number;
-  status: 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
+  // Note: applications table uses 'new' / 'duplicate' early in the funnel too.
+  status: 'new' | 'duplicate' | 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
   appliedDate: string;
   lastUpdate: string;
   source: string;

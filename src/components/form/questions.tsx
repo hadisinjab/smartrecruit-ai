@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QuestionComponentProps } from '@/types/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -109,6 +109,7 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
   const [hasRecorded, setHasRecorded] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -130,6 +131,9 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
     return () => clearInterval(interval);
   }, [isRecording, timeLeft, onChange]);
 
+  const elapsed = 180 - timeLeft
+  const canStop = isRecording && elapsed >= 30
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -137,17 +141,34 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
   };
 
   const startRecording = () => {
+    // Reveal the question only when the applicant starts recording (per UX requirement).
+    setIsRevealed(true);
     setIsRecording(true);
     setTimeLeft(180);
     setHasRecorded(false);
   };
 
+  const stopRecording = () => {
+    // Can be stopped only after 30 seconds, and cannot be restarted after stopping.
+    if (!canStop) return
+    setIsRecording(false)
+    setHasRecorded(true)
+    onChange(true) // Mark as completed
+  }
+
   return (
     <div className={`space-y-4 ${rtl ? 'text-right' : 'text-left'}`}>
-      <Label>
-        {field.label}
-        {field.required && <span className='text-red-500 ml-1'>*</span>}
-      </Label>
+      {isRevealed ? (
+        <Label>
+          {field.label}
+          {field.required && <span className='text-red-500 ml-1'>*</span>}
+        </Label>
+      ) : (
+        <div className='text-sm text-gray-600'>
+          {/* Intentionally hide the question until the user starts recording */}
+          Tap “Start Recording” to reveal the question.
+        </div>
+      )}
       
       <Card className={`${isRecording ? 'border-red-300 bg-red-50' : hasRecorded ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
         <CardContent className='p-6 text-center space-y-4'>
@@ -161,8 +182,16 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                   {formatTime(timeLeft)}
                 </div>
                 <p className='text-sm text-red-600'>
-                  Recording... Cannot pause or re-record
+                  Recording… You can stop after 30 seconds. You cannot restart after stopping.
                 </p>
+                <Button
+                  onClick={stopRecording}
+                  variant='outline'
+                  className='mt-2'
+                  disabled={!canStop}
+                >
+                  Stop Recording {canStop ? '' : `(${30 - Math.max(0, elapsed)}s)`}
+                </Button>
               </div>
             ) : hasRecorded ? (
               <div className='flex flex-col items-center space-y-2'>
@@ -172,9 +201,7 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                 <p className='text-sm text-green-600 font-medium'>
                   Recording completed successfully
                 </p>
-                <p className='text-xs text-gray-500'>
-                  Duration: 3:00
-                </p>
+                <p className='text-xs text-gray-500'>Recorded</p>
               </div>
             ) : (
               <div className='flex flex-col items-center space-y-2'>
@@ -184,7 +211,7 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                 <Button
                   onClick={startRecording}
                   className='bg-blue-600 hover:bg-blue-700'
-                  disabled={isRecording}
+                  disabled={isRecording || hasRecorded}
                 >
                   <Mic className='w-4 h-4 mr-2' />
                   Start Recording
@@ -215,12 +242,22 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   const handleFileSelect = (file: File) => {
     // Validate file type
-    const acceptedTypes = field.validation?.acceptedTypes || ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const acceptedTypes =
+      field.validation?.acceptedTypes || [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+      ];
     if (!acceptedTypes.includes(file.type)) {
-      alert('Please upload a PDF, DOC, or DOCX file');
+      alert('Please upload a PDF, DOC, DOCX, TXT, JPG, PNG, or WEBP file');
       return;
     }
 
@@ -277,34 +314,46 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
             setDragOver(true);
           }}
           onDragLeave={() => setDragOver(false)}
+          onClick={() => inputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              inputRef.current?.click()
+            }
+          }}
         >
           <Upload className='w-12 h-12 mx-auto text-gray-400 mb-4' />
           <p className='text-lg font-medium text-gray-700 mb-2'>
-            Upload your CV/Resume
+            Upload your file
           </p>
           <p className='text-sm text-gray-500 mb-4'>
             Drag and drop your file here, or click to browse
           </p>
           <p className='text-xs text-gray-400 mb-4'>
-            Accepted formats: PDF, DOC, DOCX • Max size: {field.validation?.maxFileSize || 5}MB
+            Accepted formats: PDF, DOC, DOCX, TXT, JPG, PNG, WEBP • Max size: {field.validation?.maxFileSize || 5}MB
           </p>
           
           <input
+            ref={inputRef}
             type='file'
-            accept='.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            accept='.pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/jpeg,image/png,image/webp'
             onChange={handleFileInput}
             className='hidden'
             id={field.id}
           />
-          <label htmlFor={field.id}>
-            <Button
-              type='button'
-              variant='outline'
-              className='cursor-pointer'
-            >
-              Choose File
-            </Button>
-          </label>
+          <Button
+            type='button'
+            variant='outline'
+            className='cursor-pointer'
+            onClick={(e) => {
+              e.stopPropagation()
+              inputRef.current?.click()
+            }}
+          >
+            Choose File
+          </Button>
         </div>
       ) : (
         <Card className='border-green-200 bg-green-50'>
@@ -325,8 +374,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
                   variant='outline'
                   size='sm'
                   onClick={() => {
-                    const input = document.getElementById(field.id) as HTMLInputElement;
-                    input?.click();
+                    inputRef.current?.click()
                   }}
                 >
                   Change

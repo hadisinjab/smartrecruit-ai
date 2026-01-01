@@ -6,13 +6,12 @@ import { NextRequest, NextResponse } from 'next/server';
 const intlMiddleware = createMiddleware(routing);
 
 export default async function middleware(request: NextRequest) {
-  // Convenience redirect: allow /admin/* without locale prefix.
-  // Our app routes are under /[locale]/admin/*, so redirect to default locale.
+  // Only the public apply flow should be WITHOUT locale in the URL:
+  // `/apply/[jobId]` should NOT redirect to `/${defaultLocale}/apply/...`.
   const pathname = request.nextUrl.pathname;
-  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
-    const url = request.nextUrl.clone();
-    url.pathname = `/${routing.defaultLocale}${pathname}`;
-    return NextResponse.redirect(url);
+  if (pathname === '/apply' || pathname.startsWith('/apply/')) {
+    const res = NextResponse.next({ request })
+    return await updateSession(request, res)
   }
 
   const response = intlMiddleware(request);

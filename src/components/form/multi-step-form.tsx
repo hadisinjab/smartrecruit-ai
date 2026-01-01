@@ -25,6 +25,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   const [formData, setFormData] = useState<FormData>({});
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null)
+  const [effectiveApplicationId, setEffectiveApplicationId] = useState<string | null>(applicationId || null)
 
   const progress = ((currentStep + 1) / steps.length) * 100;
 
@@ -44,11 +45,18 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   };
 
   useEffect(() => {
-    const id = steps[currentStep]?.id
-    if (applicationId && id && id !== 'job') {
-      recordProgress(applicationId, id).catch(() => {})
+    // Keep internal state in sync when parent provides/updates an applicationId.
+    if (applicationId && applicationId !== effectiveApplicationId) {
+      setEffectiveApplicationId(applicationId)
     }
-  }, [currentStep, applicationId, steps])
+  }, [applicationId, effectiveApplicationId])
+
+  useEffect(() => {
+    const id = steps[currentStep]?.id
+    if (effectiveApplicationId && id && id !== 'job') {
+      recordProgress(effectiveApplicationId, id, 'enter', { index: currentStep }).catch(() => {})
+    }
+  }, [currentStep, effectiveApplicationId, steps])
 
   const validateCurrentStep = (): boolean => {
     const step = steps[currentStep];
@@ -125,29 +133,56 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
     return isValid;
   };
 
-  const handleNext = () => {
-    if (validateCurrentStep()) {
-      // المرحلة 5️⃣: Auto-save عند الانتقال للصفحة التالية
-      // يتم حفظ الإجابات تلقائياً عند الضغط Next
-      // (سيتم استدعاء onComplete الذي يحفظ الإجابات)
-      if (typeof onFirstStepComplete === 'function' && steps[currentStep]?.id === 'candidate') {
-        onFirstStepComplete(formData);
-      }
-      
-      if (applicationId && steps[currentStep]?.id) {
-        recordProgress(applicationId, steps[currentStep].id).catch(() => {});
-      }
-      
-      if (currentStep < steps.length - 1) {
-        setCurrentStep(prev => prev + 1);
-      } else {
-        // Form is complete
-        onComplete({
-          ...formData,
-          ...(assignmentData ? { assignment: assignmentData as any } : {}),
-        });
-      }
+  const handleNext = async () => {
+    if (!validateCurrentStep()) return
+
+    const stepId = steps[currentStep]?.id
+    const nextStepId = currentStep < steps.length - 1 ? steps[currentStep + 1]?.id : null
+    let appIdForTracking: string | null = effectiveApplicationId
+
+    // Ensure we have an applicationId as soon as the candidate finishes personal info.
+    // Without this, progress events for later steps can't be linked and tracking becomes "unknown".
+    if (!effectiveApplicationId && typeof onFirstStepComplete === 'function' && stepId === 'candidate') {
+      try {
+        const maybe = await onFirstStepComplete(formData)
+        if (typeof maybe === 'string' && maybe) {
+          setEffectiveApplicationId(maybe)
+          appIdForTracking = maybe
+        }
+      } catch {}
     }
+
+    // Record progress with richer meta so admins can see what happened even if answers aren't submitted.
+    if (appIdForTracking && stepId) {
+      const step = steps[currentStep]
+      const answeredFieldIds = (step?.fields || [])
+        .map((f) => f.id)
+        .filter((fid) => {
+          const v = (formData as any)?.[fid]
+          if (v == null) return false
+          if (typeof v === 'string') return v.trim() !== ''
+          if (typeof v === 'boolean') return v === true
+          return true
+        })
+
+      await recordProgress(appIdForTracking, stepId, 'next', {
+        index: currentStep,
+        nextStepId,
+        totalFields: (step?.fields || []).length,
+        answeredCount: answeredFieldIds.length,
+        answeredFieldIds: answeredFieldIds.slice(0, 50),
+      }).catch(() => {})
+    }
+
+    if (currentStep < steps.length - 1) {
+      setCurrentStep((prev) => prev + 1)
+      return
+    }
+
+    onComplete({
+      ...formData,
+      ...(assignmentData ? { assignment: assignmentData as any } : {}),
+    })
   };
 
   const handlePrevious = () => {
@@ -211,7 +246,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
               onFieldChange={handleFieldChange}
               rtl={rtl}
               errors={errors}
-              applicationId={applicationId || undefined}
+              applicationId={effectiveApplicationId || undefined}
               jobFormId={jobFormId}
               onVoiceUploadComplete={onVoiceUploadComplete}
               onFileUploadComplete={onFileUploadComplete}
@@ -343,7 +378,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
             ))}
           </div>
 
-          <Button onClick={handleNext} disabled={steps[currentStep].id === 'assignment'}>
+          <Button onClick={() => { void handleNext() }} disabled={steps[currentStep].id === 'assignment'}>
             {steps[currentStep].id === 'job'
               ? 'Apply'
               : isLastStep

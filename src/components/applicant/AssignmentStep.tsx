@@ -48,9 +48,9 @@ export function AssignmentStep({ assignmentConfig, initialData, onNext, onPrevio
       newErrors.text = 'Text is too long (max 10,000 characters)'
     }
 
-    if (textAnswer.trim().length > 0 && textAnswer.trim().length < 50) {
-      newErrors.text = 'Please provide at least 50 characters'
-    }
+    // Requirement: no minimum length beyond "at least 1 character" when user provides text.
+    // textAnswer.trim().length < 1 while > 0 is impossible, so we intentionally don't enforce
+    // any additional minimum here. Max length is enforced above.
 
     if (assignmentConfig.type === 'text_and_links') {
       if (assignmentConfig.required && validLinks.length === 0) {
@@ -158,6 +158,7 @@ export function AssignmentStep({ assignmentConfig, initialData, onNext, onPrevio
     </div>
   )
 }
+
 
 
 
