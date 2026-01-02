@@ -187,8 +187,6 @@ export default function ActivityLogPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [userFilter, setUserFilter] = useState('all');
-  const [actionFilter, setActionFilter] = useState('all');
-  const [targetFilter, setTargetFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -225,16 +223,6 @@ export default function ActivityLogPage() {
     return users;
   };
 
-  const getUniqueActions = () => {
-    const actions = [...new Set(activityLog.map(entry => entry.action))];
-    return actions;
-  };
-
-  const getUniqueTargetTypes = () => {
-    const types = [...new Set(activityLog.map(entry => entry.targetType))];
-    return types;
-  };
-
   // Filter activities based on search and filters
   const filteredActivities = activityLog.filter(entry => {
     const matchesSearch = 
@@ -246,9 +234,6 @@ export default function ActivityLogPage() {
     const matchesUser = userFilter === 'all' || 
       entry.userName.toLowerCase().includes(userFilter.toLowerCase()) ||
       entry.userRole.toLowerCase().includes(userFilter.toLowerCase());
-    
-    const matchesAction = actionFilter === 'all' || entry.action === actionFilter;
-    const matchesTarget = targetFilter === 'all' || entry.targetType === targetFilter;
     
     // Date filtering
     const entryDate = new Date(entry.timestamp);
@@ -266,7 +251,7 @@ export default function ActivityLogPage() {
       matchesDate = entryDate >= monthAgo;
     }
     
-    return matchesSearch && matchesUser && matchesAction && matchesTarget && matchesDate;
+    return matchesSearch && matchesUser && matchesDate;
   });
 
   const getTargetTypeIcon = (type: string) => {
@@ -480,7 +465,7 @@ export default function ActivityLogPage() {
     uniqueUsers: new Set(activityLog.map(entry => entry.userId)).size
   };
 
-  const recentActions = [...new Set(activityLog.map(entry => entry.action))].slice(0, 5);
+  // Recent actions summary removed (not needed in this view).
 
   if (loading) {
     return (
@@ -507,11 +492,6 @@ export default function ActivityLogPage() {
       }
     >
       <div className='space-y-6'>
-        <Card className='p-4 border-blue-100 bg-blue-50'>
-          <div className='text-sm text-blue-900 font-medium'>{t('metadataHelp.title')}</div>
-          <div className='text-xs text-blue-800 mt-1'>{t('metadataHelp.desc')}</div>
-        </Card>
-
         {/* Stats */}
         <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
           <Card className='p-4'>
@@ -540,21 +520,6 @@ export default function ActivityLogPage() {
           </Card>
         </div>
 
-        {/* Quick Actions Summary */}
-        <Card className='p-6'>
-          <h3 className='text-lg font-semibold text-gray-900 mb-4'>{t('recentActions')}</h3>
-          <div className='flex flex-wrap gap-2'>
-            {recentActions.map((action) => (
-              <span
-                key={action}
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getActionColor(action)} bg-gray-50`}
-              >
-                {action}
-              </span>
-            ))}
-          </div>
-        </Card>
-
         {/* Filters */}
         <Card className='p-6'>
           <div className='flex flex-col sm:flex-row gap-4'>
@@ -578,32 +543,6 @@ export default function ActivityLogPage() {
                 <SelectItem value="all">{t('filters.allUsers')}</SelectItem>
                 {getUniqueUsers().map(user => (
                   <SelectItem key={user} value={user}>{user}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder={t('filters.action')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('filters.allActions')}</SelectItem>
-                {getUniqueActions().map(action => (
-                  <SelectItem key={action} value={action}>{action}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={targetFilter} onValueChange={setTargetFilter}>
-              <SelectTrigger className='w-full sm:w-[150px]'>
-                <SelectValue placeholder={t('filters.type')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('filters.allTypes')}</SelectItem>
-                {getUniqueTargetTypes().map(type => (
-                  <SelectItem key={type} value={type}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

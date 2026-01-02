@@ -27,8 +27,10 @@ export interface FormStep {
   fields: FormField[];
 }
 
+export type FormValue = string | number | boolean | File | null | Record<string, any>;
+
 export interface FormData {
-  [key: string]: string | number | boolean | File | null;
+  [key: string]: FormValue;
 }
 
 export interface MultiStepFormProps {
@@ -50,8 +52,12 @@ export interface MultiStepFormProps {
 
 export interface QuestionComponentProps {
   field: FormField;
-  value: string | number | boolean | File | null;
-  onChange: (value: string | number | boolean | File | null) => void;
+  value: FormValue;
+  onChange: (value: FormValue) => void;
   rtl?: boolean;
   error?: string;
+  // Optional context for uploads (public apply flow)
+  applicationId?: string;
+  jobFormId?: string;
+  onUploadComplete?: (questionId: string, info: any) => void;
 }

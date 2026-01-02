@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import { FormStep, FormData } from '@/types/form';
-type FormValue = string | number | boolean | File | null;
+import type { FormStep, FormData, FormValue } from '@/types/form';
 import { TextQuestion, NumberQuestion, TextareaQuestion, VoiceQuestion, FileUploadQuestion, URLQuestion, SelectQuestion } from './questions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -48,7 +47,7 @@ export const FormStepComponent: React.FC<FormStepComponentProps> = ({
       ...(field.type === 'file' && {
         applicationId,
         jobFormId,
-        onFileUploadComplete: onFileUploadComplete
+        onUploadComplete: onFileUploadComplete
       })
     };
 

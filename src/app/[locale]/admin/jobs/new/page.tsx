@@ -137,13 +137,21 @@ export default function CreateJobPage() {
   };
 
   const addQuestion = (type: FormField['type']) => {
+    // Automatically assign page number based on question type
+    // Text questions (text, textarea, number, select) → page 3
+    // Media questions (voice, file, url) → page 4
+    const isTextQuestion = type === 'text' || type === 'textarea' || type === 'number' || type === 'select'
+    const pageNumber = isTextQuestion ? 3 : 4
+
     const newField: FormField = {
       id: `field-${Date.now()}`,
       type,
       label: tCreate('questionText'),
       required: true,
       placeholder: tCreate('questionText'),
-      pageNumber: 1 // Default to page 1
+      pageNumber, // Auto-assigned based on type
+      // Set default duration for voice questions (3 minutes = 180 seconds)
+      ...(type === 'voice' && { options: [{ label: 'duration', value: '180' }] })
     };
 
     const newSteps = [...formSteps];
@@ -442,25 +450,6 @@ export default function CreateJobPage() {
                               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                             <Label htmlFor={`req-${field.id}`} className="cursor-pointer">{tCreate('required')}</Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <Label className="text-sm text-gray-600">Page:</Label>
-                            <Select
-                              value={(field.pageNumber || 1).toString()}
-                              onValueChange={(val) => updateQuestion(index, { pageNumber: parseInt(val) })}
-                            >
-                              <SelectTrigger className="w-16 h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[1, 2, 3, 4, 5].map((num) => (
-                                  <SelectItem key={num} value={num.toString()}>
-                                    {num}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
                           </div>
                           
                           {/* Config inputs based on type */}

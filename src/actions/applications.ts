@@ -201,30 +201,7 @@ export async function beginApplication(payload: {
       matchedApplicationIds,
     }).catch(() => {})
 
-    // Notification: new application started (low signal; keep title minimal)
-    try {
-      const { recipients, job } = await getRecipientsForJob(payload.jobId)
-      const actionUrl = `/admin/candidates/${app.id}`
-      await Promise.all(
-        recipients.map((userId) =>
-          createNotification({
-            user_id: userId,
-            type: 'new_application',
-            title: 'New application started',
-            content: `${payload.candidateName || 'A candidate'} started applying for ${job?.title || 'a job'}.`,
-            metadata: {
-              application_id: app.id,
-              candidate_name: payload.candidateName || null,
-              job_id: payload.jobId,
-              job_title: job?.title || null,
-              action_url: actionUrl,
-            } as any,
-          })
-        )
-      )
-    } catch (e) {
-      console.error('[notifications] beginApplication:', e)
-    }
+    // NOTE: We intentionally do NOT notify on begin/start; notifications are reserved for final events.
 
     return { applicationId: app.id, error: null }
   } catch (e: any) {

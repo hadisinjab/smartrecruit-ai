@@ -73,6 +73,13 @@ export default function UsersPage() {
     loadUsers();
   }, [loadUsers]);
 
+  // Block reviewer from accessing User Management even via direct URL.
+  useEffect(() => {
+    if (!isUserLoading && isReviewer) {
+      router.push('/admin/dashboard')
+    }
+  }, [isReviewer, isUserLoading, router])
+
   if (loading || isUserLoading) {
     return (
       <AdminLayout title={t('title')} subtitle={t('subtitle')}>
@@ -84,6 +91,10 @@ export default function UsersPage() {
         </div>
       </AdminLayout>
     );
+  }
+
+  if (isReviewer) {
+    return null
   }
 
   const handleStatusToggle = async (userId: string, currentStatus: boolean) => {

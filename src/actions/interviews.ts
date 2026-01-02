@@ -64,31 +64,7 @@ export async function createInterview(input: CreateInterviewInput): Promise<Acti
       return { ok: false, status: 500, error: error?.message || 'Failed to create interview' }
     }
 
-    // Notification: interview uploaded
-    try {
-      const { recipients, app, job } = await getRecipientsForApplication(parsed.data.application_id)
-      const actionUrl = `/admin/candidates/${parsed.data.application_id}`
-      await Promise.all(
-        recipients.map((userId) =>
-          createNotification({
-            user_id: userId,
-            type: 'interview_uploaded',
-            title: 'Interview uploaded',
-            content: `${app?.candidate_name || 'A candidate'} interview recording was added for ${job?.title || 'a job'}.`,
-            metadata: {
-              application_id: parsed.data.application_id,
-              candidate_name: app?.candidate_name || null,
-              job_id: app?.job_form_id || null,
-              job_title: job?.title || null,
-              action_url: actionUrl,
-              interview_url: parsed.data.audio_or_video_url,
-            } as any,
-          })
-        )
-      )
-    } catch (e) {
-      console.error('[notifications] createInterview:', e)
-    }
+    // NOTE: We intentionally do NOT notify on interview uploads to avoid noisy notifications.
 
     revalidatePath(`/admin/candidates/${parsed.data.application_id}`)
     return { ok: true, status: 200, data: data as Interview }

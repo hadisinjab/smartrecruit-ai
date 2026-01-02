@@ -553,12 +553,6 @@ export default function SettingsPage() {
      subtitle="Manage system configuration and preferences"
    >
      <div className='space-y-6'>
-      {!isSuperAdmin && (
-        <Card className='p-4 border-yellow-200 bg-yellow-50'>
-          <div className='text-sm text-yellow-900 font-medium'>Read-only</div>
-          <div className='text-xs text-yellow-800 mt-1'>Admins can view settings, but only Super Admin can modify them.</div>
-        </Card>
-      )}
        <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
          {/* Settings Navigation */}
          <div className='lg:col-span-1'>

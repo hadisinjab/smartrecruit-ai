@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Mic, MicOff, Upload, Link as LinkIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { createClient } from '@/utils/supabase/client'
 
 export const TextQuestion: React.FC<QuestionComponentProps> = ({
   field,
@@ -104,32 +105,39 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
   value,
   onChange,
   rtl = false,
-  error
+  error,
+  jobFormId,
+  applicationId,
+  onUploadComplete
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [timeLeft, setTimeLeft] = useState(180); // 3 minutes in seconds
   const [hasRecorded, setHasRecorded] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null)
+
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const chunksRef = useRef<BlobPart[]>([])
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const savedAudioUrl =
+    value && typeof value === 'object'
+      ? ((value as any).audio_url || (value as any).url || null)
+      : null
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isRecording && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            setIsRecording(false);
-            setHasRecorded(true);
-            onChange(true); // Mark as completed
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current)
+      if (localAudioUrl) URL.revokeObjectURL(localAudioUrl)
+      try {
+        streamRef.current?.getTracks().forEach((t) => t.stop())
+      } catch {}
     }
-
-    return () => clearInterval(interval);
-  }, [isRecording, timeLeft, onChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const elapsed = 180 - timeLeft
   const canStop = isRecording && elapsed >= 30
@@ -140,20 +148,156 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const stopTick = () => {
+    if (tickRef.current) {
+      clearInterval(tickRef.current)
+      tickRef.current = null
+    }
+  }
+
+  const startTick = () => {
+    stopTick()
+    tickRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          // timer finished -> auto stop
+          void stopAndFinalize(true)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const uploadAudio = async (file: File) => {
+    const supabase = createClient()
+    const buckets = ['files', 'resumes']
+    const base = jobFormId || applicationId || 'general'
+    const ext = (file.name.split('.').pop() || 'webm').toLowerCase()
+    const path = `voice/${base}/${field.id}/${crypto.randomUUID()}.${ext}`
+
+    let lastError: any = null
+    for (const bucket of buckets) {
+      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
+      if (!upErr) {
+        const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+        return { url: data.publicUrl, error: null as string | null }
+      }
+      lastError = upErr
+    }
+    return { url: null as string | null, error: lastError?.message || 'Failed to upload audio' }
+  }
+
+  const stopAndFinalize = async (autoStopped: boolean) => {
+    const recorder = recorderRef.current
+    if (!recorder) {
+      setIsRecording(false)
+      stopTick()
+      return
+    }
+
+    setIsRecording(false)
+    stopTick()
+
+    await new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve()
+      try {
+        recorder.stop()
+      } catch {
+        resolve()
+      }
+    })
+
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    } catch {}
+    recorderRef.current = null
+    streamRef.current = null
+
+    const mimeType = recorder.mimeType || 'audio/webm'
+    const blob = new Blob(chunksRef.current, { type: mimeType })
+    chunksRef.current = []
+
+    const objectUrl = URL.createObjectURL(blob)
+    setLocalAudioUrl(objectUrl)
+
+    setUploading(true)
+    setUploadError(null)
+    // Mark field as "present but uploading" so required validation doesn't falsely fail.
+    onChange({ uploading: true })
+    try {
+      const fileName = `voice-${field.id}-${Date.now()}.webm`
+      const file = new File([blob], fileName, { type: mimeType })
+      const { url, error: upErr } = await uploadAudio(file)
+      if (upErr || !url) {
+        setUploadError(upErr || 'Failed to upload audio')
+        return
+      }
+
+      const durationSeconds = Math.max(0, Math.min(180, 180 - timeLeft))
+      const voiceJson = {
+        audio_url: url,
+        mime_type: file.type,
+        file_name: file.name,
+        size: file.size,
+        duration_seconds: durationSeconds,
+        created_at: new Date().toISOString(),
+        auto_stopped: autoStopped,
+      }
+
+      onChange(voiceJson)
+      setHasRecorded(true)
+      onUploadComplete?.(field.id, voiceJson)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const startRecording = () => {
     // Reveal the question only when the applicant starts recording (per UX requirement).
     setIsRevealed(true);
-    setIsRecording(true);
-    setTimeLeft(180);
-    setHasRecorded(false);
+    if (hasRecorded || uploading) return
+
+    setUploadError(null)
+    setTimeLeft(180)
+
+    if (typeof window === 'undefined') return
+    if (!navigator?.mediaDevices?.getUserMedia || typeof (window as any).MediaRecorder === 'undefined') {
+      setUploadError('Audio recording is not supported in this browser.')
+      return
+    }
+
+    void (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        streamRef.current = stream
+
+        const recorder = new MediaRecorder(stream)
+        recorderRef.current = recorder
+        chunksRef.current = []
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunksRef.current.push(e.data)
+        }
+
+        recorder.start()
+        setIsRecording(true)
+        startTick()
+      } catch (e: any) {
+        setUploadError(e?.message || 'Microphone permission was denied.')
+        try {
+          streamRef.current?.getTracks().forEach((t) => t.stop())
+        } catch {}
+        streamRef.current = null
+        recorderRef.current = null
+      }
+    })()
   };
 
   const stopRecording = () => {
     // Can be stopped only after 30 seconds, and cannot be restarted after stopping.
     if (!canStop) return
-    setIsRecording(false)
-    setHasRecorded(true)
-    onChange(true) // Mark as completed
+    void stopAndFinalize(false)
   }
 
   return (
@@ -170,7 +314,7 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
         </div>
       )}
       
-      <Card className={`${isRecording ? 'border-red-300 bg-red-50' : hasRecorded ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
+      <Card className={`${isRecording ? 'border-red-300 bg-red-50' : hasRecorded || savedAudioUrl || localAudioUrl ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
         <CardContent className='p-6 text-center space-y-4'>
           <div className='flex justify-center'>
             {isRecording ? (
@@ -193,15 +337,18 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                   Stop Recording {canStop ? '' : `(${30 - Math.max(0, elapsed)}s)`}
                 </Button>
               </div>
-            ) : hasRecorded ? (
-              <div className='flex flex-col items-center space-y-2'>
+            ) : hasRecorded || savedAudioUrl || localAudioUrl ? (
+              <div className='flex flex-col items-center space-y-3 w-full'>
                 <div className='w-16 h-16 bg-green-500 rounded-full flex items-center justify-center'>
                   <MicOff className='w-8 h-8 text-white' />
                 </div>
-                <p className='text-sm text-green-600 font-medium'>
-                  Recording completed successfully
+                <p className='text-sm text-green-700 font-medium'>
+                  {savedAudioUrl ? 'Recording saved' : uploading ? 'Uploading…' : 'Recording saved'}
                 </p>
-                <p className='text-xs text-gray-500'>Recorded</p>
+                <div className='w-full'>
+                  <audio controls src={savedAudioUrl || localAudioUrl || undefined} className='w-full' />
+                </div>
+                {uploading && <p className='text-xs text-gray-600'>Uploading…</p>}
               </div>
             ) : (
               <div className='flex flex-col items-center space-y-2'>
@@ -225,6 +372,9 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
         </CardContent>
       </Card>
 
+      {uploadError && (
+        <p className='text-sm text-red-600'>{uploadError}</p>
+      )}
       {error && (
         <p className='text-sm text-red-500'>{error}</p>
       )}
@@ -237,12 +387,36 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
   value,
   onChange,
   rtl = false,
-  error
+  error,
+  jobFormId,
+  applicationId,
+  onUploadComplete
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  const uploadFile = async (file: File) => {
+    const supabase = createClient()
+    const buckets = ['files', 'resumes']
+    const base = jobFormId || applicationId || 'general'
+    const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
+    const path = `uploads/${base}/${field.id}/${crypto.randomUUID()}.${ext}`
+
+    let lastError: any = null
+    for (const bucket of buckets) {
+      const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
+      if (!upErr) {
+        const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+        return { url: data.publicUrl, bucket, path, error: null as string | null }
+      }
+      lastError = upErr
+    }
+    return { url: null as string | null, bucket: null as any, path: null as any, error: lastError?.message || 'Failed to upload file' }
+  }
 
   const handleFileSelect = (file: File) => {
     // Validate file type
@@ -270,7 +444,33 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
 
     setFileName(file.name);
     setFileSize((file.size / 1024 / 1024).toFixed(2));
-    onChange(file);
+
+    setUploading(true)
+    setUploadError(null)
+    // Mark field as "present but uploading" so required validation doesn't falsely fail.
+    onChange({ uploading: true, file_name: file.name, size: file.size, mime_type: file.type })
+    void (async () => {
+      try {
+        const { url, bucket, path, error: upErr } = await uploadFile(file)
+        if (upErr || !url) {
+          setUploadError(upErr || 'Failed to upload file')
+          return
+        }
+        // Store URL in formData so Review + submit can persist it.
+        onChange(url)
+        onUploadComplete?.(field.id, {
+          url,
+          bucket,
+          path,
+          file_name: file.name,
+          mime_type: file.type,
+          size: file.size,
+          created_at: new Date().toISOString(),
+        })
+      } finally {
+        setUploading(false)
+      }
+    })()
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -294,6 +494,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
     setFileName('');
     setFileSize('');
     onChange(null);
+    setUploadError(null)
   };
 
   return (
@@ -351,8 +552,9 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
               e.stopPropagation()
               inputRef.current?.click()
             }}
+            disabled={uploading}
           >
-            Choose File
+            {uploading ? 'Uploading…' : 'Choose File'}
           </Button>
         </div>
       ) : (
@@ -376,6 +578,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
                   onClick={() => {
                     inputRef.current?.click()
                   }}
+                  disabled={uploading}
                 >
                   Change
                 </Button>
@@ -385,6 +588,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
                   size='sm'
                   onClick={removeFile}
                   className='text-red-600 hover:text-red-700'
+                  disabled={uploading}
                 >
                   Remove
                 </Button>
@@ -394,6 +598,9 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
         </Card>
       )}
 
+      {uploadError && (
+        <p className='text-sm text-red-600'>{uploadError}</p>
+      )}
       {error && (
         <p className='text-sm text-red-500'>{error}</p>
       )}

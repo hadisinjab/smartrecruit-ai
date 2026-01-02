@@ -8,6 +8,7 @@ import { unstable_noStore as noStore } from 'next/cache'
 import { Job } from '@/types/admin';
 import { requireAdminOrSuper, requireJobOwnerOrSuper, requireStaff, getSessionInfo } from '@/utils/authz'
 import { logAdminEvent } from '@/actions/activity'
+import { createNotification, getRecipientsForJob } from '@/lib/notifications'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -498,6 +499,29 @@ export async function createJob(formData: any) {
     },
   })
 
+  // Notification: job created (after save only)
+  try {
+    const { recipients, job } = await getRecipientsForJob(data.id)
+    const actionUrl = `/admin/jobs/${data.id}`
+    await Promise.all(
+      recipients.map((userId) =>
+        createNotification({
+          user_id: userId,
+          type: 'job_created',
+          title: 'Job created',
+          content: `A job was created: ${job?.title || formData.title || 'New job'}.`,
+          metadata: {
+            job_id: data.id,
+            job_title: job?.title || formData.title || null,
+            action_url: actionUrl,
+          } as any,
+        })
+      )
+    )
+  } catch (e) {
+    console.error('[notifications] createJob:', e)
+  }
+
   revalidatePath('/admin/jobs')
   return { data }
 }
@@ -619,6 +643,29 @@ export async function updateJob(id: string, formData: any) {
       status: formData.status,
     },
   })
+
+  // Notification: job updated (after save only)
+  try {
+    const { recipients, job } = await getRecipientsForJob(id)
+    const actionUrl = `/admin/jobs/${id}`
+    await Promise.all(
+      recipients.map((userId) =>
+        createNotification({
+          user_id: userId,
+          type: 'job_updated',
+          title: 'Job updated',
+          content: `A job was updated: ${job?.title || formData.title || 'Job'}.`,
+          metadata: {
+            job_id: id,
+            job_title: job?.title || formData.title || null,
+            action_url: actionUrl,
+          } as any,
+        })
+      )
+    )
+  } catch (e) {
+    console.error('[notifications] updateJob:', e)
+  }
 
   revalidatePath('/admin/jobs')
   revalidatePath(`/admin/jobs/${id}`)

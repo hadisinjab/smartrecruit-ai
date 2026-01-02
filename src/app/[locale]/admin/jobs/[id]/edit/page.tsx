@@ -517,16 +517,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                           <Label htmlFor={`req-${field.id}`} className="cursor-pointer">{tCreate('required')}</Label>
                         </div>
 
-                         {/* Page number is auto-assigned based on question type */}
-                         <div className="flex items-center space-x-2">
-                             <Label className="text-sm text-gray-500">
-                               Page: <span className="font-semibold text-gray-700">
-                                 {(field.pageNumber === 3 || field.pageNumber === 4) 
-                                   ? field.pageNumber 
-                                   : (field.type === 'text' || field.type === 'textarea') ? 3 : 4}
-                               </span>
-                             </Label>
-                           </div>
+                         {/* Page number is fixed by question type (hidden) */}
                         
                         {/* Config inputs based on type */}
                         {field.type === 'voice' && (

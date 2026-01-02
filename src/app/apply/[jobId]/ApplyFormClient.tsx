@@ -98,9 +98,12 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       const n = typeof amount === 'number' ? amount : Number(amount)
       if (!Number.isFinite(n)) return null
       try {
-        return new Intl.NumberFormat(undefined, {
+        // Use a deterministic locale to avoid SSR/CSR hydration mismatches.
+        // (Using `undefined` depends on the runtime's default locale, which can differ between server and client.)
+        return new Intl.NumberFormat('en-US', {
           style: 'currency',
           currency: currency || 'USD',
+          currencyDisplay: 'symbol',
           maximumFractionDigits: 0,
         }).format(n)
       } catch {
@@ -274,15 +277,18 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         setApplicationId(started.applicationId)
       }
 
-      // Upload resume if any file-question provided a File
-      let resumeUrl: string | null = null
+      // Ensure file-answers have URLs (FileUploadQuestion uploads immediately, but keep a fallback here)
+      const fileUrlByQuestionId: Record<string, string | null> = {}
       for (const q of allQuestions) {
         if (q.type !== 'file') continue
         const v = data[q.id]
         if (typeof v === 'string' && v) {
-          // Already uploaded by the file question UI
-          resumeUrl = v
-          break
+          fileUrlByQuestionId[q.id] = v
+          continue
+        }
+        if (v && typeof v === 'object' && (v as any).uploading) {
+          setSubmitError('Please wait for file uploads to finish before submitting.')
+          return
         }
         if (v && typeof v === 'object' && v instanceof File) {
           const { url, error } = await uploadResume(v, jobId)
@@ -290,20 +296,29 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
             setSubmitError(error)
             return
           }
-          resumeUrl = url
-          break
+          fileUrlByQuestionId[q.id] = url
+          continue
         }
+        fileUrlByQuestionId[q.id] = null
       }
+
+      // Resume URL: keep using first file question as "resume" for the resumes table (legacy behavior)
+      const firstFileQ = allQuestions.find((q) => q.type === 'file')
+      const resumeUrl = firstFileQ ? (fileUrlByQuestionId[firstFileQ.id] || null) : null
 
       const answers = allQuestions.map((q) => {
         const v = data[q.id]
         if (q.type === 'voice') {
           // VoiceQuestion stores structured JSON after upload (audio_url, duration, etc.)
+          if (v && typeof v === 'object' && (v as any).uploading) {
+            setSubmitError('Please wait for voice uploads to finish before submitting.')
+            throw new Error('voice_upload_pending')
+          }
           return { questionId: q.id, value: null, voiceData: v || null }
         }
         if (q.type === 'file') {
-          // Stored separately as resumeUrl above (MVP)
-          return { questionId: q.id, value: resumeUrl, voiceData: null }
+          // Persist each file answer URL to the DB
+          return { questionId: q.id, value: fileUrlByQuestionId[q.id] || null, voiceData: null }
         }
         return { questionId: q.id, value: v == null ? null : String(v), voiceData: null }
       })

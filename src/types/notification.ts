@@ -5,6 +5,8 @@ export type NotificationType =
   | 'application_completed'
   | 'incomplete_application'
   | 'duplicate_application'
+  | 'job_created'
+  | 'job_updated'
   | 'ai_evaluation_ready'
   | 'interview_scheduled'
   | 'interview_uploaded'

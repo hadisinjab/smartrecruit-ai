@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { MultiStepFormProps, FormData } from '@/types/form';
+import type { MultiStepFormProps, FormData, FormValue } from '@/types/form';
 import { FormStepComponent } from './form-step';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
-type FormValue = string | number | boolean | File | null;
 import { recordProgress } from '@/actions/applications';
 import { AssignmentStep, type AssignmentConfig, type AssignmentData } from '@/components/applicant/AssignmentStep'
 
@@ -70,6 +69,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
     step.fields.forEach(field => {
       const value = formData[field.id];
+
+      // Block navigation while uploads are in progress for this step
+      if ((field.type === 'voice' || field.type === 'file') && value && typeof value === 'object' && (value as any).uploading) {
+        newErrors[field.id] = 'Upload in progress. Please wait…'
+        isValid = false
+        return
+      }
       
       // Check required fields based on type
       if (field.required) {
@@ -252,101 +258,142 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
               onFileUploadComplete={onFileUploadComplete}
             />
           ) : (
-            <div className='w-full max-w-2xl mx-auto bg-white border rounded-lg'>
-              <div className='px-6 pt-6'>
-                <h2 className='text-xl font-semibold text-gray-900'>Review & Submit</h2>
-                <p className='text-sm text-gray-600'>Please review your information before submitting.</p>
-              </div>
-              <div className='p-6 space-y-6'>
-                <div>
-                  <h3 className='text-sm font-medium text-gray-700'>Application Information</h3>
-                  <div className='mt-2 space-y-1 text-sm text-gray-800'>
-                    <p>Name: {String(formData['candidate_name'] || '—')}</p>
-                    <p>Email: {String(formData['candidate_email'] || '—')}</p>
-                  </div>
+            <div className='w-full max-w-3xl mx-auto space-y-6'>
+              <div className='bg-white border rounded-xl shadow-sm'>
+                <div className='px-6 pt-6'>
+                  <h2 className='text-xl font-semibold text-gray-900'>Review & Submit</h2>
+                  <p className='text-sm text-gray-600'>Please review your information before submitting.</p>
                 </div>
-                <div>
-                  <h3 className='text-sm font-medium text-gray-700'>Text Answers</h3>
-                  <div className='mt-2 space-y-2'>
-                    {steps
-                      .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
-                      .flatMap(s => s.fields)
-                      .filter(f => ['text', 'textarea', 'number', 'select'].includes(f.type))
-                      .map((f) => (
-                        <div key={f.id} className='text-sm'>
-                          <p className='text-gray-500'>{f.label}</p>
-                          <p className='text-gray-900'>{formData[f.id] != null && formData[f.id] !== '' ? String(formData[f.id]) : '—'}</p>
+                <div className='p-6 space-y-6'>
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    <div className='rounded-lg border bg-gray-50 p-4'>
+                      <h3 className='text-sm font-semibold text-gray-800'>Applicant</h3>
+                      <dl className='mt-3 space-y-2 text-sm'>
+                        <div className='flex items-start justify-between gap-3'>
+                          <dt className='text-gray-500'>Name</dt>
+                          <dd className='text-gray-900 font-medium text-right'>{String(formData['candidate_name'] || '—')}</dd>
                         </div>
-                      ))}
-                  </div>
-                </div>
-                <div>
-                  <h3 className='text-sm font-medium text-gray-700'>Media & Links</h3>
-                  <div className='mt-2 space-y-2'>
-                    {steps
-                      .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
-                      .flatMap(s => s.fields)
-                      .filter(f => ['voice', 'file', 'url'].includes(f.type))
-                      .map((f) => {
-                        const v = formData[f.id]
-                        const isFile = v && typeof v === 'object' && 'name' in (v as any)
-                        const isUrl = typeof v === 'string' && /^https?:\/\//i.test(v)
-                        return (
-                          <div key={f.id} className='text-sm'>
-                            <p className='text-gray-500'>{f.label}</p>
-                            {f.type === 'voice' ? (
-                              <p className='text-gray-900'>{v ? 'Voice response recorded' : '—'}</p>
-                            ) : f.type === 'file' ? (
-                              v ? (
-                                <p className='text-gray-900'>{isFile ? (v as any).name : String(v)}</p>
-                              ) : (
-                                <p className='text-gray-900'>—</p>
-                              )
-                            ) : f.type === 'url' ? (
-                              v ? (
-                                isUrl ? (
-                                  <a href={String(v)} target='_blank' rel='noopener noreferrer' className='text-blue-600 hover:underline'>
-                                    {String(v)}
-                                  </a>
-                                ) : (
-                                  <p className='text-gray-900'>{String(v)}</p>
-                                )
-                              ) : (
-                                <p className='text-gray-900'>—</p>
-                              )
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                  </div>
-                </div>
-                {assignmentData && (
-                  <div>
-                    <h3 className='text-sm font-medium text-gray-700'>Assignment</h3>
-                    <div className='mt-2 space-y-2 text-sm text-gray-800'>
-                      <p className='text-gray-500'>Text</p>
-                      <p className='text-gray-900 whitespace-pre-wrap'>{assignmentData.text_fields || '—'}</p>
-                      {assignmentData.link_fields?.length > 0 && (
-                        <div className='pt-2'>
-                          <p className='text-gray-500'>Links</p>
-                          <div className='mt-1 space-y-1'>
-                            {assignmentData.link_fields.map((l) => (
-                              <a
-                                key={l}
-                                href={l}
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                className='text-blue-600 hover:underline break-all'
-                              >
-                                {l}
-                              </a>
-                            ))}
-                          </div>
+                        <div className='flex items-start justify-between gap-3'>
+                          <dt className='text-gray-500'>Email</dt>
+                          <dd className='text-gray-900 font-medium text-right break-all'>{String(formData['candidate_email'] || '—')}</dd>
                         </div>
-                      )}
+                      </dl>
+                    </div>
+                    <div className='rounded-lg border bg-gray-50 p-4'>
+                      <h3 className='text-sm font-semibold text-gray-800'>Summary</h3>
+                      <p className='mt-3 text-sm text-gray-600'>
+                        Check your answers below. You can go back to edit anything before submitting.
+                      </p>
                     </div>
                   </div>
-                )}
+
+                  <div className='rounded-xl border bg-white'>
+                    <div className='border-b px-4 py-3'>
+                      <h3 className='text-sm font-semibold text-gray-800'>Text Answers</h3>
+                    </div>
+                    <div className='p-4 space-y-4'>
+                      {steps
+                        .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
+                        .flatMap(s => s.fields)
+                        .filter(f => ['text', 'textarea', 'number', 'select'].includes(f.type))
+                        .map((f) => (
+                          <div key={f.id} className='rounded-lg border bg-gray-50 p-4'>
+                            <p className='text-xs font-medium text-gray-500'>{f.label}</p>
+                            <p className='mt-2 text-sm text-gray-900 whitespace-pre-wrap'>
+                              {formData[f.id] != null && formData[f.id] !== '' ? String(formData[f.id]) : '—'}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  <div className='rounded-xl border bg-white'>
+                    <div className='border-b px-4 py-3'>
+                      <h3 className='text-sm font-semibold text-gray-800'>Media, Files & Links</h3>
+                    </div>
+                    <div className='p-4 space-y-4'>
+                      {steps
+                        .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
+                        .flatMap(s => s.fields)
+                        .filter(f => ['voice', 'file', 'url'].includes(f.type))
+                        .map((f) => {
+                          const v = formData[f.id]
+                          const isUrl = typeof v === 'string' && /^https?:\/\//i.test(v)
+                          const voiceUrl =
+                            v && typeof v === 'object' ? ((v as any).audio_url || (v as any).url || null) : null
+                          const fileUrl = typeof v === 'string' ? v : null
+                          const fileName = v && typeof v === 'object' && 'name' in (v as any) ? String((v as any).name) : null
+
+                          return (
+                            <div key={f.id} className='rounded-lg border bg-gray-50 p-4'>
+                              <p className='text-xs font-medium text-gray-500'>{f.label}</p>
+                              <div className='mt-3'>
+                                {f.type === 'voice' ? (
+                                  voiceUrl ? (
+                                    <audio controls src={voiceUrl} className='w-full' />
+                                  ) : (
+                                    <p className='text-sm text-gray-700'>—</p>
+                                  )
+                                ) : f.type === 'file' ? (
+                                  fileUrl ? (
+                                    <a href={fileUrl} target='_blank' rel='noopener noreferrer' className='text-sm text-blue-700 hover:underline break-all'>
+                                      {fileName || fileUrl}
+                                    </a>
+                                  ) : (
+                                    <p className='text-sm text-gray-700'>—</p>
+                                  )
+                                ) : f.type === 'url' ? (
+                                  v ? (
+                                    isUrl ? (
+                                      <a href={String(v)} target='_blank' rel='noopener noreferrer' className='text-sm text-blue-700 hover:underline break-all'>
+                                        {String(v)}
+                                      </a>
+                                    ) : (
+                                      <p className='text-sm text-gray-900 break-all'>{String(v)}</p>
+                                    )
+                                  ) : (
+                                    <p className='text-sm text-gray-700'>—</p>
+                                  )
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+
+                  {assignmentData && (
+                    <div className='rounded-xl border bg-white'>
+                      <div className='border-b px-4 py-3'>
+                        <h3 className='text-sm font-semibold text-gray-800'>Assignment</h3>
+                      </div>
+                      <div className='p-4 space-y-4'>
+                        <div className='rounded-lg border bg-gray-50 p-4'>
+                          <p className='text-xs font-medium text-gray-500'>Text</p>
+                          <p className='mt-2 text-sm text-gray-900 whitespace-pre-wrap'>{assignmentData.text_fields || '—'}</p>
+                        </div>
+                        {assignmentData.link_fields?.length > 0 && (
+                          <div className='rounded-lg border bg-gray-50 p-4'>
+                            <p className='text-xs font-medium text-gray-500'>Links</p>
+                            <div className='mt-2 space-y-2'>
+                              {assignmentData.link_fields.map((l) => (
+                                <a
+                                  key={l}
+                                  href={l}
+                                  target='_blank'
+                                  rel='noopener noreferrer'
+                                  className='block text-sm text-blue-700 hover:underline break-all'
+                                >
+                                  {l}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

@@ -16,6 +16,8 @@ const TYPES: Array<{ value: 'all' | NotificationType; label: string }> = [
   { value: 'application_completed', label: 'Application completed' },
   { value: 'incomplete_application', label: 'Incomplete application' },
   { value: 'duplicate_application', label: 'Duplicate application' },
+  { value: 'job_created', label: 'Job created' },
+  { value: 'job_updated', label: 'Job updated' },
   { value: 'ai_evaluation_ready', label: 'AI evaluation ready' },
   { value: 'interview_scheduled', label: 'Interview scheduled' },
   { value: 'interview_uploaded', label: 'Interview uploaded' },

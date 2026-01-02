@@ -465,19 +465,33 @@ export default function CandidateDetailsPage() {
                           ) : (
                             <p className='text-sm text-gray-700'>Voice response recorded</p>
                           )
-                        ) : ans.type === 'file' || ans.isUrl ? (
+                        ) : ans.type === 'file' ? (
                           ans.value ? (
                             <a
                               href={ans.value}
                               target='_blank'
                               rel='noopener noreferrer'
-                              className='inline-flex items-center space-x-2 text-blue-600 hover:underline'
+                              className='inline-flex items-center space-x-2 text-blue-600 hover:underline break-all'
                             >
                               <FileText className='w-4 h-4' />
                               <span>{ans.fileName || 'Download file'}</span>
                             </a>
                           ) : (
                             <span className='text-sm text-gray-500'>No file provided</span>
+                          )
+                        ) : ans.type === 'url' || ans.isUrl ? (
+                          ans.value ? (
+                            <a
+                              href={ans.value}
+                              target='_blank'
+                              rel='noopener noreferrer'
+                              className='inline-flex items-center space-x-2 text-blue-600 hover:underline break-all'
+                            >
+                              <Globe className='w-4 h-4' />
+                              <span>{ans.value}</span>
+                            </a>
+                          ) : (
+                            <span className='text-sm text-gray-500'>No link provided</span>
                           )
                         ) : (
                           <p className='text-sm text-gray-700'>{ans.value || '—'}</p>

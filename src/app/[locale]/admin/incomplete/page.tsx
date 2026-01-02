@@ -8,7 +8,9 @@ import { Card } from '@/components/ui/admin-card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getIncompleteApplications } from '@/actions/incomplete';
+import { getJobs } from '@/actions/jobs';
 import { IncompleteApplication } from '@/types/admin';
+import type { Job } from '@/types/admin';
 import {
   Search,
   Mail,
@@ -29,17 +31,19 @@ export default function IncompleteApplicationsPage() {
   const { addToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [jobFilter, setJobFilter] = useState('all');
+  const [jobFilter, setJobFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [progressFilter, setProgressFilter] = useState('all');
   const [incompleteApps, setIncompleteApps] = useState<IncompleteApplication[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await getIncompleteApplications();
-        setIncompleteApps(data);
+        const [apps, jobsList] = await Promise.all([getIncompleteApplications(), getJobs()]);
+        setIncompleteApps(apps);
+        setJobs(jobsList);
       } catch (error) {
         console.error('Failed to load incomplete applications:', error);
         addToast('error', 'Failed to load incomplete applications');
@@ -58,7 +62,7 @@ export default function IncompleteApplicationsPage() {
       app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       app.position.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesJob = jobFilter === 'all' || app.position.toLowerCase().includes(jobFilter.toLowerCase());
+    const matchesJob = jobFilter === 'all' || (app as any).jobFormId === jobFilter;
     
     // Date filtering
     const appDate = new Date(app.appliedDate);
@@ -210,11 +214,6 @@ export default function IncompleteApplicationsPage() {
     },
   ];
 
-  const getUniqueJobs = () => {
-    const jobs = [...new Set(incompleteApps.map(app => app.position))];
-    return jobs;
-  };
-
   const stats = {
     total: incompleteApps.length,
     lowProgress: incompleteApps.filter(app => app.completionPercentage < 50).length,
@@ -283,8 +282,8 @@ export default function IncompleteApplicationsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('filters.allJobs')}</SelectItem>
-                {getUniqueJobs().map(job => (
-                  <SelectItem key={job} value={job}>{job}</SelectItem>
+                {jobs.map((job) => (
+                  <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

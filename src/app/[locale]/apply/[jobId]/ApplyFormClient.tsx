@@ -98,9 +98,11 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       const n = typeof amount === 'number' ? amount : Number(amount)
       if (!Number.isFinite(n)) return null
       try {
-        return new Intl.NumberFormat(undefined, {
+        // Use a deterministic locale to avoid SSR/CSR hydration mismatches.
+        return new Intl.NumberFormat('en-US', {
           style: 'currency',
           currency: currency || 'USD',
+          currencyDisplay: 'symbol',
           maximumFractionDigits: 0,
         }).format(n)
       } catch {

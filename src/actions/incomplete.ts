@@ -133,6 +133,7 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
 
     return {
       id: app.id,
+      jobFormId: app.job_form_id,
       firstName: app.candidate_name?.split(' ')[0] || 'Unknown',
       lastName: app.candidate_name?.split(' ').slice(1).join(' ') || '',
       email: app.candidate_email || '',

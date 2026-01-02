@@ -37,6 +37,7 @@ export interface Job {
 
 export interface Candidate {
   id: string;
+  jobFormId?: string;
   submittedAt?: string | null;
   isDuplicate?: boolean;
   lastProgressStep?: string;

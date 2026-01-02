@@ -22,7 +22,7 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
   const tRole = useTranslations('Role');
   const router = useRouter();
   const { addToast } = useToast();
-  const { isSuperAdmin, isAdmin } = useUser();
+  const { isSuperAdmin, isAdmin, isReviewer, isLoading: isUserLoading } = useUser();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -56,6 +56,13 @@ export default function EditUserPage({ params }: { params: { id: string } }) {
     }
     loadUser();
   }, [userId, isAdmin, router, addToast]);
+
+  // Block reviewer from accessing User Management even via direct URL.
+  useEffect(() => {
+    if (!isUserLoading && isReviewer) {
+      router.push('/admin/dashboard')
+    }
+  }, [isReviewer, isUserLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

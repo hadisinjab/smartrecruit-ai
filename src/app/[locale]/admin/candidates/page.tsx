@@ -6,13 +6,12 @@ import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { FilterPanel } from '@/components/admin/FilterPanel';
 import { DataTable, Column } from '@/components/admin/DataTable';
 import { Card } from '@/components/ui/admin-card';
 import { getCandidates } from '@/actions/candidates';
 import { getJobs } from '@/actions/jobs';
 import { Candidate, Job } from '@/types/admin';
-import { Filter, Plus, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/context/ToastContext';
 import { exportToCSV } from '@/utils/exportUtils';
@@ -37,14 +36,7 @@ export default function CandidatesPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
-    status: [],
-    department: [],
-    location: [],
-    experience: { min: 0, max: 20 }
-  });
   const router = useRouter();
 
   // Support deep-linking: /admin/candidates?jobId=<id>
@@ -84,12 +76,7 @@ export default function CandidatesPage() {
     loadCandidates();
   }, [addToast, selectedJobId]);
 
-  const handleFiltersChange = (newFilters: any) => {
-    setFilters(newFilters);
-    applyFilters(searchTerm, newFilters);
-  };
-
-  const applyFilters = (search: string, currentFilters: any) => {
+  const applyFilters = (search: string) => {
     let filtered = [...candidates];
 
     // Apply search
@@ -102,25 +89,12 @@ export default function CandidatesPage() {
       );
     }
 
-    // Apply status filter
-    if (currentFilters.status.length > 0) {
-      filtered = filtered.filter(candidate =>
-        currentFilters.status.includes(candidate.status)
-      );
-    }
-
-    // Apply experience filter
-    filtered = filtered.filter(candidate =>
-      candidate.experience >= currentFilters.experience.min &&
-      candidate.experience <= currentFilters.experience.max
-    );
-
     setFilteredCandidates(filtered);
   };
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    applyFilters(value, filters);
+    applyFilters(value);
   };
 
   const getStatusColor = (status: string) => {
@@ -301,14 +275,6 @@ export default function CandidatesPage() {
             <div className='flex gap-2 w-full md:w-auto'>
               <Button
                 variant='outline'
-                onClick={() => setShowFilters(!showFilters)}
-                className='flex items-center gap-2 w-full md:w-auto'
-              >
-                <Filter className='w-4 h-4' />
-                {t('filters')}
-              </Button>
-              <Button
-                variant='outline'
                 onClick={() => exportToCSV(filteredCandidates, 'candidates')}
                 className='flex items-center gap-2 w-full md:w-auto'
               >
@@ -323,7 +289,7 @@ export default function CandidatesPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-blue-600'>
-                {candidates.filter(c => c.status === 'applied').length}
+                {candidates.filter(c => c.status === 'new' || c.status === 'duplicate').length}
               </p>
               <p className='text-sm text-gray-600'>{t('stats.newApplications')}</p>
             </div>
@@ -331,7 +297,11 @@ export default function CandidatesPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-yellow-600'>
-                {candidates.filter(c => c.status === 'screening').length}
+                {candidates.filter(c => {
+                  if (c.status === 'screening') return true
+                  const next = String((c as any)?.hrFields?.nextAction || '').toLowerCase()
+                  return next === 'screening'
+                }).length}
               </p>
               <p className='text-sm text-gray-600'>{t('stats.inScreening')}</p>
             </div>
@@ -339,7 +309,11 @@ export default function CandidatesPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-purple-600'>
-                {candidates.filter(c => c.status === 'interview').length}
+                {candidates.filter(c => {
+                  if (c.status === 'interview') return true
+                  const next = String((c as any)?.hrFields?.nextAction || '').toLowerCase()
+                  return next === 'interview'
+                }).length}
               </p>
               <p className='text-sm text-gray-600'>{t('stats.inInterview')}</p>
             </div>
@@ -347,7 +321,11 @@ export default function CandidatesPage() {
           <Card className='p-4'>
             <div className='text-center'>
               <p className='text-2xl font-bold text-green-600'>
-                {candidates.filter(c => c.status === 'offer').length}
+                {candidates.filter(c => {
+                  if (c.status === 'offer') return true
+                  const next = String((c as any)?.hrFields?.nextAction || '').toLowerCase()
+                  return next === 'offer'
+                }).length}
               </p>
               <p className='text-sm text-gray-600'>{t('stats.offersMade')}</p>
             </div>
@@ -362,13 +340,6 @@ export default function CandidatesPage() {
           emptyText={tCommon('search')}
         />
 
-        {/* Filter Panel */}
-        <FilterPanel
-          isOpen={showFilters}
-          onClose={() => setShowFilters(false)}
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-        />
       </div>
     </AdminLayout>
   );

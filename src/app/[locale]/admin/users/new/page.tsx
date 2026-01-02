@@ -20,7 +20,7 @@ export default function NewUserPage() {
   const tRole = useTranslations('Role');
   const router = useRouter();
   const { addToast } = useToast();
-  const { isSuperAdmin, isAdmin } = useUser();
+  const { isSuperAdmin, isAdmin, isReviewer, isLoading: isUserLoading } = useUser();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -29,6 +29,13 @@ export default function NewUserPage() {
   const [organizationName, setOrganizationName] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Block reviewer from accessing User Management even via direct URL.
+  React.useEffect(() => {
+    if (!isUserLoading && isReviewer) {
+      router.push('/admin/dashboard')
+    }
+  }, [isReviewer, isUserLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

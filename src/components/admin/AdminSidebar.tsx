@@ -101,7 +101,8 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         icon: <UserCog className='w-5 h-5' />,
         label: t('userManagement'),
         href: '/admin/users',
-        allowedRoles: ['admin', 'super-admin', 'reviewer'] as const
+        // Reviewer must not see or access user management.
+        allowedRoles: ['admin', 'super-admin'] as const
       },
       {
         icon: <Activity className='w-5 h-5' />,
@@ -179,14 +180,6 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         </div>
         
         {/* Role indicator for restricted access */}
-        {userRole === 'reviewer' && (
-          <div className='mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg'>
-            <div className='flex items-center space-x-2'>
-              <AlertCircle className='w-4 h-4 text-yellow-600' />
-              <span className='text-xs text-yellow-800'>Read-only access</span>
-            </div>
-          </div>
-        )}
         
         <button
           className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'
