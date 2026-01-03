@@ -334,3 +334,50 @@ When implementing in your Next.js project:
 3. **Configure Tailwind CSS** with the provided configuration
 
 This implementation provides a solid foundation for a hiring platform's application form, with clean architecture and room for future enhancements.
+ 
+## ✅ Setup Validation (Windows)
+ 
+Use this checklist to confirm the environment is healthy. No functional code is required.
+ 
+1) Python AI Server (venv)
+- PowerShell:
+  ```powershell
+  cd "C:\project\New folder\2\smartrecruit-ai\ai-server"
+  if (Test-Path .venv) { .\.venv\Scripts\Activate.ps1 }
+  python --version
+  python -m pip list
+  python -c "import flask, faster_whisper, whisper; print('AI deps OK')"
+  ```
+- CMD:
+  ```bat
+  cd "C:\project\New folder\2\smartrecruit-ai\ai-server"
+  .\.venv\Scripts\activate.bat
+  python --version
+  pip list
+  python -c "import flask, faster_whisper, whisper; print('AI deps OK')"
+  ```
+- Optional checks:
+  ```powershell
+  ffmpeg -version
+  python -c "import torch; import torchaudio; import torchvision; print('Torch OK')"
+  ```
+ 
+2) Node.js Backend
+```powershell
+cd "C:\project\New folder\2\smartrecruit-ai\backend"
+npm ls --depth=0
+```
+ 
+3) Ollama
+```powershell
+ollama --version
+ollama list
+```
+ 
+Tips:
+- Prefer Python 3.12 for Whisper/Faster-Whisper; avoid using `py` if it selects 3.14.
+- Activate the venv before running any `python`/`pip` commands.
+- If PowerShell blocks script activation, run:
+  ```powershell
+  Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+  ```
