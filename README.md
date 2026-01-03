@@ -109,7 +109,10 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-> Note: `openai-whisper` / `faster-whisper` can be **heavy** and may require **FFmpeg** and a compatible **PyTorch** installation depending on your environment.
+> Important: For `openai-whisper` / `faster-whisper`, use **Python 3.10–3.12**.  
+> Python **3.14** is very new and may fail to install Whisper dependencies.
+>
+> Also note: these packages can be **heavy** and may require **FFmpeg** and a compatible **PyTorch** installation depending on your environment.
 
 ### 3) Ollama Setup
 
