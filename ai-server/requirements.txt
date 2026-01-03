@@ -1,0 +1,9 @@
+flask==3.1.0
+flask-cors==5.0.0
+python-dotenv==1.0.1
+
+# Speech-to-text (note: these can be heavy and may require FFmpeg + a compatible PyTorch build)
+openai-whisper==20240930
+faster-whisper==1.1.1
+
+

@@ -1,0 +1,25 @@
+{
+  "name": "smartrecruit-ai-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend dependencies for SmartRecruit AI (setup only; no functional server code yet).",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "mammoth": "^1.8.0",
+    "multer": "^1.4.5-lts.1",
+    "ollama": "^0.5.14",
+    "pdf-parse": "^1.1.1",
+    "puppeteer": "^23.8.0"
+  }
+}
+
+

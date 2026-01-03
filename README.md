@@ -62,6 +62,70 @@ src/
 3. **Open your browser:**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
+## 🤖 AI Platform Setup (Dependencies Only — No Functional AI Code Yet)
+
+This repo now includes **two additional folders** for the AI-powered hiring platform setup:
+
+- `backend/` — Node.js backend dependencies (Express + parsing + Ollama client + Supabase client)
+- `ai-server/` — Python AI service dependencies (Flask + Whisper packages)
+
+### 1) Node.js Backend (`backend/`)
+
+**Installed dependencies (in `backend/package.json`):**
+- `express`
+- `multer`
+- `pdf-parse`
+- `mammoth`
+- `puppeteer`
+- `ollama`
+- `@supabase/supabase-js`
+- `axios`
+- `cors`
+- `dotenv`
+
+**Install:**
+```bash
+cd backend
+npm install
+```
+
+### 2) Python AI Server (`ai-server/`)
+
+**Pinned dependencies (in `ai-server/requirements.txt`):**
+- `flask`
+- `flask-cors`
+- `python-dotenv`
+- `openai-whisper`
+- `faster-whisper`
+
+**Install (recommended via venv):**
+```bash
+cd ai-server
+python -m venv .venv
+
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt
+```
+
+> Note: `openai-whisper` / `faster-whisper` can be **heavy** and may require **FFmpeg** and a compatible **PyTorch** installation depending on your environment.
+
+### 3) Ollama Setup
+
+**Install Ollama:**
+- Download and install from: `https://ollama.com/download`
+
+**Pull model:**
+```bash
+ollama pull llama3.2:3b
+```
+
+**Verify:**
+```bash
+ollama list
+```
+
 ## 🎯 How Components Connect
 
 ### 1. **Page Component** (`src/app/page.tsx`)
