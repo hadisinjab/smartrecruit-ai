@@ -1,7 +1,7 @@
 /**
  * دوال عامة للتعامل مع Ollama: توليد نص وتوليد JSON باستخدام النموذج المحدد.
  */
-import { generate } from 'ollama';
+import ollama from 'ollama';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
@@ -17,7 +17,7 @@ export async function generateText(prompt, options = {}) {
     throw Object.assign(new Error('Prompt غير صالح'), { status: 400 });
   }
   try {
-    const res = await generate({
+    const res = await ollama.generate({
       host: OLLAMA_HOST,
       model: OLLAMA_MODEL,
       prompt,
@@ -50,7 +50,7 @@ export async function generateJSON(prompt, options = {}) {
     throw Object.assign(new Error('Prompt غير صالح'), { status: 400 });
   }
   try {
-    const res = await generate({
+    const res = await ollama.generate({
       host: OLLAMA_HOST,
       model: OLLAMA_MODEL,
       prompt,
@@ -74,4 +74,3 @@ export async function generateJSON(prompt, options = {}) {
     throw err;
   }
 }
-
