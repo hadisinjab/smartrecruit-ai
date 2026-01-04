@@ -15,34 +15,33 @@ def _ollama_endpoint() -> str:
     return f"{host}/api/generate"
 
 
-AR_PROMPT = """أنت مساعد متخصص في تحسين النصوص العربية المفرّغة من الصوت.
-
-المهمة: حسّن النص التالي مع الحفاظ على:
-- المعنى الأصلي بالكامل
-- المصطلحات التقنية الإنجليزية كما هي
-- السياق والترتيب
-
-قم بـ:
-- إضافة علامات الترقيم المناسبة
-- إزالة التكرار والحشو (يعني، اممم، آآ)
-- تصحيح الأخطاء الإملائية البسيطة
-- تحسين التنسيق والوضوح
-
-أخرج النص المحسّن فقط بدون أي إضافات:
-
-النص الخام:
-{text}
-"""
-
-
 def refine_with_ollama(text: str, temperature: float = 0.2, max_tokens: int = 512) -> str:
     """
-    Refine raw transcript using Ollama with Arabic prompt. On failure, return original text.
+    Refine raw transcript using Ollama with English prompt. On failure, return original text.
     """
     model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+    normalized = normalize_text(text)
+    prompt = f"""You are a text refinement assistant specialized in cleaning up voice transcriptions.
+
+Task: Improve the following transcribed text while preserving:
+- The original meaning completely
+- Technical terms as they are
+- Context and sequence
+
+Please:
+- Add appropriate punctuation
+- Remove repetitions and filler words (um, uh, you know, etc.)
+- Fix minor spelling errors
+- Improve formatting and clarity
+- Keep the same language as the input
+
+Output ONLY the refined text with no additional comments:
+
+Raw text:
+{normalized}"""
     payload = {
         "model": model,
-        "prompt": AR_PROMPT.format(text=normalize_text(text)),
+        "prompt": prompt,
         "options": {
             "temperature": temperature,
             "num_predict": max_tokens,

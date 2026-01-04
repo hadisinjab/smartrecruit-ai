@@ -6,14 +6,13 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DEFAULT_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'resumes';
+const HAS_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn(
-    'تحذير: متغيرات Supabase غير مكتملة (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY)'
-  );
+if (!HAS_SUPABASE) {
+  console.warn('Warning: Supabase variables are incomplete (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY)');
 }
 
-export const supabase = createClient(SUPABASE_URL || '', SUPABASE_SERVICE_ROLE_KEY || '');
+export const supabase = HAS_SUPABASE ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) : null;
 
 /**
  * رفع ملف إلى التخزين.
@@ -24,6 +23,7 @@ export const supabase = createClient(SUPABASE_URL || '', SUPABASE_SERVICE_ROLE_K
  * @returns {Promise<{path: string}>}
  */
 export async function storageUpload(bucket = DEFAULT_BUCKET, filePath, body, options = {}) {
+  if (!supabase) throw Object.assign(new Error('Supabase not configured'), { status: 500 });
   const { data, error } = await supabase.storage
     .from(bucket)
     .upload(filePath, body, {
@@ -43,6 +43,7 @@ export async function storageUpload(bucket = DEFAULT_BUCKET, filePath, body, opt
  * @returns {Promise<Buffer>}
  */
 export async function storageDownload(bucket = DEFAULT_BUCKET, filePath) {
+  if (!supabase) throw Object.assign(new Error('Supabase not configured'), { status: 500 });
   const { data, error } = await supabase.storage.from(bucket).download(filePath);
   if (error) {
     throw Object.assign(new Error(error.message), { status: 404 });
@@ -63,6 +64,7 @@ export async function storageDownload(bucket = DEFAULT_BUCKET, filePath) {
  * @returns {Promise<void>}
  */
 export async function storageRemove(bucket = DEFAULT_BUCKET, filePath) {
+  if (!supabase) throw Object.assign(new Error('Supabase not configured'), { status: 500 });
   const files = Array.isArray(filePath) ? filePath : [filePath];
   const { error } = await supabase.storage.from(bucket).remove(files);
   if (error) {
@@ -77,6 +79,7 @@ export async function storageRemove(bucket = DEFAULT_BUCKET, filePath) {
  * @param {Record<string, any>} [match]
  */
 export async function dbSelect(table, columns = '*', match = {}) {
+  if (!supabase) throw Object.assign(new Error('Supabase not configured'), { status: 500 });
   let query = supabase.from(table).select(columns);
   if (match && Object.keys(match).length) {
     query = query.match(match);
@@ -92,6 +95,7 @@ export async function dbSelect(table, columns = '*', match = {}) {
  * @param {Record<string, any>|Record<string, any>[]} payload
  */
 export async function dbInsert(table, payload) {
+  if (!supabase) throw Object.assign(new Error('Supabase not configured'), { status: 500 });
   const { data, error } = await supabase.from(table).insert(payload).select();
   if (error) throw Object.assign(new Error(error.message), { status: 500 });
   return data;
@@ -104,6 +108,7 @@ export async function dbInsert(table, payload) {
  * @param {Record<string, any>} payload
  */
 export async function dbUpdate(table, match, payload) {
+  if (!supabase) throw Object.assign(new Error('Supabase not configured'), { status: 500 });
   const { data, error } = await supabase.from(table).update(payload).match(match).select();
   if (error) throw Object.assign(new Error(error.message), { status: 500 });
   return data;
@@ -115,8 +120,8 @@ export async function dbUpdate(table, match, payload) {
  * @param {Record<string, any>} match
  */
 export async function dbDelete(table, match) {
+  if (!supabase) throw Object.assign(new Error('Supabase not configured'), { status: 500 });
   const { data, error } = await supabase.from(table).delete().match(match).select();
   if (error) throw Object.assign(new Error(error.message), { status: 500 });
   return data;
 }
-

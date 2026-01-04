@@ -84,7 +84,7 @@ def api_transcribe() -> Any:
 
     file = request.files.get("audio")
     if not file:
-        return jsonify({"error": True, "message": "Missing 'audio' file"}), 400
+        return jsonify({"error": True, "message": "No audio file provided"}), 400
 
     # Validate size
     max_size = int(os.getenv("MAX_AUDIO_SIZE", str(50 * 1024 * 1024)))
@@ -94,9 +94,11 @@ def api_transcribe() -> Any:
     if size > max_size:
         return jsonify({"error": True, "message": "Audio file too large"}), 413
 
-    # Validate mimetype
+    # Validate mimetype/extension
     ctype = file.mimetype or mimetypes.guess_type(file.filename)[0] or ""
-    if not ctype.startswith("audio/"):
+    ext = os.path.splitext(file.filename)[1].lower()
+    allowed_ext = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".webm"}
+    if not (ctype.startswith("audio/") or ext in allowed_ext):
         return jsonify({"error": True, "message": "Invalid audio file type"}), 415
 
     # Save to temp uploads

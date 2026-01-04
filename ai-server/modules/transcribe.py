@@ -7,19 +7,21 @@ from typing import Dict, Any, Optional, List, TypedDict
 
 from .utils import LOGGER
 
-try:
-    from faster_whisper import WhisperModel  # type: ignore
-    HAS_FASTER = True
-except Exception:  # pragma: no cover
-    HAS_FASTER = False
-    WhisperModel = None  # type: ignore
+def _get_faster_model():
+    try:
+        from faster_whisper import WhisperModel  # type: ignore
+        return WhisperModel
+    except Exception as e:  # pragma: no cover
+        LOGGER.debug(f"faster-whisper import failed: {e}")
+        return None
 
-try:
-    import whisper  # type: ignore
-    HAS_WHISPER = True
-except Exception:  # pragma: no cover
-    HAS_WHISPER = False
-    whisper = None  # type: ignore
+def _get_whisper_module():
+    try:
+        import whisper  # type: ignore
+        return whisper
+    except Exception as e:  # pragma: no cover
+        LOGGER.debug(f"openai-whisper import failed: {e}")
+        return None
 
 
 class Segment(TypedDict):
@@ -49,7 +51,8 @@ def transcribe_audio(file_path: str, model_name: Optional[str] = None) -> Dict[s
     segments_out: List[Segment] = []
     detected_language: Optional[str] = None
 
-    if HAS_FASTER:
+    WhisperModel = _get_faster_model()
+    if WhisperModel is not None:
         try:
             model = WhisperModel(model_name, device="auto")
             segments, info = model.transcribe(
@@ -82,7 +85,8 @@ def transcribe_audio(file_path: str, model_name: Optional[str] = None) -> Dict[s
             LOGGER.error(f"faster-whisper error: {e}")
             # fall through to whisper backend
 
-    if HAS_WHISPER:
+    whisper = _get_whisper_module()
+    if whisper is not None:
         try:
             mdl = whisper.load_model(model_name)
             result = mdl.transcribe(

@@ -1,11 +1,11 @@
 # AI Server (Flask)
 
-## المتطلبات
+## Requirements
 - Python 3.10+
-- إنشاء ملف البيئة `ai-server/.env` (انسخ من `.env.example`)
+- Create environment file `ai-server/.env` (copy from `.env.example`)
 
-## الإعداد
-1. إنشاء بيئة افتراضية وتثبيت الاعتمادات:
+## Setup
+1. Create a virtual environment and install dependencies:
    ```bash
    cd ai-server
    python -m venv .venv
@@ -15,26 +15,26 @@
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
-2. إنشاء ملف البيئة:
+2. Create environment file:
    ```bash
    cp .env.example .env
-   # ثم عدّل القيم حسب بيئتك
+   # Then edit values according to your environment
    ```
 
-## التشغيل
+## Run
 ```bash
 python server.py
 ```
 
-## نقاط النهاية
-- `GET /health` فحص الصحة.
-- جميع المسارات الأخرى تتطلب مفتاح API عبر الرأس `x-api-key` أو `Authorization: Bearer <key>`.
+## Endpoints
+- `GET /health` health check
+- All other routes require API key via header `x-api-key` or `Authorization: Bearer <key>`.
 
-### تحويل الصوت إلى نص
+### Voice Transcription
 - `POST /api/transcribe`
-  - الحقول:
-    - ملف `audio` (multipart/form-data)
-  - الاستجابة:
+  - Fields:
+    - `audio` file (multipart/form-data)
+  - Response:
     ```json
     {
       "success": true,
@@ -52,7 +52,7 @@ python server.py
     }
     ```
 
-## ملاحظات
-- إذا كنت تستخدم Ollama محليًا، تأكد من تشغيله وإعداد `OLLAMA_HOST` و`OLLAMA_MODEL` في ملف البيئة.
-- تأكد من تثبيت FFmpeg ليعمل التفريغ الصوتي.
-- يحتاج faster-whisper إلى نماذج مناسبة وبيئة متوافقة، وقد يتطلب CUDA/ONNXRuntime للأداء الأفضل.
+## Notes
+- If using Ollama locally, ensure it's running and set `OLLAMA_HOST` and `OLLAMA_MODEL` in environment.
+- Ensure FFmpeg is installed for audio processing.
+- faster-whisper may require suitable models and environment; CUDA/ONNXRuntime improves performance.

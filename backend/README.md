@@ -1,43 +1,43 @@
 # Backend (Node.js/Express)
 
-## المتطلبات
+## Requirements
 - Node.js 18+
-- إعداد ملف البيئة `backend/.env` (انسخ من `.env.example`)
+- Environment file `backend/.env` (copy from `.env.example`)
 
-## الإعداد
-1. تثبيت الاعتمادات:
+## Setup
+1. Install dependencies:
    ```bash
    cd backend
    npm install
    ```
-2. إنشاء ملف البيئة:
+2. Create environment file:
    ```bash
    cp .env.example .env
-   # ثم عدّل القيم حسب بيئتك
+   # Then edit values according to your environment
    ```
 
-## التشغيل
-- تشغيل الخادم:
+## Run
+- Start the server:
   ```bash
   node server.js
-  # أو:
+  # or:
   npm run dev
   ```
 
-## نقاط النهاية
-- فحص الصحة:
+## Endpoints
+- Health check:
   - `GET /api/health`
-- فحص تكامل خادم الذكاء الاصطناعي:
-  - `GET /api/external/health/ai` (يتطلب رأس `x-api-key`)
-- تحقق ملف السيرة الذاتية:
-  - `POST /api/resume/validate` مع الحقل `file`
-- تحويل الصوت إلى نص:
-  - `POST /api/transcription/voice` (يتطلب رأس `x-api-key`)
-    - الحقول:
-      - ملف `audio` (multipart/form-data)
-      - `application_id` نصي
-      - `question_id` نصي
-    - الاستجابة:
+- AI server upstream health:
+  - `GET /api/external/health/ai` (requires header `x-api-key`)
+- Resume file validation:
+  - `POST /api/resume/validate` with `file` field
+- Voice transcription:
+  - `POST /api/transcription/voice` (requires header `x-api-key`)
+    - Fields:
+      - `audio` file (multipart/form-data)
+      - `application_id` string
+      - `question_id` string
+    - Response:
       ```json
       {
         "success": true,
@@ -48,13 +48,15 @@
         "processing_time": 15.2
       }
       ```
+    - Storage bucket:
+      - Set `SUPABASE_AUDIO_BUCKET` to your bucket name (e.g. `voice`)
 
-## ملاحظات أمنية
-- اضبط المتغير `BACKEND_API_KEY` وتأكد من إرساله في الطلب عبر الرأس `x-api-key` أو `Authorization: Bearer <key>`.
-- لا تقم أبداً بوضع المفاتيح في الكود أو السجلات.
+## Security Notes
+- Set `BACKEND_API_KEY` and ensure it is sent via header `x-api-key` or `Authorization: Bearer <key>`.
+- Never store or log secrets.
 
-## اختبار سريع
+## Quick Test
 ```bash
-# من داخل مجلد backend:
+# From inside backend directory:
 ./test_transcription.sh path/to/audio.wav
 ```
