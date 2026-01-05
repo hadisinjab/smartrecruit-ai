@@ -56,6 +56,8 @@ export default function CandidateDetailsPage() {
   const [answers, setAnswers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [aiEvaluation, setAiEvaluation] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   
   // HR Evaluation State
   const [hrEvaluation, setHrEvaluation] = useState<any>(null);
@@ -302,6 +304,28 @@ export default function CandidateDetailsPage() {
   };
 
   const currentCandidate = editedCandidate || candidate;
+
+  const handleAnalyze = async () => {
+    setAiLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
+      const res = await fetch(`${apiUrl}/api/evaluation/analyze/${candidateId}`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAiEvaluation(data.evaluation);
+        addToast('success', 'AI Analysis Completed Successfully');
+      } else {
+        addToast('error', data.message || 'Analysis failed');
+      }
+    } catch (e) {
+      console.error(e);
+      addToast('error', 'Failed to connect to analysis service');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   return (
     <AdminLayout
@@ -636,49 +660,177 @@ export default function CandidateDetailsPage() {
           
           <Tabs.Content value='ai' className='space-y-6'>
             <Card className='p-6 bg-purple-50 border-purple-100'>
-              <div className='flex items-center space-x-2 mb-4'>
-                <Bot className='w-5 h-5 text-purple-600' />
-                <h2 className='text-lg font-semibold text-purple-900'>{tEval('aiEvaluation')}</h2>
-              </div>
-              <div className='space-y-4'>
-                <p className='text-sm text-purple-700 italic'>
-                  {tEval('aiDisclaimer')}
-                </p>
-                <div className='grid grid-cols-2 gap-4'>
-                   <div className='bg-white p-3 rounded-lg border border-purple-100'>
-                     <p className='text-xs text-gray-500'>{tEval('matchScore')}</p>
-                     <p className='text-xl font-bold text-purple-600'>85%</p>
-                   </div>
-                   <div className='bg-white p-3 rounded-lg border border-purple-100'>
-                     <p className='text-xs text-gray-500'>{tEval('recommendation')}</p>
-                     <p className='text-md font-bold text-purple-600'>{tRec('hire')}</p>
-                   </div>
+              <div className='flex items-center justify-between mb-4'>
+                <div className='flex items-center space-x-2'>
+                  <Bot className='w-5 h-5 text-purple-600' />
+                  <h2 className='text-lg font-semibold text-purple-900'>{tEval('aiEvaluation')}</h2>
                 </div>
+                <Button 
+                  onClick={handleAnalyze} 
+                  disabled={aiLoading}
+                  className='bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50'
+                >
+                  {aiLoading ? (
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
+                      Analyzing (Running 5 Stages)...
+                    </>
+                  ) : (
+                    tCommon('startAnalysis') || 'Start Analysis'
+                  )}
+                </Button>
               </div>
-            </Card>
-            <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Strengths</h2>
-              <div className='space-y-2 text-sm text-gray-700'>
-                <p>Strong alignment with role requirements</p>
-                <p>Clear communication in application</p>
-              </div>
-            </Card>
-            <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Weaknesses</h2>
-              <div className='space-y-2 text-sm text-gray-700'>
-                <p>Limited domain experience</p>
-              </div>
-            </Card>
-            <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Ranking</h2>
-              <p className='text-sm text-gray-700'>Top 10% of applicants</p>
-            </Card>
-            <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Suggested Questions</h2>
-              <div className='space-y-2 text-sm text-gray-700'>
-                <p>Describe a challenging project you led.</p>
-                <p>How do you handle conflicting priorities?</p>
-              </div>
+              
+              {!aiEvaluation && !aiLoading && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No analysis generated yet. Click "Start Analysis" to begin the 5-stage evaluation.</p>
+                </div>
+              )}
+
+              {aiEvaluation && aiEvaluation.analysis?.final_decision && (
+                <div className='space-y-6 animate-in fade-in duration-500'>
+                  <p className='text-sm text-purple-700 italic'>
+                    {tEval('aiDisclaimer')}
+                  </p>
+
+                  {/* 1. Final Decision Banner (Stage 5 Output) */}
+                  <div className={`p-6 rounded-xl border-2 shadow-sm ${
+                    aiEvaluation.analysis.final_decision.decision === 'Interview' ? 'bg-green-50 border-green-200' :
+                    aiEvaluation.analysis.final_decision.decision === 'Reject' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-2 py-1 bg-purple-600 text-white text-xs font-bold uppercase rounded">Stage 5</span>
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">Final Decision</h3>
+                        </div>
+                        <div className="text-3xl font-extrabold flex flex-wrap items-center gap-3">
+                          <span className={
+                            aiEvaluation.analysis.final_decision.decision === 'Interview' ? 'text-green-700' :
+                            aiEvaluation.analysis.final_decision.decision === 'Reject' ? 'text-red-700' : 'text-gray-700'
+                          }>
+                            {aiEvaluation.analysis.final_decision.decision}
+                          </span>
+                          <span className="text-lg font-medium text-gray-500 bg-white px-3 py-1 rounded-full border">
+                            Score: {aiEvaluation.analysis.final_decision.final_score}/100
+                          </span>
+                        </div>
+                        <p className="mt-3 text-gray-800 text-lg leading-relaxed font-medium">
+                          {aiEvaluation.analysis.final_decision.decision_reason}
+                        </p>
+                        <div className="mt-4 flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">Recommended Action:</span>
+                          <span className="px-3 py-1 bg-white rounded border border-gray-300 text-sm font-medium shadow-sm">
+                            {aiEvaluation.analysis.final_decision.action_item}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Four Stages Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Stage 1: Text */}
+                    <Card className="p-4 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 1</h4>
+                      <h3 className="text-md font-bold text-gray-800 mb-2">Text Questions</h3>
+                      <div className="text-2xl font-bold text-blue-700 mb-2">
+                        {aiEvaluation.analysis.final_decision.stage_evaluations?.text || 'N/A'}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-3">
+                        {aiEvaluation.analysis.qa_analysis?.smart_summary || 'Analysis of text responses.'}
+                      </p>
+                    </Card>
+
+                    {/* Stage 2: Voice */}
+                    <Card className="p-4 border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 2</h4>
+                      <h3 className="text-md font-bold text-gray-800 mb-2">Voice Questions</h3>
+                      <div className="text-2xl font-bold text-purple-700 mb-2">
+                        {aiEvaluation.analysis.final_decision.stage_evaluations?.voice || 'N/A'}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {aiEvaluation.analysis.voice_transcripts?.length || 0} answers analyzed.
+                        {aiEvaluation.analysis.voice_transcripts?.length > 0 && (
+                           <span className="block mt-1 italic">"{aiEvaluation.analysis.voice_transcripts[0]?.analysis?.relevance || 'Analyzed'}"</span>
+                        )}
+                      </p>
+                    </Card>
+
+                    {/* Stage 3: Resume */}
+                    <Card className="p-4 border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 3</h4>
+                      <h3 className="text-md font-bold text-gray-800 mb-2">Resume</h3>
+                      <div className="text-2xl font-bold text-yellow-700 mb-2">
+                        {aiEvaluation.analysis.final_decision.stage_evaluations?.resume || 'N/A'}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {aiEvaluation.analysis.resume?.data?.skills?.technical?.length || 0} skills identified.
+                      </p>
+                    </Card>
+
+                    {/* Stage 4: Assignment */}
+                    <Card className="p-4 border-l-4 border-l-pink-500 hover:shadow-md transition-shadow">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 4</h4>
+                      <h3 className="text-md font-bold text-gray-800 mb-2">Assignment</h3>
+                      <div className="text-2xl font-bold text-pink-700 mb-2">
+                        {aiEvaluation.analysis.final_decision.stage_evaluations?.assignment || 'N/A'}
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-3">
+                        {aiEvaluation.analysis.assignment?.evaluation?.recommendation || 'Evaluated'}
+                      </p>
+                    </Card>
+                  </div>
+
+                  {/* Detailed Analysis Sections */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Strengths */}
+                    <Card className='p-6 border-green-100 bg-green-50/30'>
+                      <h2 className='text-lg font-semibold text-green-900 mb-4'>Key Strengths</h2>
+                      <div className='space-y-2 text-sm text-gray-700'>
+                        {aiEvaluation.strengths && aiEvaluation.strengths.length > 0 ? (
+                          aiEvaluation.strengths.map((s: string, i: number) => (
+                            <div key={i} className="flex items-start bg-white p-2 rounded border border-green-100 shadow-sm">
+                              <span className="text-green-500 mr-2 font-bold">✓</span>
+                              {s}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-gray-500">No specific strengths identified.</p>
+                        )}
+                      </div>
+                    </Card>
+
+                    {/* Weaknesses */}
+                    <Card className='p-6 border-red-100 bg-red-50/30'>
+                      <h2 className='text-lg font-semibold text-red-900 mb-4'>Areas for Improvement</h2>
+                      <div className='space-y-2 text-sm text-gray-700'>
+                        {aiEvaluation.weaknesses && aiEvaluation.weaknesses.length > 0 ? (
+                          aiEvaluation.weaknesses.map((w: string, i: number) => (
+                            <div key={i} className="flex items-start bg-white p-2 rounded border border-red-100 shadow-sm">
+                              <span className="text-red-500 mr-2 font-bold">⚠</span>
+                              {w}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-gray-500">No specific weaknesses identified.</p>
+                        )}
+                      </div>
+                    </Card>
+                  </div>
+                  
+                  {/* Detailed Assignment Feedback if available */}
+                  {aiEvaluation.analysis.assignment?.evaluation?.answer_evaluation && (
+                    <Card className="p-6 border-pink-100 bg-pink-50/30">
+                       <h2 className="text-lg font-semibold text-pink-900 mb-3">Detailed Assignment Feedback</h2>
+                       <p className="text-gray-800 text-sm leading-relaxed bg-white p-4 rounded border border-pink-100">
+                          {aiEvaluation.analysis.assignment.evaluation.answer_evaluation}
+                       </p>
+                    </Card>
+                  )}
+                  
+                </div>
+              )}
             </Card>
           </Tabs.Content>
           

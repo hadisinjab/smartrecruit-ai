@@ -51,3 +51,4 @@ create policy "Anyone can create application." on public.applications
 
 
 
+

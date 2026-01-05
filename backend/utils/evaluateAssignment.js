@@ -70,6 +70,7 @@ export async function evaluateAssignment(assignment, jobCriteria) {
         strengths: Array.isArray(evaluation.strengths) ? evaluation.strengths : [],
         weaknesses: Array.isArray(evaluation.weaknesses) ? evaluation.weaknesses : [],
         specific_feedback: evaluation.specific_feedback || '',
+        answer_evaluation: evaluation.answer_evaluation || 'No answer evaluation provided',
         meets_requirements: meetsReq,
         recommendation
       },
@@ -124,6 +125,11 @@ function validateAssignment(assignment) {
 function getPromptForType(assignment, jobCriteria) {
   const skills = (jobCriteria.required_skills || []).join(', ');
   const desc = jobCriteria.assignment_description || 'No description provided';
+  
+  if (!jobCriteria.assignment_description) {
+    console.warn('Warning: No assignment description provided for evaluation!');
+  }
+
   const text = assignment.text_fields || 'N/A';
   const links = assignment.link_fields || 'N/A';
 
@@ -146,7 +152,7 @@ function getPromptForType(assignment, jobCriteria) {
     
     Evaluate based on:
     1. Code Quality (0-100): Clean code, best practices, readability
-    2. Problem Solving (0-100): Logic, algorithm efficiency, correctness
+    2. Problem Solving (0-100): Logic, algorithm efficiency, correctness (Does it solve the specific task?)
     3. Technical Skills (0-100): Use of required technologies
     4. Documentation (0-100): Comments, README, clarity
     
@@ -160,6 +166,7 @@ function getPromptForType(assignment, jobCriteria) {
       "strengths": ["..."],
       "weaknesses": ["..."],
       "specific_feedback": "...",
+      "answer_evaluation": "Detailed assessment of how the code solves the specific problem...",
       "meets_requirements": true|false
     }
     ${baseInstruction}`;
@@ -179,7 +186,7 @@ function getPromptForType(assignment, jobCriteria) {
     1. Creativity (0-100): Originality and innovation
     2. Technical Execution (0-100): Use of design tools and principles
     3. Presentation (0-100): How well the work is presented
-    4. Relevance (0-100): Alignment with job requirements
+    4. Relevance (0-100): Alignment with job requirements and specific assignment task
     
     Output ONLY valid JSON:
     {
@@ -191,6 +198,7 @@ function getPromptForType(assignment, jobCriteria) {
       "strengths": ["..."],
       "weaknesses": ["..."],
       "specific_feedback": "...",
+      "answer_evaluation": "Detailed assessment of how the design addresses the specific task...",
       "meets_requirements": true|false
     }
     ${baseInstruction}`;
@@ -209,7 +217,7 @@ function getPromptForType(assignment, jobCriteria) {
     Evaluate based on:
     1. Content Quality (0-100): Depth and accuracy
     2. Communication (0-100): Clarity and structure
-    3. Relevance (0-100): Answers the question/task
+    3. Relevance (0-100): Answers the question/task (CRITICAL: Does it address the specific task?)
     4. Professionalism (0-100): Presentation quality
     
     Output ONLY valid JSON:
@@ -222,6 +230,7 @@ function getPromptForType(assignment, jobCriteria) {
       "strengths": ["..."],
       "weaknesses": ["..."],
       "specific_feedback": "...",
+      "answer_evaluation": "Detailed assessment of how the answer addresses the specific question...",
       "meets_requirements": true|false
     }
     ${baseInstruction}`;

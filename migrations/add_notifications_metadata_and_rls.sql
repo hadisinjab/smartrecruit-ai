@@ -115,3 +115,4 @@ grant update (is_read) on table public.notifications to authenticated;
 
 
 
+
