@@ -173,16 +173,24 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
     const supabase = createClient()
     const buckets = ['files', 'resumes']
     const base = jobFormId || applicationId || 'general'
+    // Sanitize path components to prevent InvalidKey errors
+    const safeBase = String(base).replace(/[^a-zA-Z0-9-]/g, '_')
+    const safeFieldId = String(field.id).replace(/[^a-zA-Z0-9-]/g, '_')
+    
     const ext = (file.name.split('.').pop() || 'webm').toLowerCase()
-    const path = `voice/${base}/${field.id}/${crypto.randomUUID()}.${ext}`
+    const path = `voice/${safeBase}/${safeFieldId}/${crypto.randomUUID()}.${ext}`
+
+    console.log(`[VoiceQuestion] Uploading to bucket: ${buckets[0]}, path: ${path}`);
 
     let lastError: any = null
     for (const bucket of buckets) {
       const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, { upsert: true })
       if (!upErr) {
         const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+        console.log(`[VoiceQuestion] Upload success: ${data.publicUrl}`);
         return { url: data.publicUrl, error: null as string | null }
       }
+      console.error(`[VoiceQuestion] Upload failed to ${bucket}:`, upErr);
       lastError = upErr
     }
     return { url: null as string | null, error: lastError?.message || 'Failed to upload audio' }

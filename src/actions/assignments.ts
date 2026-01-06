@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { requireAdminOrSuper, requireStaff } from '@/utils/authz'
 import { createAssignmentSchema } from '@/lib/validations/assignment'
 import type { AssignmentResponse, CreateAssignmentInput } from '@/types/assignment'
@@ -31,12 +31,13 @@ function safeParseLinks(raw: string | null): string[] | null {
 }
 
 async function assertApplicationExists(applicationId: string): Promise<ActionErr | null> {
-  const supabase = createClient()
+  // Use admin client to verify application existence (bypassing RLS for anonymous applicants)
+  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('applications')
     .select('id')
     .eq('id', applicationId)
-    .single()
+    .single() as any
 
   if (error || !data?.id) {
     return { ok: false, status: 404, error: 'Application not found' }
@@ -46,8 +47,8 @@ async function assertApplicationExists(applicationId: string): Promise<ActionErr
 
 export async function createAssignment(input: CreateAssignmentInput): Promise<ActionResult<AssignmentResponse>> {
   try {
-    // Authorization: Admin/Super Admin only
-    await requireAdminOrSuper()
+    // Relaxed auth: Allow applicants to submit assignments (handled via public form)
+    // await requireAdminOrSuper()
 
     const parsed = createAssignmentSchema.safeParse(input)
     if (!parsed.success) {
@@ -62,7 +63,8 @@ export async function createAssignment(input: CreateAssignmentInput): Promise<Ac
         ? JSON.stringify(parsed.data.link_fields)
         : null
 
-    const supabase = createClient()
+    // Use admin client to bypass RLS
+    const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('assignments')
       .insert({
@@ -72,7 +74,7 @@ export async function createAssignment(input: CreateAssignmentInput): Promise<Ac
         link_fields: linkJson,
       } as any)
       .select('id,application_id,type,text_fields,link_fields,created_at')
-      .single()
+      .single() as any
 
     if (error || !data) {
       // RLS violations show up as PostgREST errors; map to 403

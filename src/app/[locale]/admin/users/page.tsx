@@ -260,8 +260,8 @@ export default function UsersPage() {
         
         return (
           <div className='text-sm text-gray-600'>
-            <div>{loginDate.toLocaleDateString()}</div>
-            <div className='text-xs text-gray-500'>{timeText}</div>
+            <div suppressHydrationWarning>{loginDate.toLocaleDateString()}</div>
+            <div className='text-xs text-gray-500' suppressHydrationWarning>{timeText}</div>
           </div>
         );
       }
@@ -270,7 +270,7 @@ export default function UsersPage() {
       key: 'createdAt',
       title: tTable('joined'),
       render: (createdAt) => (
-        <div className='text-sm text-gray-600'>
+        <div className='text-sm text-gray-600' suppressHydrationWarning>
           {new Date(createdAt).toLocaleDateString()}
         </div>
       )
@@ -282,41 +282,25 @@ export default function UsersPage() {
         <div className='flex items-center space-x-2'>
           {isAdmin && (
             <>
-            <Select
-              value={record.role}
-              onValueChange={(value) => handleRoleChange(record.id, value)}
-              // Only super-admin can change roles. Admin can manage reviewers but cannot change roles.
-              disabled={!isSuperAdmin}
-            >
-              <SelectTrigger className="w-[130px] h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {isSuperAdmin && <SelectItem value="super-admin">{tRole('super-admin')}</SelectItem>}
-                {isSuperAdmin && <SelectItem value="admin">{tRole('admin')}</SelectItem>}
-                <SelectItem value="reviewer">{tRole('reviewer')}</SelectItem>
-              </SelectContent>
-            </Select>
-          
-          <Button
+              <Button
                 variant='ghost' 
-            size='sm'
+                size='sm'
                 className='h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50'
                 onClick={() => router.push(`/admin/users/${record.id}/edit`)}
                 disabled={record.role === 'super-admin' && !isSuperAdmin || (!isSuperAdmin && record.role !== 'reviewer')}
               >
                 <Edit className='w-4 h-4' />
-          </Button>
+              </Button>
           
-          <Button
+              <Button
                 variant='ghost' 
-            size='sm'
+                size='sm'
                 className='h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50'
                 onClick={() => setUserToDelete(record)}
                 disabled={record.role === 'super-admin' && !isSuperAdmin || (!isSuperAdmin && record.role !== 'reviewer')}
-          >
+              >
                 <Trash2 className='w-4 h-4' />
-          </Button>
+              </Button>
             </>
           )}
         </div>
@@ -334,7 +318,6 @@ export default function UsersPage() {
   return (
     <AdminLayout
       title={t('title')}
-      subtitle={t('count', { count: filteredUsers.length })}
       actions={
         isAdmin ? (
           <Button 

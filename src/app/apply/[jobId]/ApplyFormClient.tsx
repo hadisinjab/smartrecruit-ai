@@ -178,7 +178,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
               {(job as any)?.deadline && (
                 <div className="p-3 rounded-lg border border-gray-200 bg-gray-50 sm:col-span-2">
                   <div className="text-xs text-gray-500">Deadline</div>
-                  <div className="text-sm font-semibold text-gray-900">
+                  <div className="text-sm font-semibold text-gray-900" suppressHydrationWarning>
                     {new Date(String((job as any).deadline)).toLocaleDateString()}
                   </div>
                 </div>
