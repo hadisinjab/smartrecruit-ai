@@ -375,19 +375,17 @@ export async function getJobById(id: string): Promise<Job | null> {
 
 export async function createJob(formData: any) {
   const supabase = createClient()
-  await requireAdminOrSuper()
+  
+  // Use requireAdminOrSuper() to validate permissions
+  const session = await requireAdminOrSuper()
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new Error('Unauthorized')
-  }
-
-  // Fetch organization of current user to auto-link job
-  const { data: userRow, error: userError } = await supabase
+  // Get current user details from DB (using admin client to ensure we get org ID)
+  // This redundancy with authz.ts is okay for safety
+  const admin = createAdminClient()
+  const { data: userRow, error: userError } = await admin
     .from('users')
     .select('organization_id')
-    .eq('id', user.id)
+    .eq('id', session.id)
     .single()
 
   if (userError || !userRow?.organization_id) {
@@ -430,7 +428,7 @@ export async function createJob(formData: any) {
       benefits: formData.benefits,
       deadline: formData.deadline,
       hiring_manager_name: formData.hiring_manager_name,
-      created_by: user.id,
+      created_by: session.id,
       evaluation_criteria: formData.evaluation_criteria || {},
       assignment_enabled: !!formData.assignment_enabled,
       assignment_required: !!formData.assignment_required,

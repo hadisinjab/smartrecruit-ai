@@ -4,12 +4,9 @@
  *
  * يعتمد على متغيرات البيئة من ملف .env الموجود داخل مجلد backend أو الجذر.
  */
+import './config.js';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 
 import errorHandler, { notFoundHandler } from './middleware/errorHandler.js';
 import authMiddleware from './middleware/auth.js';
@@ -21,30 +18,24 @@ import assignmentRouter from './routes/assignment.js';
 import interviewRouter from './routes/interview.js';
 import evaluationRouter from './routes/evaluation.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// تحميل متغيرات البيئة بشكل ذكي من backend/.env أو الجذر/.env
-(() => {
-  const backendEnvPath = path.resolve(__dirname, '.env');
-  const rootEnvPath = path.resolve(process.cwd(), '.env');
-  const chosenEnv =
-    fs.existsSync(backendEnvPath) ? backendEnvPath :
-    (fs.existsSync(rootEnvPath) ? rootEnvPath : null);
-  if (chosenEnv) {
-    dotenv.config({ path: chosenEnv });
-  } else {
-    dotenv.config(); // محاولة افتراضية
-  }
-})();
-
 const app = express();
 
 /**
  * إعداد CORS والميدلوير الأساسية
  */
-const corsOrigin = process.env.CORS_ORIGIN || '*';
-app.use(cors({ origin: corsOrigin }));
+const corsOrigin = process.env.CORS_ORIGIN || true; // Default to reflecting origin
+app.use(cors({
+  origin: corsOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+}));
+
+// Request Logging Middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // تحديد حجم الجسم وفق إعدادات الرفع
 const jsonLimit = Number(process.env.MAX_UPLOAD_SIZE || 10 * 1024 * 1024);

@@ -1,7 +1,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch'; // Native fetch in Node 18+
 import { pipeline } from 'stream';
 import { promisify } from 'util';
 

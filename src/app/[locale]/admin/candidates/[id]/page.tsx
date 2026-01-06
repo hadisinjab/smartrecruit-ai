@@ -36,6 +36,8 @@ import {
   Bot
 } from 'lucide-react';
 
+import { createClient } from '@/utils/supabase/client';
+
 export default function CandidateDetailsPage() {
   const t = useTranslations('Candidates');
   const tEval = useTranslations('Evaluations');
@@ -78,6 +80,12 @@ export default function CandidateDetailsPage() {
           setEditedCandidate(data as unknown as Candidate);
           const a = (data as any).answers || [];
           setAnswers(a);
+          
+          // Load existing AI evaluation if available
+          const aiEval = (data as any).ai_evaluations?.[0] || null;
+          if (aiEval) {
+            setAiEvaluation(aiEval);
+          }
         }
         
         const hrData = await getHrEvaluation(candidateId);
@@ -308,9 +316,18 @@ export default function CandidateDetailsPage() {
   const handleAnalyze = async () => {
     setAiLoading(true);
     try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002';
-      const res = await fetch(`${apiUrl}/api/evaluation/analyze/${candidateId}`, {
+      const targetId = candidate.id; // In Candidate type, id IS the application ID
+      console.log('Analyzing application:', targetId);
+      const res = await fetch(`${apiUrl}/api/evaluation/analyze/${targetId}`, {
         method: 'POST',
+        headers: token ? {
+          'Authorization': `Bearer ${token}`
+        } : {}
       });
       const data = await res.json();
       if (data.success) {
@@ -319,9 +336,9 @@ export default function CandidateDetailsPage() {
       } else {
         addToast('error', data.message || 'Analysis failed');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      addToast('error', 'Failed to connect to analysis service');
+      addToast('error', `Connection failed: ${e.message || 'Unknown error'}`);
     } finally {
       setAiLoading(false);
     }

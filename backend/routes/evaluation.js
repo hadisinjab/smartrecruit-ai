@@ -8,7 +8,7 @@ import { evaluateAssignment } from '../utils/evaluateAssignment.js';
 import { parseResume } from '../utils/parseResume.js';
 import { downloadFile } from '../utils/download.js';
 import fs from 'fs';
-import { generateJSON } from '../utils/ollama.js';
+import { generateJSON, generateText } from '../utils/ollama.js';
 
 const router = Router();
 
@@ -22,9 +22,26 @@ router.get('/health', (req, res) => {
  */
 router.post('/analyze/:applicationId', async (req, res) => {
   const { applicationId } = req.params;
+  console.log(`[Evaluation] Analyzing Application ID: ${applicationId}`);
   
   try {
-    // 1. جلب بيانات المتقدم
+    // 0. تحقق من وجود الطلب أولاً (للتشخيص)
+    const { data: checkApp, error: checkError } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('id', applicationId)
+      .maybeSingle();
+      
+    if (checkError) {
+      console.error('[Evaluation] Check Error:', checkError);
+      return res.status(500).json({ error: true, message: `DB Check Error: ${checkError.message}` });
+    }
+    if (!checkApp) {
+      console.error(`[Evaluation] Application ${applicationId} not found in simple query`);
+      return res.status(404).json({ error: true, message: `Application ${applicationId} not found (Simple Query)` });
+    }
+
+    // 1. جلب بيانات المتقدم الكاملة
     const { data: application, error: appError } = await supabase
       .from('applications')
       .select(`
@@ -53,16 +70,39 @@ router.post('/analyze/:applicationId', async (req, res) => {
         answers (
           id,
           question_id,
-          type,
           value,
-          voice_data
+          voice_data,
+          questions (
+            type
+          )
         )
       `)
       .eq('id', applicationId)
       .single();
 
     if (appError || !application) {
-      return res.status(404).json({ error: true, message: 'Application not found' });
+      console.error('[Evaluation] DB Error:', appError);
+      return res.status(404).json({ 
+        error: true, 
+        message: appError ? `DB Error: ${appError.message}` : 'Application not found in DB' 
+      });
+    }
+
+    // Normalize answers to include type from joined questions
+    if (application.answers) {
+      application.answers = application.answers.map(a => {
+        let rawType = (a.questions?.type || 'text').toLowerCase();
+        let type = 'text';
+        if (['voice', 'audio', 'voice_recording'].includes(rawType)) type = 'voice';
+        else if (['text', 'short_text', 'long_text', 'textarea'].includes(rawType)) type = 'text';
+        else if (['file', 'file_upload'].includes(rawType)) type = 'file';
+        else if (['url', 'link'].includes(rawType)) type = 'url';
+        
+        return {
+          ...a,
+          type
+        };
+      });
     }
 
     const jobContext = {
@@ -140,7 +180,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
     if (application.answers && application.answers.length > 0) {
       
       // A. Voice Answers -> Transcribe -> Refine -> Analyze
-      const voiceAnswers = application.answers.filter(a => a.type === 'voice' && a.value);
+      const voiceAnswers = application.answers.filter(a => a.type === 'voice'); // Removed && a.value check
       
       // Fetch questions for voice answers
       const voiceQuestionIds = voiceAnswers.map(a => a.question_id);
@@ -153,8 +193,19 @@ router.post('/analyze/:applicationId', async (req, res) => {
 
       for (const ans of voiceAnswers) {
         try {
-          console.log(`Processing voice answer ${ans.id}...`);
-          const tempPath = await downloadFile(ans.value, '.wav');
+          // Use voice_data if available (preferred), or value as fallback
+          let audioUrl = ans.value;
+          if (ans.voice_data && typeof ans.voice_data === 'object') {
+             audioUrl = ans.voice_data.audio_url || ans.value;
+          }
+
+          if (!audioUrl) {
+             console.log(`Skipping voice answer ${ans.id}: No audio URL found`);
+             continue;
+          }
+
+          console.log(`Processing voice answer ${ans.id} (URL: ${audioUrl})...`);
+          const tempPath = await downloadFile(audioUrl, '.wav');
           
           // 1. Transcribe (using direct transcribeAudio to skip redundant full analysis)
           const transcriptData = await transcribeAudio(tempPath);
@@ -426,9 +477,26 @@ router.post('/analyze/:applicationId', async (req, res) => {
       created_at: new Date().toISOString()
     };
 
-    const { error: saveError } = await supabase
+    // Use explicit check-then-update/insert to avoid "no unique constraint" error on upsert
+    const { data: existingEval } = await supabase
       .from('ai_evaluations')
-      .upsert(finalEvaluation, { onConflict: 'application_id' });
+      .select('id')
+      .eq('application_id', applicationId)
+      .maybeSingle();
+
+    let saveError;
+    if (existingEval) {
+      const { error } = await supabase
+        .from('ai_evaluations')
+        .update(finalEvaluation)
+        .eq('application_id', applicationId);
+      saveError = error;
+    } else {
+      const { error } = await supabase
+        .from('ai_evaluations')
+        .insert(finalEvaluation);
+      saveError = error;
+    }
 
     if (saveError) {
       throw saveError;

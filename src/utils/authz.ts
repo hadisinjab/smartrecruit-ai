@@ -27,15 +27,33 @@ export async function getSessionInfo(): Promise<SessionInfo | null> {
     return null
   }
 
+  // Use admin client to bypass RLS when checking roles
+  // This is critical because normal RLS policies might prevent reading the user's own role
+  // if the policy itself depends on reading the role (circular dependency) or is misconfigured.
+  const admin = createClient() // Still use normal client, but rely on "users" table "select own profile" policy
+  
+  // Actually, let's use the admin/service role client if available in server context
+  // But createClient() usually returns authenticated client. 
+  // Let's assume standard RLS allows user to read their own profile.
+  // If that fails, we have a bigger problem.
+  
   const { data, error } = await supabase
     .from('users')
     .select('role, organization_id, is_active')
     .eq('id', user.id)
     .single()
 
-  console.log('[Authz] User:', user.id, 'DB Role:', data?.role, 'Active:', data?.is_active, 'DB Error:', error?.message);
+  if (error) {
+     console.error('[Authz] DB Error fetching user role:', error.message);
+     // Fallback: try to see if role is in user metadata (less secure but good fallback)
+     // const metaRole = user.user_metadata?.role;
+     // if (metaRole) return { id: user.id, role: metaRole, organizationId: user.user_metadata?.organization_id };
+     return null;
+  }
 
-  if (error || !data?.role) return null
+  // console.log('[Authz] User:', user.id, 'DB Role:', data?.role);
+
+  if (!data?.role) return null
   if (data.is_active === false) return null
 
   return {

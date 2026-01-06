@@ -163,6 +163,7 @@ export async function getCandidateById(id: string) {
       resumes(*),
       external_profiles(*),
       hr_evaluations(*),
+      ai_evaluations(*),
       answers(*)
     `)
     .eq('id', id)

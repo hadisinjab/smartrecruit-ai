@@ -104,7 +104,7 @@ function validateAssignment(assignment) {
     return { valid: false, errors };
   }
 
-  const validTypes = ['code', 'design', 'video', 'text'];
+  const validTypes = ['code', 'design', 'video', 'text', 'text_only', 'short_text', 'long_text', 'file_upload'];
   if (!validTypes.includes(assignment.type)) {
     errors.push(`Invalid assignment type: ${assignment.type}`);
   }

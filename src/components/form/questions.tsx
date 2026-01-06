@@ -443,7 +443,16 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
     }
 
     setFileName(file.name);
-    setFileSize((file.size / 1024 / 1024).toFixed(2));
+    
+    // Format file size
+    const formatFileSize = (bytes: number) => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+    setFileSize(formatFileSize(file.size));
 
     setUploading(true)
     setUploadError(null)
@@ -567,7 +576,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
                 </div>
                 <div>
                   <p className='font-medium text-green-800'>{fileName}</p>
-                  <p className='text-sm text-green-600'>{fileSize} MB</p>
+                  <p className='text-sm text-green-600'>{fileSize}</p>
                 </div>
               </div>
               <div className='flex gap-2'>
