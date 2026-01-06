@@ -105,6 +105,20 @@ router.post('/analyze/:applicationId', async (req, res) => {
       });
     }
 
+    // 1.1 Fetch application history
+    let previousApplicationsCount = 0;
+    if (application.candidate_email) {
+      const { count, error: historyError } = await supabase
+        .from('applications')
+        .select('id', { count: 'exact', head: true })
+        .eq('candidate_email', application.candidate_email)
+        .lt('created_at', application.created_at); // Only count *previous* applications
+      
+      if (!historyError) {
+        previousApplicationsCount = count || 0;
+      }
+    }
+
     const jobContext = {
       position: application.job_forms?.title || 'Unknown Position',
       required_skills: application.job_forms?.evaluation_criteria?.required_skills || [],
@@ -166,6 +180,30 @@ router.post('/analyze/:applicationId', async (req, res) => {
                  .from('resumes')
                  .update({ parsed_data: resumeResult.data })
                  .eq('id', resume.id);
+               
+               // Analyze Resume against Job Description
+               console.log('Analyzing Resume against Job Description...');
+               const resumeAnalysisPrompt = `
+               Evaluate this candidate's resume for the position of ${jobContext.position}.
+               Required Skills: ${jobContext.required_skills.join(', ')}
+               
+               Resume Data:
+               ${JSON.stringify(resumeResult.data).slice(0, 3000)}
+               
+               Output JSON:
+               {
+                 "match_score": 0-100,
+                 "qualification_summary": "Concise summary of qualification fit",
+                 "missing_critical_skills": ["..."],
+                 "experience_relevance": "High|Medium|Low"
+               }
+               `;
+               try {
+                  const analysis = await generateJSON(resumeAnalysisPrompt, { temperature: 0.1 });
+                  resumeResult.analysis = analysis;
+               } catch (e) {
+                  console.error('Resume Analysis failed:', e);
+               }
             }
             
             if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
@@ -215,6 +253,13 @@ router.post('/analyze/:applicationId', async (req, res) => {
              
              // 2. Refine Transcript
              console.log('Refining transcript...');
+             
+             // Calculate Time to First Answer
+             const firstSegmentStart = (transcriptData.segments && transcriptData.segments.length > 0) 
+                ? transcriptData.segments[0].start 
+                : 0;
+             const timeToAnswer = Math.round(firstSegmentStart);
+             
              const refinePrompt = `
              You are a professional editor. Correct the following transcript for grammar and clarity. 
              Remove filler words (um, uh) but keep the original meaning and tone.
@@ -236,10 +281,18 @@ router.post('/analyze/:applicationId', async (req, res) => {
              Question: "${questionLabel}"
              Answer: "${refinedTranscript}"
              
+             METRICS:
+             - Time taken to start answering: ${timeToAnswer} seconds.
+             
+             CRITICAL INSTRUCTION:
+             - If "Time taken to start answering" is > 15 seconds, you MUST flag this as a potential red flag (Candidate took too long, possibly searching for answer).
+             - Mention this delay in "weaknesses" or "red_flags" if significant.
+             
              Output valid JSON:
              {
                "quality_score": 0-100,
                "relevance": "high|medium|low",
+               "answer_quality_summary": "Short sentence (e.g., 'Weak answer, lacks detail' or 'Strong, accurate answer')",
                "key_points": ["point1", "point2"],
                "strengths": ["..."],
                "weaknesses": ["..."]
@@ -319,6 +372,11 @@ router.post('/analyze/:applicationId', async (req, res) => {
          Analyses:
          ${JSON.stringify(individualAnalyses, null, 2)}
 
+         CRITICAL INSTRUCTION FOR SUMMARY:
+         - Provide a descriptive but concise summary (approx 2 lines).
+         - Explain the candidate's answers to the text questions clearly.
+         - Focus on the content of their answers.
+
          Output JSON:
          {
            "inferred_facts": {
@@ -328,7 +386,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
              "skills_mentioned": ["..."],
              "tools_mentioned": ["..."]
            },
-           "smart_summary": "A cohesive paragraph summarizing the candidate based on the answers provided...",
+           "smart_summary": "Concise (2 lines) descriptive summary explaining the text answers...",
            "alignment_score": 0-100,
            "strengths": ["..."],
            "weaknesses": ["..."],
@@ -384,49 +442,61 @@ router.post('/analyze/:applicationId', async (req, res) => {
        if (resumeResult.data.work_experience?.length > 0) resumeScore = Math.min(100, resumeScore + 20);
     }
 
+    // Detect available stages
+    const hasText = !!textAnswersAnalysis;
+    const hasVoice = voiceTranscripts.length > 0;
+    const hasResume = !!resumeResult;
+    const hasAssignment = !!assignmentResult;
+
     // B. AI Final Decision Prompt
     const finalDecisionPrompt = `
-    You are a Senior Hiring Manager. Make a final hiring decision for this candidate based on 4 evaluation stages.
+    You are a Senior Hiring Manager. Make a final hiring decision for this candidate based on the AVAILABLE evaluation stages.
     
     Job Position: ${jobContext.position}
     Required Skills: ${jobContext.required_skills.join(', ')}
 
+    CANDIDATE HISTORY:
+    - Previous Applications: ${previousApplicationsCount} (Count of times applied before this)
+
     STAGES DATA:
-    1. Text Questions (Weight 15%):
-       - Score: ${Math.round(textScore)}/100
-       - Summary: ${textAnswersAnalysis?.smart_summary || 'N/A'}
+    1. Text Questions:
+       ${hasText ? `- Score: ${Math.round(textScore)}/100
+       - Summary: ${textAnswersAnalysis?.smart_summary || 'N/A'}` : '- Status: N/A (No text questions)'}
     
-    2. Voice Questions (Weight 35% - CRITICAL):
-       - Avg Score: ${Math.round(voiceScore)}/100
-       - Count: ${voiceTranscripts.length}
-       - Analysis: ${voiceTranscripts.map(v => v.analysis?.relevance).join(', ')}
+    2. Voice Questions:
+       ${hasVoice ? `- Avg Score: ${Math.round(voiceScore)}/100
+       - Answer Summaries: ${voiceTranscripts.map((v, i) => `Q${i+1}: ${v.analysis?.answer_quality_summary || 'N/A'}`).join('; ')}
+       - Key Weaknesses: ${voiceTranscripts.flatMap(v => v.analysis?.weaknesses || []).join(', ')}` : '- Status: N/A (No voice questions)'}
     
-    3. Resume (Weight 15%):
-       - Skill Match Score: ${resumeScore}/100
-       - Key Skills: ${resumeResult?.data?.skills?.technical?.slice(0, 5).join(', ') || 'N/A'}
+    3. Resume:
+       ${hasResume ? `- Skill Match Score: ${resumeScore}/100
+       - AI Analysis: ${resumeResult?.analysis?.qualification_summary || 'N/A'}
+       - Key Skills: ${resumeResult?.data?.skills?.technical?.slice(0, 5).join(', ') || 'N/A'}` : '- Status: N/A (No resume)'}
     
-    4. Assignment (Weight 35% - CRITICAL):
-       - Score: ${Math.round(assignmentScore)}/100
+    4. Assignment:
+       ${hasAssignment ? `- Score: ${Math.round(assignmentScore)}/100
        - Evaluation: ${assignmentResult?.evaluation?.answer_evaluation || 'N/A'}
-       - Recommendation: ${assignmentResult?.evaluation?.recommendation || 'N/A'}
+       - Recommendation: ${assignmentResult?.evaluation?.recommendation || 'N/A'}` : '- Status: N/A (No assignment)'}
 
     DECISION RULES:
-    - Voice and Assignment are the MOST important.
-    - If Voice OR Assignment is WEAK (< 50), lean towards REJECT.
-    - If both Voice AND Assignment are GOOD (> 70), lean towards INTERVIEW.
-    - Calculate a weighted final score: (Text*0.15 + Voice*0.35 + Resume*0.15 + Assignment*0.35).
+    - IGNORE stages marked as N/A.
+    - Base your decision ONLY on the provided data.
+    - Re-distribute the importance/weights to the available stages.
+    - If only Resume/Text are available, base decision on skills and communication.
+    - If Voice/Assignment are present, they remain critical.
+    - CANDIDATE HISTORY FACTOR: If "Previous Applications" > 0, check if this application is better than average. If they are persistent but weak, Reject. If they show improvement, consider Interview.
 
     OUTPUT JSON ONLY:
     {
       "stage_evaluations": {
-        "text": "Excellent|Good|Average|Weak|Bad",
-        "voice": "Excellent|Good|Average|Weak|Bad",
-        "resume": "Excellent|Good|Average|Weak|Bad",
-        "assignment": "Excellent|Good|Average|Weak|Bad"
+        "text": "Excellent|Good|Average|Weak|Bad|N/A",
+        "voice": "Excellent|Good|Average|Weak|Bad|N/A",
+        "resume": "Excellent|Good|Average|Weak|Bad|N/A",
+        "assignment": "Excellent|Good|Average|Weak|Bad|N/A"
       },
       "final_score": 0-100,
       "decision": "Interview" (if Good/Excellent) or "Reject" (if Weak/Bad),
-      "decision_reason": "Clear explanation citing specific stages (e.g. 'Strong assignment but poor voice communication').",
+      "decision_reason": "Clear explanation citing available stages.",
       "action_item": "Schedule Interview | Send Rejection Email | Request Follow-up"
     }
     `;

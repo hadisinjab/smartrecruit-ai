@@ -256,7 +256,7 @@ async function analyzeTranscript(transcript, segments, jobContext) {
     "weaknesses": ["..."],
     "red_flags": ["..."],
     "recommendation": "Strong Pass|Pass|Review|Fail",
-    "summary": "...",
+    "summary": "Concise (2 lines) descriptive summary...",
     "suggested_follow_up": ["..."]
   }`;
 

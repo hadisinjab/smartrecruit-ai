@@ -309,8 +309,7 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
         </Label>
       ) : (
         <div className='text-sm text-gray-600'>
-          {/* Intentionally hide the question until the user starts recording */}
-          Tap “Start Recording” to reveal the question.
+          The question will appear here when you start recording.
         </div>
       )}
       
@@ -355,6 +354,13 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                 <div className='w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center'>
                   <MicOff className='w-8 h-8 text-gray-500' />
                 </div>
+                
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-2 max-w-sm">
+                  <p className="text-xs text-yellow-800 font-medium">
+                    ⚠️ Warning: You cannot re-record once you stop.
+                  </p>
+                </div>
+
                 <Button
                   onClick={startRecording}
                   className='bg-blue-600 hover:bg-blue-700'
@@ -364,7 +370,9 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
                   Start Recording
                 </Button>
                 <p className='text-xs text-gray-500'>
-                  3-minute recording timer will start automatically
+                  The question will appear when you start recording.
+                  <br />
+                  3-minute recording timer will start automatically.
                 </p>
               </div>
             )}

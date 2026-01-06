@@ -228,11 +228,19 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     }
 
     if (mediaQuestions.length) {
+      // Enforce order: Voice -> File -> URL
+      const typeOrder: Record<string, number> = { voice: 1, file: 2, url: 3 }
+      const sortedMediaQuestions = [...mediaQuestions].sort((a, b) => {
+        const orderA = typeOrder[a.type] || 99
+        const orderB = typeOrder[b.type] || 99
+        return orderA - orderB
+      })
+
       s.push({
         id: 'media-questions',
         title: 'Uploads & Links',
         description: 'Provide any files, voice responses, or links requested.',
-        fields: mediaQuestions.map(toFormField)
+        fields: sortedMediaQuestions.map(toFormField)
       })
     }
 

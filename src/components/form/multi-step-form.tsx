@@ -89,10 +89,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
           isValid = false;
           return;
         }
-        if ((field.type === 'text' || field.type === 'textarea' || field.type === 'url' || field.type === 'select') && (!value || value === '')) {
-          newErrors[field.id] = 'This field is required';
-          isValid = false;
-          return;
+        if ((field.type === 'text' || field.type === 'textarea' || field.type === 'url' || field.type === 'select')) {
+          const isEmpty = !value || (typeof value === 'string' && value.trim() === '')
+          if (isEmpty) {
+            newErrors[field.id] = 'This field is required';
+            isValid = false;
+            return;
+          }
         }
         if (field.type === 'number' && (value === '' || value === undefined || value === null)) {
           newErrors[field.id] = 'This field is required';

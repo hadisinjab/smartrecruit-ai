@@ -836,6 +836,34 @@ export default function CandidateDetailsPage() {
                     </Card>
                   </div>
                   
+                  {/* Detailed Voice Analysis */}
+                  {aiEvaluation.analysis.voice_transcripts && aiEvaluation.analysis.voice_transcripts.length > 0 && (
+                    <Card className="p-6 border-purple-100 bg-purple-50/30">
+                       <h2 className="text-lg font-semibold text-purple-900 mb-3">Detailed Voice Analysis</h2>
+                       <div className="space-y-4">
+                          {aiEvaluation.analysis.voice_transcripts.map((vt: any, idx: number) => (
+                             <div key={idx} className="bg-white p-4 rounded border border-purple-100 shadow-sm">
+                                <h3 className="font-semibold text-gray-800 text-sm mb-2">{vt.question || `Question ${idx + 1}`}</h3>
+                                <div className="flex items-center gap-2 mb-2">
+                                   <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                                      (vt.analysis?.quality_score || 0) >= 70 ? 'bg-green-100 text-green-800' : 
+                                      (vt.analysis?.quality_score || 0) >= 40 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                                   }`}>
+                                      Score: {vt.analysis?.quality_score || 0}/100
+                                   </span>
+                                   <span className="text-xs text-gray-500">
+                                      {vt.analysis?.relevance} relevance
+                                   </span>
+                                </div>
+                                <p className="text-sm text-gray-700 font-medium">
+                                   {vt.analysis?.answer_quality_summary || 'No summary available.'}
+                                </p>
+                             </div>
+                          ))}
+                       </div>
+                    </Card>
+                  )}
+
                   {/* Detailed Assignment Feedback if available */}
                   {aiEvaluation.analysis.assignment?.evaluation?.answer_evaluation && (
                     <Card className="p-6 border-pink-100 bg-pink-50/30">

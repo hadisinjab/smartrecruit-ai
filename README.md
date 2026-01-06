@@ -39,7 +39,19 @@ src/
     └── form.ts                  # TypeScript type definitions
 ```
 
-## 🛠️ Installation & Setup
+## 🚀 Quick Start (Recommended)
+
+We have created a helper script to start all services (Frontend, Backend, AI Server) at once.
+
+**Windows:**
+Double-click `start-app.bat` or run:
+```bash
+.\start-app.bat
+```
+
+---
+
+## 🛠️ Manual Installation & Setup
 
 1. **Install dependencies:**
    ```bash

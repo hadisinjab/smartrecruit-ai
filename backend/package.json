@@ -5,8 +5,8 @@
   "description": "Backend dependencies for SmartRecruit AI (setup only; no functional server code yet).",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
