@@ -191,15 +191,7 @@
       "close": "Close"
     }
   },
-  "Status": {
-    "new": "New",
-    "applied": "Applied",
-    "screening": "Screening",
-    "interview": "Interview",
-    "offer": "Offer",
-    "hired": "Hired",
-    "rejected": "Rejected"
-  },
+ 
   "Jobs": {
     "title": "Jobs",
     "subtitle": "Manage job postings and track applications",
@@ -446,7 +438,7 @@
     "target": "Target",
     "action": "Action",
     "timestamp": "Timestamp",
-    "location": "Location",
+    "locaton": "Location",
     "entity": "Entity",
     "metadata": "Metadata",
     "joined": "Joined",
