@@ -149,7 +149,7 @@ def run() -> None:
     """
     Run the Flask app using env PORT.
     """
-    port = int(os.getenv("PORT", "5001"))
+    port = int(os.environ.get('PORT', 5002))
     debug = os.getenv("FLASK_ENV", "development") == "development"
     app.run(host="0.0.0.0", port=port, debug=debug)
 

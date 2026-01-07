@@ -21,8 +21,6 @@ import { InterviewsList } from '@/components/admin/interviews/InterviewsList'
 import {
   ArrowLeft,
   Edit3,
-  Save,
-  X,
   Calendar,
   MapPin,
   Phone,
@@ -53,8 +51,6 @@ export default function CandidateDetailsPage() {
   
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedCandidate, setEditedCandidate] = useState<Candidate | null>(null);
   const [answers, setAnswers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
@@ -77,13 +73,20 @@ export default function CandidateDetailsPage() {
         const data = await getCandidateById(candidateId);
         if (data) {
           setCandidate(data as unknown as Candidate);
-          setEditedCandidate(data as unknown as Candidate);
           const a = (data as any).answers || [];
           setAnswers(a);
           
           // Load existing AI evaluation if available
           const aiEval = (data as any).ai_evaluations?.[0] || null;
           if (aiEval) {
+            // Ensure analysis is an object (in case it came as string from DB)
+            if (typeof aiEval.analysis === 'string') {
+              try {
+                aiEval.analysis = JSON.parse(aiEval.analysis);
+              } catch (e) {
+                console.error('Failed to parse AI analysis JSON', e);
+              }
+            }
             setAiEvaluation(aiEval);
           }
         }
@@ -112,23 +115,10 @@ export default function CandidateDetailsPage() {
                 } as any)
               : prev
           )
-          setEditedCandidate((prev) =>
-            prev
-              ? ({
-                  ...prev,
-                  hrFields: {
-                    ...(prev as any).hrFields,
-                    nextAction: hrData.hr_decision || (prev as any).hrFields?.nextAction,
-                    nextActionDate: hrData.next_action_date || (prev as any).hrFields?.nextActionDate || null,
-                    notes: hrData.hr_notes || (prev as any).hrFields?.notes,
-                  },
-                } as any)
-              : prev
-          )
         }
       } catch (error) {
         console.error('Failed to load candidate:', error);
-        addToast('error', 'Failed to load candidate details');
+        addToast('error', t('details.loadError'));
       } finally {
         setLoading(false);
       }
@@ -167,13 +157,13 @@ export default function CandidateDetailsPage() {
       const decision = String(editedHrEval.hr_decision || '').toLowerCase()
       const needsDate = decision === 'interview' || decision === 'approve'
       if (needsDate && !editedHrEval.next_action_date) {
-        addToast('error', 'يرجى تحديد تاريخ الإجراء')
+        addToast('error', t('details.pleaseSelectDate'))
         return
       }
       await addHrEvaluation(candidateId, editedHrEval);
       setHrEvaluation({ ...hrEvaluation, ...editedHrEval });
       setIsHrEditing(false);
-      addToast('success', 'HR Evaluation saved successfully');
+      addToast('success', t('details.saveHrSuccess'));
       
       // Reload to get fresh data
       const hrData = await getHrEvaluation(candidateId);
@@ -193,24 +183,11 @@ export default function CandidateDetailsPage() {
               } as any)
             : prev
         )
-        setEditedCandidate((prev) =>
-          prev
-            ? ({
-                ...prev,
-                hrFields: {
-                  ...(prev as any).hrFields,
-                  nextAction: hrData.hr_decision || (prev as any).hrFields?.nextAction,
-                  nextActionDate: hrData.next_action_date || (prev as any).hrFields?.nextActionDate || null,
-                  notes: hrData.hr_notes || (prev as any).hrFields?.notes,
-                },
-              } as any)
-            : prev
-        )
       }
       
     } catch (error) {
       console.error('Failed to save HR evaluation:', error);
-      addToast('error', 'Failed to save HR evaluation');
+      addToast('error', t('details.saveHrError'));
     }
   };
 
@@ -218,7 +195,7 @@ export default function CandidateDetailsPage() {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
         <div className='text-center'>
-          <p className='text-gray-600'>Loading candidate details...</p>
+          <p className='text-gray-600'>{t('details.loading')}</p>
         </div>
       </div>
     );
@@ -228,10 +205,10 @@ export default function CandidateDetailsPage() {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
           <div className='text-center'>
-            <h2 className='text-2xl font-bold text-gray-900 mb-2'>Candidate Not Found</h2>
-            <p className='text-gray-600 mb-4'>The candidate you&apos;re looking for doesn&apos;t exist.</p>
+            <h2 className='text-2xl font-bold text-gray-900 mb-2'>{t('details.notFound')}</h2>
+            <p className='text-gray-600 mb-4'>{t('details.notFoundDesc')}</p>
             <Button onClick={() => router.push('/admin/candidates')}>
-              Back to Candidates
+              {t('details.backToCandidates')}
             </Button>
           </div>
       </div>
@@ -242,52 +219,6 @@ export default function CandidateDetailsPage() {
   // For now we'll assume they are not yet fully implemented in the backend response structure
   // or we need to adapt the UI to show what we have.
   const evaluations: Evaluation[] = []; // Placeholder until we fetch evaluations properly
-
-  const handleSave = async () => {
-    if (!editedCandidate) return;
-    try {
-      const priority = editedCandidate.hrFields?.priority || 'medium';
-      const nextActionRaw = editedCandidate.hrFields?.nextAction || '';
-      const notes = editedCandidate.hrFields?.notes || '';
-      
-      const normalizeDecision = (s: string) => {
-        const v = s.toLowerCase().trim();
-        if (v.includes('interview')) return 'interview';
-        if (v.includes('offer') || v.includes('approve') || v.includes('approved') || v.includes('accept')) return 'approve';
-        if (v.includes('reject')) return 'reject';
-        if (v.includes('hold') || v.includes('pending') || v.includes('review') || v.includes('wait')) return 'hold';
-        return 'hold';
-      };
-      const scoreFromPriority = (p: string) => {
-        if (p === 'high') return 80;
-        if (p === 'medium') return 50;
-        if (p === 'low') return 20;
-        return hrEvaluation?.hr_score || 0;
-      };
-      
-      const payload = {
-        hr_score: scoreFromPriority(priority),
-        hr_decision: normalizeDecision(nextActionRaw),
-        hr_notes: notes,
-        next_action_date: editedCandidate.hrFields?.nextActionDate || null
-      };
-      
-      await addHrEvaluation(candidateId, payload);
-      const fresh = await getHrEvaluation(candidateId);
-      setHrEvaluation(fresh);
-      setCandidate(editedCandidate);
-      setIsEditing(false);
-      addToast('success', 'تم حفظ حقول HR في قاعدة البيانات');
-    } catch (e) {
-      console.error(e);
-      addToast('error', 'فشل حفظ حقول HR');
-    }
-  };
-
-  const handleCancel = () => {
-    setEditedCandidate(candidate);
-    setIsEditing(false);
-  };
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -310,8 +241,6 @@ export default function CandidateDetailsPage() {
     };
     return colors[priority as keyof typeof colors] || 'text-gray-600';
   };
-
-  const currentCandidate = editedCandidate || candidate;
 
   const handleAnalyze = async () => {
     setAiLoading(true);
@@ -350,33 +279,7 @@ export default function CandidateDetailsPage() {
       subtitle={candidate.position}
       actions={
         <div className='flex space-x-3'>
-          {!isEditing ? (
-            <Button
-              onClick={() => setIsEditing(true)}
-              className='flex items-center space-x-2'
-            >
-              <Edit3 className='w-4 h-4' />
-              <span>{t('details.editCandidate')}</span>
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant='outline'
-                onClick={handleCancel}
-                className='flex items-center space-x-2'
-              >
-                <X className='w-4 h-4' />
-                <span>{tCommon('cancel')}</span>
-              </Button>
-              <Button
-                onClick={handleSave}
-                className='flex items-center space-x-2'
-              >
-                <Save className='w-4 h-4' />
-                <span>{tCommon('save')}</span>
-              </Button>
-            </>
-          )}
+          {/* Edit button removed */}
         </div>
       }
     >
@@ -491,10 +394,10 @@ export default function CandidateDetailsPage() {
             </Card>
             
             <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Form Answers</h2>
+              <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.formAnswers')}</h2>
               <div className='space-y-3'>
                 {answers.length === 0 ? (
-                  <p className='text-sm text-gray-600'>No answers available</p>
+                  <p className='text-sm text-gray-600'>{t('details.noAnswers')}</p>
                 ) : (
                   answers.map((ans) => (
                     <div key={ans.id} className='p-3 border border-gray-200 rounded-lg'>
@@ -504,7 +407,7 @@ export default function CandidateDetailsPage() {
                           ans.audioUrl ? (
                             <audio controls src={ans.audioUrl} className='w-full mt-2' />
                           ) : (
-                            <p className='text-sm text-gray-700'>Voice response recorded</p>
+                            <p className='text-sm text-gray-700'>{t('details.voiceResponseRecorded')}</p>
                           )
                         ) : ans.type === 'file' ? (
                           ans.value ? (
@@ -515,10 +418,10 @@ export default function CandidateDetailsPage() {
                               className='inline-flex items-center space-x-2 text-blue-600 hover:underline break-all'
                             >
                               <FileText className='w-4 h-4' />
-                              <span>{ans.fileName || 'Download file'}</span>
+                              <span>{ans.fileName || t('details.downloadFile')}</span>
                             </a>
                           ) : (
-                            <span className='text-sm text-gray-500'>No file provided</span>
+                            <span className='text-sm text-gray-500'>{t('details.noFileProvided')}</span>
                           )
                         ) : ans.type === 'url' || ans.isUrl ? (
                           ans.value ? (
@@ -532,7 +435,7 @@ export default function CandidateDetailsPage() {
                               <span>{ans.value}</span>
                             </a>
                           ) : (
-                            <span className='text-sm text-gray-500'>No link provided</span>
+                            <span className='text-sm text-gray-500'>{t('details.noLinkProvided')}</span>
                           )
                         ) : (
                           <p className='text-sm text-gray-700'>{ans.value || '—'}</p>
@@ -546,22 +449,22 @@ export default function CandidateDetailsPage() {
 
             {/* Assignment Submissions */}
             <Card className='p-6'>
-              <h2 className='text-lg font-semibold text-gray-900 mb-4'>Assignment Submissions</h2>
+              <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.assignmentSubmissions')}</h2>
 
               {assignmentsLoading ? (
-                <p className='text-sm text-gray-600'>Loading assignments…</p>
+                <p className='text-sm text-gray-600'>{t('details.loadingAssignments')}</p>
               ) : assignments.length === 0 ? (
-                <p className='text-sm text-gray-500 text-center'>No assignment submissions for this candidate</p>
+                <p className='text-sm text-gray-500 text-center'>{t('details.noAssignments')}</p>
               ) : (
                 <div className='space-y-6'>
                   {assignments.map((a: any, index: number) => (
                     <div key={a.id} className='border border-gray-200 rounded-lg p-4'>
                       {assignments.length > 1 && (
-                        <h4 className='font-medium mb-2'>Assignment {index + 1}</h4>
+                        <h4 className='font-medium mb-2'>{t('details.assignmentNumber', { number: index + 1 })}</h4>
                       )}
 
                       <div className='mb-4'>
-                        <Label className='text-sm font-medium text-gray-700'>Solution:</Label>
+                        <Label className='text-sm font-medium text-gray-700'>{t('details.solution')}:</Label>
                         <div className='mt-2 p-4 bg-gray-50 rounded-md border'>
                           <p className='whitespace-pre-wrap text-sm'>{a.text_fields || '—'}</p>
                         </div>
@@ -571,18 +474,18 @@ export default function CandidateDetailsPage() {
                             size='sm'
                             onClick={() => {
                               navigator.clipboard.writeText(String(a.text_fields))
-                              addToast('success', 'Copied to clipboard')
+                              addToast('success', t('details.copiedToClipboard'))
                             }}
                             className='mt-2'
                           >
-                            📋 Copy to Clipboard
+                            📋 {t('details.copyToClipboard')}
                           </Button>
                         )}
                       </div>
 
                       {Array.isArray(a.link_fields) && a.link_fields.length > 0 && (
                         <div>
-                          <Label className='text-sm font-medium text-gray-700'>Links:</Label>
+                          <Label className='text-sm font-medium text-gray-700'>{t('details.links')}:</Label>
                           <div className='mt-2 space-y-2'>
                             {a.link_fields.map((link: string, linkIndex: number) => (
                               <div key={linkIndex} className='flex items-center gap-2'>
@@ -602,7 +505,7 @@ export default function CandidateDetailsPage() {
                       )}
 
                       <div className='mt-4 text-xs text-gray-500'>
-                        Submitted: {a.created_at ? new Date(a.created_at).toLocaleString() : '—'}
+                        {t('details.submitted')} {a.created_at ? new Date(a.created_at).toLocaleString() : '—'}
                       </div>
                     </div>
                   ))}
@@ -647,7 +550,7 @@ export default function CandidateDetailsPage() {
                 })
 
                 if (unique.length === 0) {
-                  return <p className='text-sm text-gray-500'>No documents uploaded</p>
+                  return <p className='text-sm text-gray-500'>{t('details.noDocuments')}</p>
                 }
 
                 return (
@@ -803,7 +706,7 @@ export default function CandidateDetailsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Strengths */}
                     <Card className='p-6 border-green-100 bg-green-50/30'>
-                      <h2 className='text-lg font-semibold text-green-900 mb-4'>Key Strengths</h2>
+                      <h2 className='text-lg font-semibold text-green-900 mb-4'>{t('details.keyStrengths')}</h2>
                       <div className='space-y-2 text-sm text-gray-700'>
                         {aiEvaluation.strengths && aiEvaluation.strengths.length > 0 ? (
                           aiEvaluation.strengths.map((s: string, i: number) => (
@@ -813,14 +716,14 @@ export default function CandidateDetailsPage() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-gray-500">No specific strengths identified.</p>
+                          <p className="text-gray-500">{t('details.noStrengths')}</p>
                         )}
                       </div>
                     </Card>
 
                     {/* Weaknesses */}
                     <Card className='p-6 border-red-100 bg-red-50/30'>
-                      <h2 className='text-lg font-semibold text-red-900 mb-4'>Areas for Improvement</h2>
+                      <h2 className='text-lg font-semibold text-red-900 mb-4'>{t('details.areasForImprovement')}</h2>
                       <div className='space-y-2 text-sm text-gray-700'>
                         {aiEvaluation.weaknesses && aiEvaluation.weaknesses.length > 0 ? (
                           aiEvaluation.weaknesses.map((w: string, i: number) => (
@@ -830,7 +733,7 @@ export default function CandidateDetailsPage() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-gray-500">No specific weaknesses identified.</p>
+                          <p className="text-gray-500">{t('details.noWeaknesses')}</p>
                         )}
                       </div>
                     </Card>
@@ -839,24 +742,24 @@ export default function CandidateDetailsPage() {
                   {/* Detailed Voice Analysis */}
                   {aiEvaluation.analysis.voice_transcripts && aiEvaluation.analysis.voice_transcripts.length > 0 && (
                     <Card className="p-6 border-purple-100 bg-purple-50/30">
-                       <h2 className="text-lg font-semibold text-purple-900 mb-3">Detailed Voice Analysis</h2>
+                       <h2 className="text-lg font-semibold text-purple-900 mb-3">{t('details.detailedVoiceAnalysis')}</h2>
                        <div className="space-y-4">
                           {aiEvaluation.analysis.voice_transcripts.map((vt: any, idx: number) => (
                              <div key={idx} className="bg-white p-4 rounded border border-purple-100 shadow-sm">
-                                <h3 className="font-semibold text-gray-800 text-sm mb-2">{vt.question || `Question ${idx + 1}`}</h3>
+                                <h3 className="font-semibold text-gray-800 text-sm mb-2">{vt.question || `${t('details.question')} ${idx + 1}`}</h3>
                                 <div className="flex items-center gap-2 mb-2">
                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                                       (vt.analysis?.quality_score || 0) >= 70 ? 'bg-green-100 text-green-800' : 
                                       (vt.analysis?.quality_score || 0) >= 40 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                                    }`}>
-                                      Score: {vt.analysis?.quality_score || 0}/100
+                                      {t('details.score')}: {vt.analysis?.quality_score || 0}/100
                                    </span>
                                    <span className="text-xs text-gray-500">
-                                      {vt.analysis?.relevance} relevance
+                                      {vt.analysis?.relevance} {t('details.relevance')}
                                    </span>
                                 </div>
                                 <p className="text-sm text-gray-700 font-medium">
-                                   {vt.analysis?.answer_quality_summary || 'No summary available.'}
+                                   {vt.analysis?.answer_quality_summary || t('details.noSummary')}
                                 </p>
                              </div>
                           ))}
@@ -867,7 +770,7 @@ export default function CandidateDetailsPage() {
                   {/* Detailed Assignment Feedback if available */}
                   {aiEvaluation.analysis.assignment?.evaluation?.answer_evaluation && (
                     <Card className="p-6 border-pink-100 bg-pink-50/30">
-                       <h2 className="text-lg font-semibold text-pink-900 mb-3">Detailed Assignment Feedback</h2>
+                       <h2 className="text-lg font-semibold text-pink-900 mb-3">{t('details.detailedAssignmentFeedback')}</h2>
                        <p className="text-gray-800 text-sm leading-relaxed bg-white p-4 rounded border border-pink-100">
                           {aiEvaluation.analysis.assignment.evaluation.answer_evaluation}
                        </p>
@@ -990,69 +893,6 @@ export default function CandidateDetailsPage() {
             
             <Card className='p-6'>
               <h2 className='text-lg font-semibold text-gray-900 mb-4'>{t('details.hrFields')}</h2>
-              {isEditing ? (
-                <div className='space-y-4'>
-                  <div>
-                    <Label htmlFor='priority'>{t('details.priority')}</Label>
-                    <Select
-                      value={currentCandidate?.hrFields.priority}
-                      onValueChange={(value) => 
-                        setEditedCandidate(prev => prev ? {
-                          ...prev,
-                          hrFields: { ...prev.hrFields, priority: value as any }
-                        } : null)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='low'>{tCommon('low') || 'Low'}</SelectItem>
-                        <SelectItem value='medium'>{tCommon('medium') || 'Medium'}</SelectItem>
-                        <SelectItem value='high'>{tCommon('high') || 'High'}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor='nextAction'>{t('details.nextAction')}</Label>
-                    <Input
-                      value={currentCandidate?.hrFields.nextAction || ''}
-                      onChange={(e) =>
-                        setEditedCandidate(prev => prev ? {
-                          ...prev,
-                          hrFields: { ...prev.hrFields, nextAction: e.target.value }
-                        } : null)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor='nextActionDate'>{t('details.nextActionDate')}</Label>
-                    <Input
-                      type='date'
-                      value={currentCandidate?.hrFields.nextActionDate ? String(currentCandidate.hrFields.nextActionDate) : ''}
-                      onChange={(e) =>
-                        setEditedCandidate(prev => prev ? {
-                          ...prev,
-                          hrFields: { ...prev.hrFields, nextActionDate: e.target.value }
-                        } : null)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor='hrNotes'>{t('details.hrNotes')}</Label>
-                    <Textarea
-                      value={currentCandidate?.hrFields.notes || ''}
-                      onChange={(e) =>
-                        setEditedCandidate(prev => prev ? {
-                          ...prev,
-                          hrFields: { ...prev.hrFields, notes: e.target.value }
-                        } : null)
-                      }
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              ) : (
                 <div className='space-y-4'>
                   <div>
                     <Label className='text-sm font-medium text-gray-500'>{t('details.priority')}</Label>
@@ -1077,7 +917,6 @@ export default function CandidateDetailsPage() {
                     <p className='text-sm text-gray-900'>{candidate.hrFields.notes}</p>
                   </div>
                 </div>
-              )}
             </Card>
             
             {/* Quick Actions removed */}

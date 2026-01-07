@@ -7,25 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/context/ToastContext'
 import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from '@/actions/notifications'
 import type { NotificationRow, NotificationType } from '@/types/notification'
-
-const TYPES: Array<{ value: 'all' | NotificationType; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'new_application', label: 'New application' },
-  { value: 'application_completed', label: 'Application completed' },
-  { value: 'incomplete_application', label: 'Incomplete application' },
-  { value: 'duplicate_application', label: 'Duplicate application' },
-  { value: 'job_created', label: 'Job created' },
-  { value: 'job_updated', label: 'Job updated' },
-  { value: 'ai_evaluation_ready', label: 'AI evaluation ready' },
-  { value: 'interview_scheduled', label: 'Interview scheduled' },
-  { value: 'interview_uploaded', label: 'Interview uploaded' },
-  { value: 'interview_analysis_ready', label: 'Interview analysis ready' },
-  { value: 'assignment_submitted', label: 'Assignment submitted' },
-  { value: 'status_changed', label: 'Status changed' },
-  { value: 'reminder', label: 'Reminder' },
-]
 
 function getActionUrl(n: any): string | null {
   const m = n?.metadata as any
@@ -34,8 +18,26 @@ function getActionUrl(n: any): string | null {
 }
 
 export default function NotificationsPage() {
+  const t = useTranslations('Notifications')
   const { addToast } = useToast()
   const router = useRouter()
+
+  const TYPES: Array<{ value: 'all' | NotificationType; label: string }> = [
+    { value: 'all', label: t('filterAll') },
+    { value: 'new_application', label: t('types.new_application') },
+    { value: 'application_completed', label: t('types.application_completed') },
+    { value: 'incomplete_application', label: t('types.incomplete_application') },
+    { value: 'duplicate_application', label: t('types.duplicate_application') },
+    { value: 'job_created', label: t('types.job_created') },
+    { value: 'job_updated', label: t('types.job_updated') },
+    { value: 'ai_evaluation_ready', label: t('types.ai_evaluation_ready') },
+    { value: 'interview_scheduled', label: t('types.interview_scheduled') },
+    { value: 'interview_uploaded', label: t('types.interview_uploaded') },
+    { value: 'interview_analysis_ready', label: t('types.interview_analysis_ready') },
+    { value: 'assignment_submitted', label: t('types.assignment_submitted') },
+    { value: 'status_changed', label: t('types.status_changed') },
+    { value: 'reminder', label: t('types.reminder') },
+  ]
 
   const [items, setItems] = useState<NotificationRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,20 +110,20 @@ export default function NotificationsPage() {
           </div>
 
           <Button variant={unreadOnly ? 'default' : 'outline'} onClick={() => setUnreadOnly((v) => !v)}>
-            {unreadOnly ? 'Showing unread' : 'Show unread only'}
+            {unreadOnly ? t('showUnreadOnly') : t('showUnreadOnly')}
           </Button>
 
           <Button variant='outline' onClick={markAll} disabled={!items.some((x) => !x.is_read)}>
-            Mark all as read
+            {t('markAllAsRead')}
           </Button>
         </div>
 
         <Card className='p-0 overflow-hidden'>
           <div className='divide-y'>
             {loading ? (
-              <div className='p-6 text-sm text-gray-500'>Loading…</div>
+              <div className='p-6 text-sm text-gray-500'>{t('loading')}</div>
             ) : items.length === 0 ? (
-              <div className='p-6 text-sm text-gray-500'>No notifications</div>
+              <div className='p-6 text-sm text-gray-500'>{t('empty')}</div>
             ) : (
               items.map((n) => (
                 <button

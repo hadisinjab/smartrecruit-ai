@@ -24,11 +24,12 @@ import {
   Info,
   Globe
 } from 'lucide-react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { useUser } from '@/context/UserContext';
 
 export default function SettingsPage() {
+  const t = useTranslations('Settings');
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('general');
@@ -52,7 +53,7 @@ export default function SettingsPage() {
       } catch (error) {
         console.error('Failed to load settings:', error);
         if (isMounted) {
-          addToast('error', 'Failed to load settings');
+          addToast('error', t('loadError'));
         }
       } finally {
         if (isMounted) {
@@ -72,7 +73,7 @@ export default function SettingsPage() {
 
   const handleSettingChange = (section: keyof SystemSettings, field: string, value: any) => {
     if (!isSuperAdmin) {
-      addToast('info', 'Read-only mode: only Super Admin can change settings.');
+      addToast('info', t('readOnly'));
       return;
     }
     if (!settings) return;
@@ -91,7 +92,7 @@ export default function SettingsPage() {
 
   const handleNestedSettingChange = (section: keyof SystemSettings, subsection: string, field: string, value: any) => {
     if (!isSuperAdmin) {
-      addToast('info', 'Read-only mode: only Super Admin can change settings.');
+      addToast('info', t('readOnly'));
       return;
     }
     if (!settings) return;
@@ -114,7 +115,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!settings) return;
     if (!isSuperAdmin) {
-      addToast('error', 'Access denied: Settings are read-only for Admin.');
+      addToast('error', t('accessDenied'));
       return;
     }
     
@@ -122,14 +123,14 @@ export default function SettingsPage() {
     try {
       const result = await updateSystemSettings(settings);
       if (result.success) {
-        addToast('success', 'Settings saved successfully');
+        addToast('success', t('saveSuccess'));
         setHasUnsavedChanges(false);
       } else {
-        addToast('error', result.error || 'Failed to save settings');
+        addToast('error', result.error || t('saveError'));
       }
     } catch (error) {
       console.error('Error saving settings:', error);
-      addToast('error', 'An unexpected error occurred');
+      addToast('error', t('unexpectedError'));
     } finally {
       setLoading(false);
     }
@@ -137,7 +138,7 @@ export default function SettingsPage() {
 
   const handleReset = async () => {
     if (!isSuperAdmin) {
-      addToast('info', 'Read-only mode: no changes to discard.');
+      addToast('info', t('readOnly'));
       return;
     }
     setLoading(true);
@@ -145,10 +146,10 @@ export default function SettingsPage() {
       const data = await getSystemSettings();
       setSettings(data);
       setHasUnsavedChanges(false);
-      addToast('info', 'Changes discarded');
+      addToast('info', t('discardSuccess'));
     } catch (error) {
       console.error('Error resetting settings:', error);
-      addToast('error', 'Failed to reset settings');
+      addToast('error', t('resetError'));
     } finally {
       setLoading(false);
     }
@@ -157,48 +158,48 @@ export default function SettingsPage() {
   const sections = [
     {
       id: 'general',
-      title: 'General Settings',
+      title: t('General.title'),
       icon: Globe,
-      description: 'Configure language and regional preferences'
+      description: t('General.description')
     },
     {
       id: 'email',
-      title: 'Email Settings',
+      title: t('Email.title'),
       icon: Mail,
-      description: 'Configure email server and notification preferences'
+      description: t('Email.description')
     },
     {
       id: 'ai',
-      title: 'AI Integrations',
+      title: t('AI.title'),
       icon: Brain,
-      description: 'Manage AI-powered features and automation'
+      description: t('AI.description')
     },
     {
       id: 'security',
-      title: 'Security Settings',
+      title: t('Security.title'),
       icon: Shield,
-      description: 'Configure security policies and access controls'
+      description: t('Security.description')
     },
     {
       id: 'export',
-      title: 'Export Defaults',
+      title: t('Export.title'),
       icon: Download,
-      description: 'Set default export formats and data handling'
+      description: t('Export.description')
     }
   ];
 
   const renderGeneralSettings = () => (
     <div className='space-y-6'>
       <div>
-        <h3 className='text-lg font-semibold text-gray-900 mb-4'>Language & Region</h3>
+        <h3 className='text-lg font-semibold text-gray-900 mb-4'>{t('General.languageRegion')}</h3>
         <div className='max-w-md'>
-          <Label htmlFor='language'>Display Language</Label>
+          <Label htmlFor='language'>{t('General.displayLanguage')}</Label>
           <Select
             value={locale}
             onValueChange={handleLanguageChange}
           >
             <SelectTrigger id='language' className='mt-1.5'>
-              <SelectValue placeholder='Select language' />
+              <SelectValue placeholder={t('General.selectLanguage')} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value='en'>English (US)</SelectItem>
@@ -206,7 +207,7 @@ export default function SettingsPage() {
             </SelectContent>
           </Select>
           <p className='text-sm text-gray-500 mt-2'>
-            Select the language you want to use for the admin interface.
+            {t('General.languageHelp')}
           </p>
         </div>
       </div>
@@ -216,10 +217,10 @@ export default function SettingsPage() {
   const renderEmailSettings = () => (
     <div className='space-y-6'>
       <div>
-        <h3 className='text-lg font-semibold text-gray-900 mb-4'>SMTP Configuration</h3>
+        <h3 className='text-lg font-semibold text-gray-900 mb-4'>{t('Email.smtpConfig')}</h3>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
           <div>
-            <Label htmlFor='smtpHost'>SMTP Host</Label>
+            <Label htmlFor='smtpHost'>{t('Email.host')}</Label>
             <Input
               id='smtpHost'
               value={settings?.email.smtpHost || ''}
@@ -227,7 +228,7 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <Label htmlFor='smtpPort'>SMTP Port</Label>
+            <Label htmlFor='smtpPort'>{t('Email.port')}</Label>
             <Input
               id='smtpPort'
               type='number'
@@ -236,7 +237,7 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <Label htmlFor='smtpUsername'>Username</Label>
+            <Label htmlFor='smtpUsername'>{t('Email.username')}</Label>
             <Input
               id='smtpUsername'
               value={settings?.email.smtpUsername || ''}
@@ -244,7 +245,7 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <Label htmlFor='smtpPassword'>Password</Label>
+            <Label htmlFor='smtpPassword'>{t('Email.password')}</Label>
             <div className='relative'>
               <Input
                 id='smtpPassword'
@@ -264,7 +265,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div>
-            <Label htmlFor='fromName'>From Name</Label>
+            <Label htmlFor='fromName'>{t('Email.fromName')}</Label>
             <Input
               id='fromName'
               value={settings?.email.fromName || ''}
@@ -272,7 +273,7 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <Label htmlFor='fromEmail'>From Email</Label>
+            <Label htmlFor='fromEmail'>{t('Email.fromEmail')}</Label>
             <Input
               id='fromEmail'
               type='email'
@@ -286,15 +287,15 @@ export default function SettingsPage() {
       <div className='border-t pt-6'>
         <div className='flex items-center justify-between'>
           <div>
-            <Label>Enable Email Notifications</Label>
-            <p className='text-sm text-gray-500'>Send automatic notifications for application updates</p>
+            <Label>{t('Email.enableNotifications')}</Label>
+            <p className='text-sm text-gray-500'>{t('Email.enableNotificationsDesc')}</p>
           </div>
           <Button
             variant={settings?.email.enableNotifications ? 'default' : 'outline'}
             onClick={() => handleSettingChange('email', 'enableNotifications', !settings?.email.enableNotifications)}
             className='min-w-[80px]'
           >
-            {settings?.email.enableNotifications ? 'Enabled' : 'Disabled'}
+            {settings?.email.enableNotifications ? t('enabled') : t('disabled')}
           </Button>
         </div>
       </div>
@@ -305,10 +306,10 @@ export default function SettingsPage() {
     <div className='space-y-6'>
       <div className='space-y-4'>
         {[
-          { key: 'resumeParsing', title: 'Resume Parsing', description: 'Automatically extract candidate information from resumes' },
-          { key: 'candidateScoring', title: 'Candidate Scoring', description: 'AI-powered candidate evaluation and scoring' },
-          { key: 'interviewScheduling', title: 'Smart Interview Scheduling', description: 'Automated interview scheduling based on availability' },
-          { key: 'smartMatching', title: 'Smart Job Matching', description: 'Intelligent matching between candidates and job requirements' }
+          { key: 'resumeParsing', title: t('AI.resumeParsing'), description: t('AI.resumeParsingDesc') },
+          { key: 'candidateScoring', title: t('AI.candidateScoring'), description: t('AI.candidateScoringDesc') },
+          { key: 'interviewScheduling', title: t('AI.interviewScheduling'), description: t('AI.interviewSchedulingDesc') },
+          { key: 'smartMatching', title: t('AI.smartMatching'), description: t('AI.smartMatchingDesc') }
         ].map((feature) => (
           <div key={feature.key} className='flex items-center justify-between p-4 border border-gray-200 rounded-lg'>
             <div className='flex-1'>
@@ -323,7 +324,7 @@ export default function SettingsPage() {
               disabled={!isSuperAdmin}
               className='min-w-[80px]'
             >
-              {(settings as any)?.ai?.[feature.key] ? 'Enabled' : 'Disabled'}
+              {(settings as any)?.ai?.[feature.key] ? t('enabled') : t('disabled')}
             </Button>
           </div>
         ))}
@@ -334,10 +335,10 @@ export default function SettingsPage() {
   const renderSecuritySettings = () => (
     <div className='space-y-6'>
       <div>
-        <h3 className='text-lg font-semibold text-gray-900 mb-4'>Password Policy</h3>
+        <h3 className='text-lg font-semibold text-gray-900 mb-4'>{t('Security.passwordPolicy')}</h3>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
           <div>
-            <Label htmlFor='minLength'>Minimum Password Length</Label>
+            <Label htmlFor='minLength'>{t('Security.minLength')}</Label>
             <Input
               id='minLength'
               type='number'
@@ -345,11 +346,11 @@ export default function SettingsPage() {
               onChange={(e) => handleNestedSettingChange('security', 'passwordPolicy', 'minLength', parseInt(e.target.value))}
               readOnly={!isSuperAdmin}
             />
-            {!isSuperAdmin && <p className='text-xs text-gray-500 mt-1'>Read-only</p>}
+            {!isSuperAdmin && <p className='text-xs text-gray-500 mt-1'>{t('readOnlyLabel')}</p>}
           </div>
           <div className='space-y-3'>
             <div className='flex items-center justify-between'>
-              <Label>Require Uppercase Letters</Label>
+              <Label>{t('Security.requireUppercase')}</Label>
               <Button
                 variant={settings?.security.passwordPolicy.requireUppercase ? 'default' : 'outline'}
                 onClick={() =>
@@ -363,11 +364,11 @@ export default function SettingsPage() {
                 disabled={!isSuperAdmin}
                 className='min-w-[80px]'
               >
-                {settings?.security.passwordPolicy.requireUppercase ? 'On' : 'Off'}
+                {settings?.security.passwordPolicy.requireUppercase ? t('on') : t('off')}
               </Button>
             </div>
             <div className='flex items-center justify-between'>
-              <Label>Require Numbers</Label>
+              <Label>{t('Security.requireNumbers')}</Label>
               <Button
                 variant={settings?.security.passwordPolicy.requireNumbers ? 'default' : 'outline'}
                 onClick={() =>
@@ -381,11 +382,11 @@ export default function SettingsPage() {
                 disabled={!isSuperAdmin}
                 className='min-w-[80px]'
               >
-                {settings?.security.passwordPolicy.requireNumbers ? 'On' : 'Off'}
+                {settings?.security.passwordPolicy.requireNumbers ? t('on') : t('off')}
               </Button>
             </div>
             <div className='flex items-center justify-between'>
-              <Label>Require Special Characters</Label>
+              <Label>{t('Security.requireSymbols')}</Label>
               <Button
                 variant={settings?.security.passwordPolicy.requireSymbols ? 'default' : 'outline'}
                 onClick={() =>
@@ -399,7 +400,7 @@ export default function SettingsPage() {
                 disabled={!isSuperAdmin}
                 className='min-w-[80px]'
               >
-                {settings?.security.passwordPolicy.requireSymbols ? 'On' : 'Off'}
+                {settings?.security.passwordPolicy.requireSymbols ? t('on') : t('off')}
               </Button>
             </div>
           </div>
@@ -409,7 +410,7 @@ export default function SettingsPage() {
       <div className='border-t pt-6'>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
           <div>
-            <Label htmlFor='sessionTimeout'>Session Timeout (minutes)</Label>
+            <Label htmlFor='sessionTimeout'>{t('Security.sessionTimeout')}</Label>
             <Input
               id='sessionTimeout'
               type='number'
@@ -417,12 +418,12 @@ export default function SettingsPage() {
               onChange={(e) => handleSettingChange('security', 'sessionTimeout', parseInt(e.target.value))}
               readOnly={!isSuperAdmin}
             />
-            {!isSuperAdmin && <p className='text-xs text-gray-500 mt-1'>Read-only</p>}
+            {!isSuperAdmin && <p className='text-xs text-gray-500 mt-1'>{t('readOnlyLabel')}</p>}
           </div>
           <div className='flex items-center justify-between p-4 border border-gray-200 rounded-lg'>
             <div>
-              <Label>Two-Factor Authentication</Label>
-              <p className='text-sm text-gray-500'>Require 2FA for all admin users</p>
+              <Label>{t('Security.2fa')}</Label>
+              <p className='text-sm text-gray-500'>{t('Security.2faDesc')}</p>
             </div>
             <Button
               variant={settings?.security.twoFactorRequired ? 'default' : 'outline'}
@@ -430,7 +431,7 @@ export default function SettingsPage() {
               disabled={!isSuperAdmin}
               className='min-w-[80px]'
             >
-              {settings?.security.twoFactorRequired ? 'On' : 'Off'}
+              {settings?.security.twoFactorRequired ? t('on') : t('off')}
             </Button>
           </div>
         </div>
@@ -441,7 +442,7 @@ export default function SettingsPage() {
   const renderExportSettings = () => (
     <div className='space-y-6'>
       <div>
-        <h3 className='text-lg font-semibold text-gray-900 mb-4'>Default Export Format</h3>
+        <h3 className='text-lg font-semibold text-gray-900 mb-4'>{t('Export.defaultFormat')}</h3>
         <Select
           value={settings?.export.defaultFormat || 'csv'}
           onValueChange={(value) => handleSettingChange('export', 'defaultFormat', value)}
@@ -450,9 +451,9 @@ export default function SettingsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value='csv'>CSV (Comma Separated Values)</SelectItem>
-            <SelectItem value='xlsx'>Excel (XLSX)</SelectItem>
-            <SelectItem value='pdf'>PDF Report</SelectItem>
+            <SelectItem value='csv'>{t('Export.csv')}</SelectItem>
+            <SelectItem value='xlsx'>{t('Export.xlsx')}</SelectItem>
+            <SelectItem value='pdf'>{t('Export.pdf')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -460,22 +461,22 @@ export default function SettingsPage() {
       <div className='space-y-4'>
         <div className='flex items-center justify-between p-4 border border-gray-200 rounded-lg'>
           <div>
-            <Label>Include Personal Data</Label>
-            <p className='text-sm text-gray-500'>Include sensitive personal information in exports</p>
+            <Label>{t('Export.includePersonal')}</Label>
+            <p className='text-sm text-gray-500'>{t('Export.includePersonalDesc')}</p>
           </div>
           <Button
             variant={settings?.export.includePersonalData ? 'default' : 'outline'}
             onClick={() => handleSettingChange('export', 'includePersonalData', !settings?.export.includePersonalData)}
             className='min-w-[80px]'
           >
-            {settings?.export.includePersonalData ? 'Enabled' : 'Disabled'}
+            {settings?.export.includePersonalData ? t('enabled') : t('disabled')}
           </Button>
         </div>
 
         <div className='flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-green-50 border-green-200'>
           <div>
-            <Label>Anonymize Data</Label>
-            <p className='text-sm text-gray-500'>Automatically anonymize personal identifiers in exports</p>
+            <Label>{t('Export.anonymize')}</Label>
+            <p className='text-sm text-gray-500'>{t('Export.anonymizeDesc')}</p>
           </div>
           <Button
             variant={settings?.export.anonymizeData ? 'default' : 'outline'}
@@ -483,7 +484,7 @@ export default function SettingsPage() {
             disabled={!isSuperAdmin}
             className='min-w-[80px]'
           >
-            {settings?.export.anonymizeData ? 'Enabled' : 'Disabled'}
+            {settings?.export.anonymizeData ? t('enabled') : t('disabled')}
           </Button>
         </div>
       </div>
@@ -492,10 +493,9 @@ export default function SettingsPage() {
         <div className='flex items-start space-x-3'>
           <Info className='w-5 h-5 text-blue-600 mt-0.5' />
           <div>
-            <h3 className='text-sm font-medium text-blue-900'>Export Compliance</h3>
+            <h3 className='text-sm font-medium text-blue-900'>{t('Export.compliance')}</h3>
             <p className='text-sm text-blue-800 mt-1'>
-              Data anonymization helps ensure compliance with GDPR and other privacy regulations.
-              Enable both personal data inclusion and anonymization for maximum compliance.
+              {t('Export.complianceDesc')}
             </p>
           </div>
         </div>
@@ -540,8 +540,8 @@ export default function SettingsPage() {
         subtitle="Manage system configuration and preferences"
       >
         <div className="flex flex-col items-center justify-center h-96">
-           <p className="text-red-500 mb-4">Failed to load settings</p>
-           <Button onClick={() => window.location.reload()}>Retry</Button>
+           <p className="text-red-500 mb-4">{t('loadError')}</p>
+           <Button onClick={() => window.location.reload()}>{t('retry')}</Button>
         </div>
       </AdminLayout>
    )
@@ -549,15 +549,15 @@ export default function SettingsPage() {
 
  return (
    <AdminLayout
-     title="Settings"
-     subtitle="Manage system configuration and preferences"
+     title={t('title')}
+     subtitle={t('subtitle')}
    >
      <div className='space-y-6'>
        <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
          {/* Settings Navigation */}
          <div className='lg:col-span-1'>
            <Card className='p-4'>
-             <h3 className='text-sm font-semibold text-gray-900 mb-4'>Settings Categories</h3>
+             <h3 className='text-sm font-semibold text-gray-900 mb-4'>{t('categories')}</h3>
              <nav className='space-y-1'>
                {sections.map((section) => {
                  const Icon = section.icon;
@@ -600,7 +600,7 @@ export default function SettingsPage() {
                {hasUnsavedChanges && (
                  <div className='flex items-center space-x-2'>
                   <Button variant='outline' onClick={handleReset} disabled={loading || !isSuperAdmin}>
-                     Reset
+                     {t('discard')}
                    </Button>
                   <Button onClick={handleSave} disabled={loading || !isSuperAdmin}>
                      {loading ? (
@@ -608,7 +608,7 @@ export default function SettingsPage() {
                      ) : (
                        <Save className='w-4 h-4 mr-2' />
                      )}
-                     Save Changes
+                     {t('save')}
                    </Button>
                  </div>
                )}

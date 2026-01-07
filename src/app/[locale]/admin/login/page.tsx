@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import { Card } from '@/components/ui/admin-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const t = useTranslations('Login');
   const supabase = createClient();
   const { refreshUser } = useUser();
 
@@ -95,85 +97,84 @@ export default function AdminLogin() {
         {/* Logo */}
         <div className='text-center mb-8'>
           <h1 className='text-3xl font-bold text-gray-900 mb-2'>SmartRecruit AI</h1>
-          <p className='text-gray-600'>Admin Portal</p>
+          <p className='text-gray-600'>{t('adminPortal')}</p>
         </div>
 
-        {/* Login Form */}
-        <Card className='p-8'>
-          <div className='mb-6'>
-            <h2 className='text-2xl font-semibold text-gray-900 mb-2'>Welcome Back</h2>
-            <p className='text-gray-600'>Sign in to your admin account</p>
+        <Card className='p-8 shadow-xl border-0'>
+          <div className='text-center mb-8'>
+            <h2 className='text-2xl font-bold text-gray-900'>{t('welcomeBack')}</h2>
+            <p className='text-gray-600'>{t('signInSubtitle')}</p>
           </div>
 
+          {error && (
+            <div className='mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700'>
+              <AlertCircle className='w-5 h-5 flex-shrink-0' />
+              <p className='text-sm'>{error}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className='space-y-6'>
-            {/* Email Field */}
-            <div>
-              <Label htmlFor='email' className='text-sm font-medium text-gray-700'>
-                Email Address
-              </Label>
-              <div className='mt-1 relative'>
-                <Mail className='w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
+            <div className='space-y-2'>
+              <Label htmlFor='email'>{t('emailLabel')}</Label>
+              <div className='relative'>
+                <Mail className='absolute left-3 top-3 h-5 w-5 text-gray-400' />
                 <Input
                   id='email'
                   type='email'
+                  placeholder='admin@smartrecruit.com'
+                  className='pl-10'
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className='pl-10'
-                  placeholder='admin@smartrecruit.com'
                   required
                 />
               </div>
             </div>
 
-            {/* Password Field */}
-            <div>
-              <Label htmlFor='password' className='text-sm font-medium text-gray-700'>
-                Password
-              </Label>
-              <div className='mt-1 relative'>
-                <Lock className='w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400' />
+            <div className='space-y-2'>
+              <Label htmlFor='password'>{t('passwordLabel')}</Label>
+              <div className='relative'>
+                <Lock className='absolute left-3 top-3 h-5 w-5 text-gray-400' />
                 <Input
                   id='password'
                   type={showPassword ? 'text' : 'password'}
+                  placeholder={t('passwordPlaceholder')}
+                  className='pl-10 pr-10'
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className='pl-10 pr-10'
-                  placeholder='Enter your password'
                   required
                 />
                 <button
                   type='button'
                   onClick={() => setShowPassword(!showPassword)}
-                  className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600'
+                  className='absolute right-3 top-3 text-gray-400 hover:text-gray-600'
                 >
-                  {showPassword ? <EyeOff className='w-5 h-5' /> : <Eye className='w-5 h-5' />}
+                  {showPassword ? (
+                    <EyeOff className='w-5 h-5' />
+                  ) : (
+                    <Eye className='w-5 h-5' />
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className='flex items-center justify-between'>
-              <div className='flex items-center'>
+              <div className='flex items-center space-x-2'>
                 <input
-                  id='remember-me'
                   type='checkbox'
-                  className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+                  id='remember'
+                  className='rounded border-gray-300 text-blue-600 focus:ring-blue-500'
                 />
-                <label htmlFor='remember-me' className='ml-2 block text-sm text-gray-900'>
-                  Remember me
-                </label>
+                <Label htmlFor='remember' className='cursor-pointer font-normal'>
+                  {t('rememberMe')}
+                </Label>
               </div>
               <a href='#' className='text-sm font-medium text-blue-600 hover:text-blue-500'>
-                Forgot password?
+                {t('forgotPassword')}
               </a>
             </div>
 
-            <Button
-              type='submit'
-              className='w-full'
-              disabled={isLoading}
-            >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+            <Button type='submit' className='w-full bg-blue-600 hover:bg-blue-700' disabled={isLoading}>
+              {isLoading ? t('signingIn') : t('signInButton')}
             </Button>
           </form>
         </Card>

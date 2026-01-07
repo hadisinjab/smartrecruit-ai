@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { createInterview } from '@/actions/interviews'
 import { useToast } from '@/context/ToastContext'
+import { useTranslations } from 'next-intl'
 
 interface AddInterviewModalProps {
   applicationId: string
@@ -21,6 +22,8 @@ interface AddInterviewModalProps {
 }
 
 export function AddInterviewModal({ applicationId, onSuccess }: AddInterviewModalProps) {
+  const t = useTranslations('Candidates.Interviews')
+  const tCommon = useTranslations('Common')
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
   const [notes, setNotes] = useState('')
@@ -67,17 +70,17 @@ export function AddInterviewModal({ applicationId, onSuccess }: AddInterviewModa
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>+ Add Interview</Button>
+        <Button>+ {t('addInterview')}</Button>
       </DialogTrigger>
       <DialogContent className='sm:max-w-[520px]'>
         <DialogHeader>
-          <DialogTitle>Add Interview Recording</DialogTitle>
+          <DialogTitle>{t('addRecordingTitle')}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className='space-y-4'>
           <div>
             <Label htmlFor='url'>
-              Recording Link <span className='text-red-600'>*</span>
+              {t('recordingLink')} <span className='text-red-600'>*</span>
             </Label>
             <Input
               id='url'
@@ -89,12 +92,12 @@ export function AddInterviewModal({ applicationId, onSuccess }: AddInterviewModa
             />
             {error ? <p className='text-sm text-red-600 mt-1'>{error}</p> : null}
             <div className='mt-2 text-xs text-gray-500'>
-              Supported: YouTube (unlisted/public), Google Drive, Dropbox/OneDrive, direct links (.mp3/.mp4/.wav)
+              {t('supportedFormats')}
             </div>
           </div>
 
           <div>
-            <Label htmlFor='notes'>Notes (optional)</Label>
+            <Label htmlFor='notes'>{t('notes')}</Label>
             <Textarea
               id='notes'
               placeholder='e.g., Technical interview focused on APIs and database design'
@@ -108,10 +111,10 @@ export function AddInterviewModal({ applicationId, onSuccess }: AddInterviewModa
 
           <div className='flex justify-end gap-2 pt-2'>
             <Button type='button' variant='outline' onClick={() => setOpen(false)} disabled={isSubmitting}>
-              Cancel
+              {tCommon('cancel')}
             </Button>
             <Button type='submit' disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save'}
+              {isSubmitting ? tCommon('save') + '...' : tCommon('save')}
             </Button>
           </div>
         </form>

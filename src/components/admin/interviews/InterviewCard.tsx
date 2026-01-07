@@ -8,6 +8,7 @@ import { deleteInterview } from '@/actions/interviews'
 import { useToast } from '@/context/ToastContext'
 import { InterviewAnalysisDialog } from './InterviewAnalysisDialog'
 import type { Interview } from '@/types/interview'
+import { useTranslations } from 'next-intl'
 
 interface InterviewCardProps {
   interview: Interview
@@ -16,25 +17,26 @@ interface InterviewCardProps {
 }
 
 export function InterviewCard({ interview, index, onDeleted }: InterviewCardProps) {
+  const t = useTranslations('Candidates.Interviews')
   const [isDeleting, setIsDeleting] = useState(false)
   const { addToast } = useToast()
 
   const handleDelete = async () => {
-    const ok = window.confirm('Delete this interview?')
+    const ok = window.confirm(t('deleteConfirm'))
     if (!ok) return
 
     setIsDeleting(true)
     try {
       const res = await deleteInterview(interview.id)
       if (res.ok) {
-        addToast('success', 'Interview deleted')
+        addToast('success', t('deleteSuccess'))
         onDeleted()
       } else {
-        addToast('error', res.error || 'Failed to delete interview')
+        addToast('error', res.error || t('deleteError'))
       }
     } catch (e) {
       console.error(e)
-      addToast('error', 'Failed to delete interview')
+      addToast('error', t('deleteError'))
     } finally {
       setIsDeleting(false)
     }
@@ -44,9 +46,9 @@ export function InterviewCard({ interview, index, onDeleted }: InterviewCardProp
     <Card className='p-4'>
       <div className='flex items-start justify-between gap-3 mb-3'>
         <div>
-          <h4 className='font-medium text-gray-900'>Interview #{index + 1}</h4>
+          <h4 className='font-medium text-gray-900'>{t('interviewNumber', { number: index + 1 })}</h4>
           <div className='text-xs text-gray-500 mt-1'>
-            Uploaded: {interview.created_at ? new Date(interview.created_at).toLocaleString() : '—'}
+            {t('uploaded')} {interview.created_at ? new Date(interview.created_at).toLocaleString() : '—'}
           </div>
         </div>
 
@@ -58,30 +60,30 @@ export function InterviewCard({ interview, index, onDeleted }: InterviewCardProp
           className='text-red-600 hover:text-red-700 hover:bg-red-50'
         >
           <Trash2 className='w-4 h-4 mr-2' />
-          {isDeleting ? 'Deleting...' : 'Delete'}
+          {isDeleting ? t('deleting') : t('delete')}
         </Button>
       </div>
 
       <div className='space-y-4'>
         <div>
-          <div className='text-sm text-gray-600 mb-1'>Recording</div>
+          <div className='text-sm text-gray-600 mb-1'>{t('recording')}</div>
           <a
             href={interview.audio_or_video_url}
             target='_blank'
             rel='noopener noreferrer'
             className='inline-flex items-center gap-2 text-sm text-blue-600 hover:underline break-all'
           >
-            <span>Open recording</span>
+            <span>{t('openRecording')}</span>
             <ExternalLink className='w-4 h-4' />
           </a>
         </div>
 
         <div>
-          <div className='text-sm text-gray-600 mb-1'>AI Analysis</div>
+          <div className='text-sm text-gray-600 mb-1'>{t('aiAnalysis')}</div>
           {interview.audio_analysis ? (
             <InterviewAnalysisDialog analysis={interview.audio_analysis} />
           ) : (
-            <div className='text-sm text-gray-500 italic'>Not available yet</div>
+            <div className='text-sm text-gray-500 italic'>{t('notAvailable')}</div>
           )}
         </div>
       </div>

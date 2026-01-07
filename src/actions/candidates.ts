@@ -297,6 +297,7 @@ export async function getCandidateById(id: string) {
     lastProgressEvent,
     lastProgressAt: lastProgressAt || null,
     lastProgressMeta,
+    ai_evaluations: app.ai_evaluations,
     hrFields: {
       priority: 'medium',
       notes: latestHrEval.hr_notes || '',

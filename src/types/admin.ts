@@ -72,6 +72,7 @@ export interface Candidate {
   // Only populated for Super Admin views
   organizationName?: string;
   jobOwnerName?: string;
+  ai_evaluations?: any[];
 }
 
 export interface Evaluation {
