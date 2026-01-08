@@ -8,6 +8,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DEFAULT_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'resumes';
 const HAS_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
+console.log('[Supabase Config] URL:', SUPABASE_URL ? 'Set' : 'Missing');
+console.log('[Supabase Config] KEY:', SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Missing');
+
 if (!HAS_SUPABASE) {
   console.warn('Warning: Supabase variables are incomplete (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY)');
 }

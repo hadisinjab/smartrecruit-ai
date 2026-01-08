@@ -190,15 +190,8 @@
       "close": "إغلاق"
     }
   },
-  "Status": {
-    "new": "جديد",
-    "applied": "تم التقديم",
-    "screening": "فرز",
-    "interview": "مقابلة",
-    "offer": "عرض عمل",
-    "hired": "تم التوظيف",
-    "rejected": "مرفوض"
-  },
+ 
+ 
   "Jobs": {
     "title": "الوظائف",
     "subtitle": "إدارة إعلانات الوظائف وتتبع الطلبات",
@@ -434,7 +427,6 @@
     "actions": "إجراءات",
     "jobTitle": "المسمى الوظيفي",
     "department": "القسم",
-    "location": "الموقع",
     "type": "النوع",
     "applicants": "المتقدمين",
     "salaryRange": "نطاق الراتب",
