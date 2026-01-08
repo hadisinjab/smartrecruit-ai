@@ -79,11 +79,11 @@ export async function getNotifications(opts?: {
         const {
           data: { user },
         } = await supabase.auth.getUser()
-        if (!user) return { ok: false as const, status: 401, error: 'Unauthorized' }
+        if (!user) throw new Error('Access denied')
         query = query.eq('user_id', user.id)
       }
 
-      return await query
+      return (await query) as any
     }
 
     // Prefer selecting metadata, but fall back gracefully if DB schema hasn't been migrated yet.
@@ -97,8 +97,8 @@ export async function getNotifications(opts?: {
       msg.toLowerCase().includes('column') && msg.toLowerCase().includes('metadata') && msg.toLowerCase().includes('does not exist')
 
     if (isMetadataMissing) {
-      const retry = await runQuery('id,user_id,type,title,content,is_read,created_at')
-      if (retry.error) return { ok: false, status: 500, error: retry.error.message || 'Failed to fetch notifications' }
+      const retry = await runQuery('id,user_id,type,title,content,is_read,created_at') as any
+      if (retry.error) return { ok: false, status: 500, error: (retry.error as any).message || retry.error || 'Failed to fetch notifications' }
       return { ok: true, status: 200, data: retry.data || [] }
     }
 

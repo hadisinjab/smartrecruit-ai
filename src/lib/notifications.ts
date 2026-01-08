@@ -16,8 +16,7 @@ export interface CreateNotificationInput {
 export async function createNotification(input: CreateNotificationInput) {
   const admin = createAdminClient()
   const insertWithMetadata = async () =>
-    await admin
-      .from('notifications')
+    await (admin.from('notifications') as any)
       .insert({
         user_id: input.user_id,
         type: input.type,
@@ -25,20 +24,19 @@ export async function createNotification(input: CreateNotificationInput) {
         content: input.content,
         is_read: false,
         metadata: input.metadata ?? null,
-      } as Database['public']['Tables']['notifications']['Insert'])
+      })
       .select('*')
       .single()
 
   const insertWithoutMetadata = async () =>
-    await admin
-      .from('notifications')
+    await (admin.from('notifications') as any)
       .insert({
         user_id: input.user_id,
         type: input.type,
         title: input.title,
         content: input.content,
         is_read: false,
-      } as any)
+      })
       .select('*')
       .single()
 
@@ -69,7 +67,7 @@ export async function getRecipientsForJob(jobFormId: string) {
     .from('job_forms')
     .select('id,organization_id,created_by,title')
     .eq('id', jobFormId)
-    .single()
+    .single() as any
 
   if (jobErr || !job?.id) {
     console.error('[notifications] getRecipientsForJob job lookup error:', jobErr)
@@ -105,7 +103,7 @@ export async function getRecipientsForApplication(applicationId: string) {
     .from('applications')
     .select('id,candidate_name,job_form_id')
     .eq('id', applicationId)
-    .single()
+    .single() as any
 
   if (appErr || !app?.id || !app.job_form_id) {
     console.error('[notifications] getRecipientsForApplication app lookup error:', appErr)

@@ -264,9 +264,7 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
     if (input.role && input.role !== 'reviewer') {
       throw new Error('Access denied: Admins cannot change user roles')
     }
-    if (input.role === 'super-admin') {
-      throw new Error('Access denied')
-    }
+    
 
     // Admins cannot change organization
     if (input.organizationName) {
@@ -338,8 +336,7 @@ export async function updateUser(userId: string, input: Partial<CreateUserInput>
   if (organizationId) publicUpdate.organization_id = organizationId
   if (typeof input.isActive === 'boolean') publicUpdate.is_active = input.isActive
 
-  const { error: publicError } = await adminClient
-    .from('users')
+  const { error: publicError } = await (adminClient.from('users') as any)
     .update(publicUpdate)
     .eq('id', userId)
 
@@ -515,9 +512,8 @@ export async function createUser(input: CreateUserInput) {
 
   // Ensure public.users.is_active matches UI selection (trigger inserts row with default true).
   if (typeof input.isActive === 'boolean') {
-    const { error: activeErr } = await adminClient
-      .from('users')
-      .update({ is_active: input.isActive } as any)
+    const { error: activeErr } = await (adminClient.from('users') as any)
+      .update({ is_active: input.isActive })
       .eq('id', authData.user.id)
 
     if (activeErr) {

@@ -64,7 +64,7 @@ export async function getOrganizationUsers(jobCreatorId?: string) {
         .from('users')
         .select('organization_id')
         .eq('id', jobCreatorId)
-        .single()
+        .single() as any
 
       if (jobCreator?.organization_id) {
         organizationId = jobCreator.organization_id
@@ -75,7 +75,7 @@ export async function getOrganizationUsers(jobCreatorId?: string) {
         .from('users')
         .select('organization_id')
         .eq('id', jobCreatorId)
-        .single()
+        .single() as any
 
       if (jobCreator?.organization_id && jobCreator.organization_id === session.organizationId) {
         organizationId = jobCreator.organization_id
@@ -323,7 +323,7 @@ export async function getJobById(id: string): Promise<Job | null> {
         .from('users')
         .select('full_name, email, organization_id')
         .eq('id', jobData.hiring_manager_name)
-        .single()
+        .single() as any
       
       if (hmErr) {
         console.error('Error fetching hiring manager:', hmErr)
@@ -386,7 +386,7 @@ export async function createJob(formData: any) {
     .from('users')
     .select('organization_id')
     .eq('id', session.id)
-    .single()
+    .single() as any
 
   if (userError || !userRow?.organization_id) {
     throw new Error('Missing organization for current user')
@@ -399,7 +399,7 @@ export async function createJob(formData: any) {
       .from('users')
       .select('organization_id')
       .eq('id', formData.hiring_manager_name)
-      .single()
+      .single() as any
 
     if (managerErr || !managerRow) {
       throw new Error('Invalid hiring manager')
@@ -580,10 +580,10 @@ export async function updateJob(id: string, formData: any) {
           assignment_description: formData.assignment_description || null,
           assignment_weight: formData.assignment_weight ?? null,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', id)
         .select()
-        .single(),
+        .single() as any,
     3
   )
 
@@ -682,7 +682,7 @@ export async function deleteJob(id: string) {
     .from('job_forms')
     .select('title')
     .eq('id', id)
-    .single()
+    .single() as any
 
   // IMPORTANT: applications.job_form_id is NOT cascade-deleting in our schema,
   // so delete applications first. application children are cascade-deleted.
