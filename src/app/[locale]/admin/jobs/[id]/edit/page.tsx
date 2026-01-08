@@ -47,12 +47,11 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
   const [usersLoading, setUsersLoading] = useState(true);
   
   // Protect page: Redirect Reviewers to Jobs list
-  if (isReviewer) {
-    React.useEffect(() => {
-        router.push('/admin/jobs');
-    }, [router]);
-    return null;
-  }
+  React.useEffect(() => {
+      if (isReviewer) {
+          router.push('/admin/jobs');
+      }
+  }, [isReviewer, router]);
 
   const [jobData, setJobData] = useState({
     title: '',
@@ -171,8 +170,11 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
       }
     }
     fetchJob();
-  }, [params.id]);
+  }, [params.id, addToast, router]);
 
+  if (isReviewer) {
+    return null;
+  }
 
   const handleRequirementChange = (index: number, value: string) => {
     const newRequirements = [...jobData.requirements];

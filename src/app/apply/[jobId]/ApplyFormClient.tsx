@@ -262,7 +262,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     })
 
     return s
-  }, [job.title, job.description, textQuestions, mediaQuestions])
+  }, [job, textQuestions, mediaQuestions])
 
   const allQuestions = useMemo(() => [...textQuestions, ...mediaQuestions], [textQuestions, mediaQuestions])
 

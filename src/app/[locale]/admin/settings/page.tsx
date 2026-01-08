@@ -65,7 +65,7 @@ export default function SettingsPage() {
     return () => {
       isMounted = false;
     };
-  }, [addToast]);
+  }, [addToast, t]);
 
   const handleLanguageChange = (newLocale: string) => {
     router.replace(pathname, { locale: newLocale });

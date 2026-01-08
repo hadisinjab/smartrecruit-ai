@@ -142,7 +142,7 @@ export function InterviewAnalysisDialog({ analysis }: InterviewAnalysisDialogPro
                 {analysis.suggested_follow_up.map((q, i) => (
                   <li key={i} className='text-sm text-gray-700 flex items-start gap-2'>
                     <span className='text-purple-600 mt-0.5'>•</span>
-                    <span className='italic'>"{q}"</span>
+                    <span className='italic'>&quot;{q}&quot;</span>
                   </li>
                 ))}
               </ul>

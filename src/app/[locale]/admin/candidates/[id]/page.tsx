@@ -124,7 +124,7 @@ export default function CandidateDetailsPage() {
       }
     }
     loadCandidate();
-  }, [candidateId, addToast]);
+  }, [candidateId, addToast, t]);
 
   useEffect(() => {
     let isMounted = true
@@ -603,7 +603,7 @@ export default function CandidateDetailsPage() {
               
               {!aiEvaluation && !aiLoading && (
                 <div className="text-center py-8 text-gray-500">
-                  <p>No analysis generated yet. Click "Start Analysis" to begin the 5-stage evaluation.</p>
+                  <p>No analysis generated yet. Click &quot;Start Analysis&quot; to begin the 5-stage evaluation.</p>
                 </div>
               )}
 
@@ -672,7 +672,7 @@ export default function CandidateDetailsPage() {
                       <p className="text-xs text-gray-500">
                         {aiEvaluation.analysis.voice_transcripts?.length || 0} answers analyzed.
                         {aiEvaluation.analysis.voice_transcripts?.length > 0 && (
-                           <span className="block mt-1 italic">"{aiEvaluation.analysis.voice_transcripts[0]?.analysis?.relevance || 'Analyzed'}"</span>
+                           <span className="block mt-1 italic">&quot;{aiEvaluation.analysis.voice_transcripts[0]?.analysis?.relevance || 'Analyzed'}&quot;</span>
                         )}
                       </p>
                     </Card>

@@ -42,13 +42,11 @@ export default function CreateJobPage() {
   const [usersLoading, setUsersLoading] = useState(true);
   
   // Protect page: Redirect Reviewers to Jobs list
-  if (isReviewer) {
-    // Ideally this should be done in useEffect or middleware, but for client-side rendering protection:
-    React.useEffect(() => {
+  React.useEffect(() => {
+    if (isReviewer) {
         router.push('/admin/jobs');
-    }, [router]);
-    return null; // Or show Access Denied message
-  }
+    }
+  }, [isReviewer, router]);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -97,6 +95,10 @@ export default function CreateJobPage() {
       fields: []
     }
   ]);
+
+  if (isReviewer) {
+    return null;
+  }
 
   const toDeadlineTimestamp = (dateInput: string): string | null => {
     if (!dateInput) return null;

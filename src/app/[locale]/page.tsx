@@ -164,7 +164,7 @@ export default function Home() {
               Application Submitted Successfully!
             </CardTitle>
             <CardDescription>
-              Thank you for submitting your application. Here's a summary of your data:
+              Thank you for submitting your application. Here&apos;s a summary of your data:
             </CardDescription>
           </CardHeader>
           <CardContent>
