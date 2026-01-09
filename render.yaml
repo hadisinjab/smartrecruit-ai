@@ -3,8 +3,10 @@ services:
   - type: web
     name: smartrecruit-ai-server
     env: docker
+    plan: free
     region: oregon
     dockerfilePath: ./ai-server/Dockerfile
+    rootDir: .
     envVars:
       - key: HUGGINGFACE_API_TOKEN
         sync: false
@@ -35,6 +37,7 @@ services:
   - type: web
     name: smartrecruit-backend
     env: docker
+    plan: free
     region: oregon
     dockerfilePath: ./backend/Dockerfile
     rootDir: .
@@ -62,6 +65,7 @@ services:
   - type: web
     name: smartrecruit-frontend
     env: docker
+    plan: free
     region: oregon
     dockerfilePath: ./Dockerfile.frontend
     rootDir: .
