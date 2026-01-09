@@ -398,9 +398,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         <Card className='max-w-xl w-full p-6'>
           <h2 className='text-2xl font-bold text-gray-900 mb-2'>Application submitted</h2>
           <p className='text-gray-600 mb-6'>Thanks for applying. We’ll review your application and get back to you.</p>
-          <a href='/'>
-            <Button>Back to Home</Button>
-          </a>
+         
         </Card>
       </div>
     )
