@@ -1,36 +1,80 @@
 services:
-  # AI Server (Python/Flask)
+  # AI Server Service
   - type: web
     name: smartrecruit-ai-server
     env: python
-    rootDir: ai-server
+    region: oregon
     buildCommand: pip install -r requirements.txt
     startCommand: python server.py
+    rootDir: ai-server
     envVars:
+      - key: HUGGINGFACE_API_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET_NAME
+        value: recordings
+      - key: BACKEND_API_KEY
+        sync: false
       - key: PORT
-        value: 5002
+        value: 10000
       - key: FLASK_ENV
         value: production
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: WHISPER_MODEL
+        value: medium
+      - key: DELETE_INPUT_FILES
+        value: "true"
+      - key: MAX_AUDIO_SIZE
+        value: "52428800"
+      - key: TRANSCRIBE_LANGUAGE
+        value: ar
 
-  # Backend (Node.js/Express)
+  # Backend Service (Node.js)
   - type: web
     name: smartrecruit-backend
     env: node
-    rootDir: backend
+    region: oregon
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: npm start
+    rootDir: backend
     envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: AI_SERVER_URL
+        value: https://smartrecruit-ai-server.onrender.com
+      - key: AI_API_KEY
+        sync: false
       - key: PORT
-        value: 5000
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        sync: false
 
-  # Frontend (Next.js)
+  # Frontend Service (React)
   - type: web
     name: smartrecruit-frontend
-    env: node
+    env: static
+    region: oregon
     buildCommand: npm install && npm run build
-    startCommand: npm start
+    staticPublishPath: ./build
+    rootDir: frontend
     envVars:
-      - key: PORT
-        value: 3000
-      - key: NODE_VERSION
-        value: 20.11.0
+      - key: REACT_APP_API_URL
+        value: https://smartrecruit-backend.onrender.com
+      - key: REACT_APP_AI_SERVER_URL
+        value: https://smartrecruit-ai-server.onrender.com
+      - key: REACT_APP_SUPABASE_URL
+        sync: false
+      - key: REACT_APP_SUPABASE_KEY
+        sync: false
