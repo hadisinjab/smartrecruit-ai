@@ -117,4 +117,7 @@ def transcribe_audio(file_path: str, model_name: Optional[str] = None) -> Dict[s
         except Exception as e:
             LOGGER.error(f"whisper error: {e}")
 
-    raise RuntimeError("No whisper backend available (faster-whisper or openai-whisper)")
+    raise RuntimeError(
+        "No whisper backend available. Please install faster-whisper: pip install faster-whisper "
+        "or openai-whisper: pip install openai-whisper"
+    )
