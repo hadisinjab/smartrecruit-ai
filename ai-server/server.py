@@ -14,7 +14,7 @@ import mimetypes
 
 from modules.utils import LOGGER, validate_api_key, audio_duration_seconds
 from modules.transcribe import transcribe_audio
-from modules.refine_hf import refine_with_hf  # استخدام Hugging Face بدل Ollama
+from modules.refine_audio import refine_audio_transcript  # استخدام التحليل المحلي بخمس خطوات
 
 
 def _load_env() -> None:
@@ -115,7 +115,7 @@ def api_transcribe() -> Any:
         raw = result.get("raw_transcript", "")
         segments = result.get("segments", [])
         metadata = result.get("metadata", {})
-        clean = refine_with_hf(raw)  # Hugging Face بدل Ollama
+        clean = refine_audio_transcript(raw, temp_path)  # التحليل المحلي بخمس خطوات
         processing_time = round(time.time() - start, 3)
         # metadata enrichment
         metadata["processing_time"] = processing_time
