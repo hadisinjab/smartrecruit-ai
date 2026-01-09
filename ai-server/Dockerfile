@@ -15,6 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy AI server files
 COPY ai-server/ ./
 
-EXPOSE 5001
+EXPOSE 10000
 
-CMD ["python", "server.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "--workers", "2", "--timeout", "120", "server:app"]

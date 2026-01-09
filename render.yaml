@@ -2,16 +2,9 @@ services:
   # AI Server Service (Python)
   - type: web
     name: smartrecruit-ai-server
-    env: python
+    env: docker
     region: oregon
-    buildCommand: |
-      echo "Building AI Server..."
-      cd ai-server
-      pip install -r requirements.txt
-    startCommand: |
-      echo "Starting AI Server on port $PORT..."
-      cd ai-server
-      python server.py
+    dockerfilePath: ./ai-server/Dockerfile
     rootDir: .
     envVars:
       - key: HUGGINGFACE_API_TOKEN
@@ -42,16 +35,9 @@ services:
   # Backend Service (Node.js)
   - type: web
     name: smartrecruit-backend
-    env: node
+    env: docker
     region: oregon
-    buildCommand: |
-      echo "Building Backend..."
-      cd backend
-      npm install
-    startCommand: |
-      echo "Starting Backend on port $PORT..."
-      cd backend
-      npm start
+    dockerfilePath: ./backend/Dockerfile
     rootDir: .
     envVars:
       - key: DATABASE_URL
@@ -76,13 +62,9 @@ services:
   # Frontend Service (Static)
   - type: web
     name: smartrecruit-frontend
-    env: static
+    env: docker
     region: oregon
-    buildCommand: |
-      echo "Building Frontend..."
-      npm install
-      npm run build
-    staticPublishPath: ./build
+    dockerfilePath: ./Dockerfile.frontend
     rootDir: .
     envVars:
       - key: REACT_APP_API_URL
