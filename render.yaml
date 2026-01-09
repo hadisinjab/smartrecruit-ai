@@ -70,11 +70,11 @@ services:
     dockerfilePath: ./Dockerfile.frontend
     rootDir: .
     envVars:
-      - key: REACT_APP_API_URL
+      - key: NEXT_PUBLIC_API_URL
         value: https://smartrecruit-backend.onrender.com
-      - key: REACT_APP_AI_SERVER_URL
+      - key: NEXT_PUBLIC_AI_SERVER_URL
         value: https://smartrecruit-ai-server.onrender.com
-      - key: REACT_APP_SUPABASE_URL
+      - key: NEXT_PUBLIC_SUPABASE_URL
         sync: false
-      - key: REACT_APP_SUPABASE_KEY
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
