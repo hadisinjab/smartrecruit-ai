@@ -14,7 +14,7 @@ import mimetypes
 
 from modules.utils import LOGGER, validate_api_key, audio_duration_seconds
 from modules.transcribe import transcribe_audio
-from modules.refine_audio import refine_audio_transcript  # استخدام التحليل المحلي بخمس خطوات
+from modules.huggingface_analyzer import get_huggingface_analyzer  # Hugging Face API
 
 
 def _load_env() -> None:
@@ -115,7 +115,22 @@ def api_transcribe() -> Any:
         raw = result.get("raw_transcript", "")
         segments = result.get("segments", [])
         metadata = result.get("metadata", {})
-        clean = refine_audio_transcript(raw, temp_path)  # التحليل المحلي بخمس خطوات
+        
+        # استخدام Hugging Face API للتحليل
+        try:
+            analyzer = get_huggingface_analyzer()
+            refinement_result = analyzer.refine_transcript(raw)
+            clean = refinement_result.get("cleaned_text", raw)
+            
+            # إضافة معلومات التحليل للـ metadata
+            metadata["sentiment"] = refinement_result.get("sentiment", "neutral")
+            metadata["summary"] = refinement_result.get("summary", "")
+            metadata["key_points"] = refinement_result.get("key_points", [])
+            
+        except Exception as hf_error:
+            LOGGER.warning(f"Hugging Face API failed, using basic cleaning: {hf_error}")
+            # نستخدم تنظيف بسيط كبديل
+            clean = raw.strip()
         processing_time = round(time.time() - start, 3)
         # metadata enrichment
         metadata["processing_time"] = processing_time
@@ -138,11 +153,154 @@ def api_transcribe() -> Any:
         LOGGER.error(f"Transcription endpoint error: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
     finally:
-        if os.getenv("DELETE_INPUT_FILES", "true").lower() == "true":
-            try:
-                os.remove(temp_path)
-            except Exception as re:
-                LOGGER.warning(f"Failed to remove temp file: {re}")
+            if os.getenv("DELETE_INPUT_FILES", "true").lower() == "true":
+                try:
+                    os.remove(temp_path)
+                except Exception as re:
+                    LOGGER.warning(f"Failed to remove temp file: {re}")
+
+
+@app.post("/api/analyze-question")
+def api_analyze_question() -> Any:
+    """تحليل نوع السؤال"""
+    try:
+        data = request.get_json()
+        if not data or "question" not in data:
+            return jsonify({"error": True, "message": "No question provided"}), 400
+        
+        analyzer = get_huggingface_analyzer()
+        result = analyzer.analyze_question(data["question"])
+        
+        return jsonify({
+            "success": True,
+            "analysis": result
+        })
+        
+    except Exception as e:
+        LOGGER.error(f"Question analysis error: {e}")
+        return jsonify({"error": True, "message": str(e)}), 500
+
+
+@app.post("/api/analyze-cv")
+def api_analyze_cv() -> Any:
+    """تحليل السيرة الذاتية"""
+    try:
+        data = request.get_json()
+        if not data or "cv_text" not in data:
+            return jsonify({"error": True, "message": "No CV text provided"}), 400
+        
+        analyzer = get_huggingface_analyzer()
+        result = analyzer.analyze_cv_text(data["cv_text"])
+        
+        return jsonify({
+            "success": True,
+            "analysis": result
+        })
+        
+    except Exception as e:
+        LOGGER.error(f"CV analysis error: {e}")
+        return jsonify({"error": True, "message": str(e)}), 500
+
+
+@app.post("/api/analyze-job")
+def api_analyze_job() -> Any:
+    """تحليل وصف الوظيفة"""
+    try:
+        data = request.get_json()
+        if not data or "job_description" not in data:
+            return jsonify({"error": True, "message": "No job description provided"}), 400
+        
+        analyzer = get_huggingface_analyzer()
+        result = analyzer.analyze_job_description(data["job_description"])
+        
+        return jsonify({
+            "success": True,
+            "analysis": result
+        })
+        
+    except Exception as e:
+        LOGGER.error(f"Job analysis error: {e}")
+        return jsonify({"error": True, "message": str(e)}), 500
+
+
+@app.post("/api/comprehensive-analysis")
+def api_comprehensive_analysis() -> Any:
+    """التحليل الشامل (الربط بين كل العناصر)"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": True, "message": "No data provided"}), 400
+        
+        analyzer = get_huggingface_analyzer()
+        
+        # تحليل كل عنصر
+        cv_analysis = {}
+        job_analysis = {}
+        transcript_analysis = {}
+        
+        if "cv_text" in data:
+            cv_analysis = analyzer.analyze_cv_text(data["cv_text"])
+        
+        if "job_description" in data:
+            job_analysis = analyzer.analyze_job_description(data["job_description"])
+        
+        if "transcript" in data:
+            transcript_analysis = analyzer.refine_transcript(data["transcript"])
+        
+        # الربط والمقارنة
+        compatibility_score = 0
+        if cv_analysis and job_analysis:
+            compatibility_score = calculate_compatibility(cv_analysis, job_analysis)
+        
+        return jsonify({
+            "success": True,
+            "comprehensive_analysis": {
+                "cv_analysis": cv_analysis,
+                "job_analysis": job_analysis,
+                "transcript_analysis": transcript_analysis,
+                "compatibility_score": compatibility_score,
+                "recommendations": generate_recommendations(cv_analysis, job_analysis, transcript_analysis)
+            }
+        })
+        
+    except Exception as e:
+        LOGGER.error(f"Comprehensive analysis error: {e}")
+        return jsonify({"error": True, "message": str(e)}), 500
+
+
+def calculate_compatibility(cv_analysis: Dict, job_analysis: Dict) -> float:
+    """حساب نسبة التوافق بين السيرة الذاتية والوظيفة"""
+    score = 0.0
+    
+    if cv_analysis.get("skills") and job_analysis.get("requirements"):
+        cv_skills = set(cv_analysis["skills"].keys())
+        job_reqs = set(job_analysis["requirements"].keys())
+        
+        if job_reqs:
+            matching = len(cv_skills.intersection(job_reqs))
+            score = (matching / len(job_reqs)) * 100
+    
+    return round(score, 2)
+
+
+def generate_recommendations(cv_analysis: Dict, job_analysis: Dict, transcript_analysis: Dict) -> List[str]:
+    """توليد توصيات بناءً على التحليل"""
+    recommendations = []
+    
+    if cv_analysis.get("skills"):
+        recommendations.append("تحليل المهارات في السيرة الذاتية مكتمل")
+    
+    if job_analysis.get("requirements"):
+        recommendations.append("تم تحليل متطلبات الوظيفة بنجاح")
+    
+    if transcript_analysis.get("sentiment"):
+        sentiment = transcript_analysis["sentiment"]
+        if sentiment == "positive":
+            recommendations.append("النغمة الإيجابية في المقابلة تدل على ثقة المرشح")
+        elif sentiment == "negative":
+            recommendations.append("ينصح بتحسين النغطة التعبيرية في المقابلات")
+    
+    return recommendations
 
 
 def run() -> None:
