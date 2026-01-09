@@ -11,9 +11,9 @@ services:
       - key: HUGGINGFACE_API_TOKEN
         sync: false
       - key: SUPABASE_URL
-        sync: false
+        value: https://xtvwgtlhhsepqfndagzg.supabase.co
       - key: SUPABASE_KEY
-        sync: false
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0dndndGxoaHNlcHFmbmRhZ3pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwOTQ1ODgsImV4cCI6MjA4MTY3MDU4OH0.W-mhQd0l2odExtp__qiyU_Cwf3phAcRVi5tH0VlgTLw
       - key: SUPABASE_BUCKET_NAME
         value: recordings
       - key: BACKEND_API_KEY

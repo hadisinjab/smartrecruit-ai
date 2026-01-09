@@ -10,7 +10,7 @@
  */
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
-import { generateJSON, generateText } from './ollama.js';
+// import { generateJSON, generateText } from './ollama.js'; // Replaced with Hugging Face API
 
 const DEFAULT_OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
 
@@ -73,122 +73,87 @@ function cleanText(text) {
 }
 
 /**
- * Parse resume text with Ollama, retrying if JSON is invalid.
+ * Parse resume text using Hugging Face AI Server CV analysis endpoint
  * @param {string} text
  * @param {number} [retries=2]
  * @returns {Promise<{ data?: any, raw?: string }>}
  */
-async function parseWithOllama(text, retries = 2) {
-  const prompt = `You are an expert CV/Resume parser. Extract structured data from the following resume text.
- 
- CRITICAL REQUIREMENTS:
- - Output ONLY valid JSON, no markdown, no explanations, no additional text
- - Start directly with { and end with }
- - If a field is not found, use null or empty array []
- - Extract ALL information accurately
- - Dates: use original format or YYYY-MM-DD if clear
- 
- JSON Structure (output this exactly):
- {
-   "personal_info": {
-     "name": null,
-     "email": null,
-     "phone": null,
-     "location": null,
-     "linkedin": null,
-     "portfolio": null
-   },
-   "summary": null,
-   "work_experience": [
-     {
-       "company": "",
-       "position": "",
-       "start_date": "",
-       "end_date": "",
-       "description": "",
-       "technologies": []
-     }
-   ],
-   "education": [
-     {
-       "institution": "",
-       "degree": "",
-       "field": "",
-       "start_date": "",
-       "end_date": "",
-       "gpa": null
-     }
-   ],
-   "skills": {
-     "technical": [],
-     "languages": [],
-     "soft_skills": []
-   },
-   "certifications": [
-     {
-       "name": "",
-       "issuer": "",
-       "date": "",
-       "credential_id": null
-     }
-   ],
-   "projects": [
-     {
-       "name": "",
-       "description": "",
-       "technologies": [],
-       "url": null
-     }
-   ],
-   "languages": [
-     {
-       "language": "",
-       "proficiency": ""
-     }
-   ]
- }
- 
- Resume Text:
- ${text}
- 
- JSON Output:`;
+async function parseWithAI(text, retries = 2) {
+  const apiKey = process.env.BACKEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('BACKEND_API_KEY is not set');
+  }
 
-  console.log('Sending to Ollama...');
-  let lastRaw = '';
+  const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:5001';
+  
+  const analysisData = {
+    cv_text: text,
+    extract_structure: true
+  };
+
+  let lastError = '';
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      // Try strict JSON mode first with reduced tokens for speed
-      console.log(`Sending prompt to Ollama (attempt ${attempt + 1})...`);
+      console.log(`Sending to AI Server for CV analysis (attempt ${attempt + 1})...`);
       const tStart = Date.now();
-      const json = await generateJSON(prompt, { temperature: 0, max_tokens: 2048 });
-      console.log(`Ollama responded in ${(Date.now() - tStart) / 1000}s`);
-      return { data: json };
+      
+      const response = await fetch(`${AI_SERVER_URL}/api/analyze-cv`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey 
+        },
+        body: JSON.stringify(analysisData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`AI Server error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'CV analysis failed');
+      }
+
+      console.log(`AI Server responded in ${(Date.now() - tStart) / 1000}s`);
+      return { data: result.analysis };
+
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
       const connError =
         /ECONNREFUSED|ENOTFOUND|fetch failed|Failed to fetch|socket hang up/i.test(e.message);
+      
       if (connError) {
-        console.error('Ollama service unavailable:', e.message);
-        throw Object.assign(new Error('Ollama service unavailable'), { details: e.message });
+        console.error('AI Server unavailable:', e.message);
+        throw Object.assign(new Error('AI Server unavailable'), { details: e.message });
       }
-      console.warn(`Invalid JSON from Ollama (attempt ${attempt + 1})`, e.message);
-      try {
-        // Fallback: non-JSON format and manual parse with reduced tokens for speed
-        console.log(`Sending manual prompt to Ollama (attempt ${attempt + 1})...`);
-        const tStart = Date.now();
-        const raw = await generateText(prompt, { temperature: 0, max_tokens: 2048 });
-        console.log(`Ollama (manual) responded in ${(Date.now() - tStart) / 1000}s`);
-        lastRaw = raw;
-        const sliced = sliceToFirstJsonObject(raw);
-        const parsed = JSON.parse(sliced);
-        return { data: parsed, raw };
-      } catch (inner) {
-        const ie = inner instanceof Error ? inner : new Error(String(inner));
-        console.warn(`Manual parse failed (attempt ${attempt + 1}):`, ie.message);
+      
+      console.warn(`CV analysis failed (attempt ${attempt + 1}):`, e.message);
+      lastError = e.message;
+      
+      if (attempt < retries) {
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
   }
-  throw Object.assign(new Error('Invalid JSON after retries'), { details: lastRaw || 'No raw output' });
+  
+  // Fallback to basic parsing if AI server fails
+  console.warn('AI Server failed, using fallback basic parsing...');
+  return {
+    data: {
+      personal_info: { name: null, email: null, phone: null, location: null },
+      summary: "Fallback parsing - AI server unavailable",
+      work_experience: [],
+      education: [],
+      skills: { technical: [], languages: [], soft_skills: [] },
+      certifications: [],
+      projects: [],
+      languages: []
+    }
+  };
 }
 
 /**
@@ -419,8 +384,8 @@ export async function parseResume(fileBuffer, fileType) {
       };
     }
 
-    // 3. Ollama analysis
-    const { data: parsed, raw } = await parseWithOllama(text, 2);
+    // 3. AI Server analysis
+    const { data: parsed } = await parseWithAI(text, 2);
 
     // 4. Validate structure
     const { valid, data: normalized, errors } = validateParsedData(parsed);
@@ -451,7 +416,7 @@ export async function parseResume(fileBuffer, fileType) {
         text_length: textLength,
         processing_time: processingTime,
         confidence,
-        ollama_model: DEFAULT_OLLAMA_MODEL,
+        ai_model: 'Hugging Face API',
       },
     };
     console.log('Parsing completed. Confidence:', confidence);
