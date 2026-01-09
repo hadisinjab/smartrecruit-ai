@@ -1,11 +1,17 @@
 services:
-  # AI Server Service
+  # AI Server Service (Python)
   - type: web
     name: smartrecruit-ai-server
     env: python
     region: oregon
-    buildCommand: cd ai-server && pip install -r requirements.txt
-    startCommand: cd ai-server && python server.py
+    buildCommand: |
+      echo "Building AI Server..."
+      cd ai-server
+      pip install -r requirements.txt
+    startCommand: |
+      echo "Starting AI Server on port $PORT..."
+      cd ai-server
+      python server.py
     rootDir: .
     envVars:
       - key: HUGGINGFACE_API_TOKEN
@@ -38,8 +44,14 @@ services:
     name: smartrecruit-backend
     env: node
     region: oregon
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && npm start
+    buildCommand: |
+      echo "Building Backend..."
+      cd backend
+      npm install
+    startCommand: |
+      echo "Starting Backend on port $PORT..."
+      cd backend
+      npm start
     rootDir: .
     envVars:
       - key: DATABASE_URL
@@ -61,12 +73,15 @@ services:
       - key: JWT_SECRET
         sync: false
 
-  # Frontend Service (React)
+  # Frontend Service (Static)
   - type: web
     name: smartrecruit-frontend
     env: static
     region: oregon
-    buildCommand: npm install && npm run build
+    buildCommand: |
+      echo "Building Frontend..."
+      npm install
+      npm run build
     staticPublishPath: ./build
     rootDir: .
     envVars:

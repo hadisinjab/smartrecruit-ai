@@ -172,6 +172,7 @@ export async function deleteInterview(interviewId: string): Promise<ActionResult
 
 /**
  * Trigger AI analysis for an interview using Hugging Face AI Server
+ * Note: AI analysis functionality is currently disabled
  */
 export async function triggerInterviewAnalysis(interviewId: string): Promise<ActionResult<{ queued: boolean; message: string }>> {
   try {
@@ -180,10 +181,10 @@ export async function triggerInterviewAnalysis(interviewId: string): Promise<Act
 
     const supabase = createClient()
     
-    // Get interview data
+    // Verify interview exists
     const { data: interview, error: interviewError } = await supabase
       .from('interviews')
-      .select('*, applications(job_form_id, candidate_name)')
+      .select('id')
       .eq('id', interviewId)
       .single()
 
@@ -191,90 +192,13 @@ export async function triggerInterviewAnalysis(interviewId: string): Promise<Act
       return { ok: false, status: 404, error: 'Interview not found' }
     }
 
-    // Get job details for context
-    const { data: jobForm, error: jobError } = await supabase
-      .from('job_forms')
-      .select('title, required_skills, key_topics')
-      .eq('id', interview.applications.job_form_id)
-      .single()
-
-    if (jobError || !jobForm) {
-      return { ok: false, status: 404, error: 'Job form not found' }
-    }
-
-    // Get transcription data if available
-    const { data: transcription, error: transError } = await supabase
-      .from('transcriptions')
-      .select('clean_transcript')
-      .eq('application_id', interview.application_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (transError || !transcription?.clean_transcript) {
-      return { ok: false, status: 404, error: 'No transcription found for this interview' }
-    }
-
-    // Call AI server for comprehensive analysis
-    const aiServerUrl = process.env.AI_SERVER_URL || 'http://localhost:5001'
-    const apiKey = process.env.BACKEND_API_KEY
-    
-    if (!apiKey) {
-      return { ok: false, status: 500, error: 'AI API key not configured' }
-    }
-
-    const analysisData = {
-      transcript: transcription.clean_transcript,
-      job_description: {
-        position: jobForm.title,
-        required_skills: jobForm.required_skills || [],
-        key_topics: jobForm.key_topics || []
-      }
-    }
-
-    const response = await fetch(`${aiServerUrl}/api/comprehensive-analysis`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey 
-      },
-      body: JSON.stringify(analysisData)
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      return { ok: false, status: 502, error: `AI Server error: ${errorText}` }
-    }
-
-    const result = await response.json()
-    
-    if (!result.success) {
-      return { ok: false, status: 500, error: result.message || 'AI analysis failed' }
-    }
-
-    // Save analysis results to interview record
-    const { error: updateError } = await supabase
-      .from('interviews')
-      .update({ 
-        audio_analysis: {
-          analysis: result.analysis,
-          metadata: result.metadata,
-          processed_at: new Date().toISOString()
-        }
-      })
-      .eq('id', interviewId)
-
-    if (updateError) {
-      return { ok: false, status: 500, error: 'Failed to save analysis results' }
-    }
-
+    // AI analysis is currently disabled - return success message
     return { 
       ok: true, 
       status: 200, 
       data: { 
         queued: false, 
-        message: 'AI analysis completed successfully',
-        analysis: result.analysis
+        message: 'AI analysis functionality is currently disabled'
       } 
     }
   } catch (e: any) {
