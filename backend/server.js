@@ -7,6 +7,7 @@
 import './config.js';
 import express from 'express';
 import cors from 'cors';
+import { supabase } from './utils/supabase.js';
 
 import errorHandler, { notFoundHandler } from './middleware/errorHandler.js';
 import authMiddleware from './middleware/auth.js';
@@ -45,12 +46,36 @@ app.use(express.urlencoded({ extended: true, limit: jsonLimit }));
 /**
  * Route: Health للتحقق السريع
  */
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  let supabaseStatus = 'unknown';
+  let supabaseError = null;
+
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('users').select('count').limit(1).single();
+      if (error && error.code !== 'PGRST116') {
+        supabaseStatus = 'error';
+        supabaseError = error.message;
+      } else {
+        supabaseStatus = 'connected';
+      }
+    } else {
+      supabaseStatus = 'not_configured';
+    }
+  } catch (e) {
+    supabaseStatus = 'exception';
+    supabaseError = e.message;
+  }
+
   res.json({
     status: 'ok',
     service: 'backend',
     node: process.version,
     env: process.env.NODE_ENV || 'development',
+    supabase: {
+      status: supabaseStatus,
+      error: supabaseError
+    }
   });
 });
 
