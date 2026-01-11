@@ -23,8 +23,8 @@ RUN npm install
 # Copy source code
 COPY backend/ ./
 
-# Expose port 5000
-EXPOSE 5000
+# Expose port 8000
+EXPOSE 8000
 
 # Run as non-root user (optional but good practice, though Koyeb runs as root by default unless specified)
 # We will run as root to avoid permission issues with Puppeteer sandbox in some environments,
@@ -32,6 +32,6 @@ EXPOSE 5000
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable \
-    PORT=5000
+    PORT=8000
 
 CMD ["node", "server.js"]
