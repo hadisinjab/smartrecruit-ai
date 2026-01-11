@@ -250,10 +250,19 @@ def api_analyze_job() -> Any:
 def api_comprehensive_analysis() -> Any:
     """التحليل الشامل (الربط بين كل العناصر)"""
     try:
+        LOGGER.info("Received comprehensive analysis request")
         data = request.get_json()
         if not data:
+            LOGGER.error("No data provided in request")
             return jsonify({"error": True, "message": "No data provided"}), 400
         
+        # Log incoming data keys and sizes
+        LOGGER.info(f"Request data keys: {list(data.keys())}")
+        if "transcript" in data:
+            LOGGER.info(f"Transcript length: {len(data['transcript'])}")
+        if "job_description" in data:
+            LOGGER.info(f"Job description present: {data['job_description'].keys()}")
+
         analyzer = get_huggingface_analyzer()
         
         # تحليل كل عنصر
@@ -262,12 +271,15 @@ def api_comprehensive_analysis() -> Any:
         transcript_analysis = {}
         
         if "cv_text" in data:
+            LOGGER.info("Analyzing CV text...")
             cv_analysis = analyzer.analyze_cv_text(data["cv_text"])
         
         if "job_description" in data:
+            LOGGER.info("Analyzing job description...")
             job_analysis = analyzer.analyze_job_description(data["job_description"])
         
         if "transcript" in data:
+            LOGGER.info("Refining transcript...")
             transcript_analysis = analyzer.refine_transcript(data["transcript"])
         
         # الربط والمقارنة
@@ -275,6 +287,7 @@ def api_comprehensive_analysis() -> Any:
         if cv_analysis and job_analysis:
             compatibility_score = calculate_compatibility(cv_analysis, job_analysis)
         
+        LOGGER.info("Analysis complete, sending response")
         return jsonify({
             "success": True,
             "comprehensive_analysis": {

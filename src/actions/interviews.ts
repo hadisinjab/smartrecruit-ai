@@ -172,36 +172,140 @@ export async function deleteInterview(interviewId: string): Promise<ActionResult
 
 /**
  * Trigger AI analysis for an interview using Hugging Face AI Server
- * Note: AI analysis functionality is currently disabled
  */
-export async function triggerInterviewAnalysis(interviewId: string): Promise<ActionResult<{ queued: boolean; message: string }>> {
+export async function triggerInterviewAnalysis(interviewId: string): Promise<ActionResult<{ queued: boolean; message: string; analysis?: any }>> {
   try {
     await requireAdminOrSuper()
     if (!interviewId) return { ok: false, status: 400, error: 'Validation error' }
 
+    console.log(`[Analysis] Starting analysis for interview: ${interviewId}`);
     const supabase = createClient()
     
-    // Verify interview exists
+    // Get interview data
     const { data: interview, error: interviewError } = await supabase
       .from('interviews')
-      .select('id')
+      .select('*, applications(job_form_id, candidate_name)')
       .eq('id', interviewId)
       .single()
 
     if (interviewError || !interview) {
+      console.error('[Analysis] Interview not found:', interviewError);
       return { ok: false, status: 404, error: 'Interview not found' }
     }
 
-    // AI analysis is currently disabled - return success message
+    console.log(`[Analysis] Found interview for candidate: ${interview.applications?.candidate_name}`);
+
+    // Get job details for context
+    const { data: jobForm, error: jobError } = await supabase
+      .from('job_forms')
+      .select('title, required_skills, key_topics')
+      .eq('id', interview.applications.job_form_id)
+      .single()
+
+    if (jobError || !jobForm) {
+      console.error('[Analysis] Job form not found:', jobError);
+      return { ok: false, status: 404, error: 'Job form not found' }
+    }
+
+    console.log(`[Analysis] Job context: ${jobForm.title}, Skills: ${jobForm.required_skills?.length}`);
+
+    // Get transcription data if available
+    const { data: transcription, error: transError } = await supabase
+      .from('transcriptions')
+      .select('clean_transcript')
+      .eq('application_id', interview.application_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (transError || !transcription?.clean_transcript) {
+      console.error('[Analysis] Transcription not found:', transError);
+      return { ok: false, status: 404, error: 'No transcription found for this interview' }
+    }
+
+    console.log(`[Analysis] Transcript found, length: ${transcription.clean_transcript.length} chars`);
+
+    // Call AI server for comprehensive analysis
+    const aiServerUrl = process.env.AI_SERVER_URL || 'http://localhost:5001'
+    const apiKey = process.env.BACKEND_API_KEY
+    
+    if (!apiKey) {
+      console.error('[Analysis] AI API key missing');
+      return { ok: false, status: 500, error: 'AI API key not configured' }
+    }
+
+    const analysisData = {
+      transcript: transcription.clean_transcript,
+      job_description: {
+        position: jobForm.title,
+        required_skills: jobForm.required_skills || [],
+        key_topics: jobForm.key_topics || []
+      }
+    }
+
+    console.log(`[Analysis] Sending request to AI Server: ${aiServerUrl}`);
+
+    const response = await fetch(`${aiServerUrl}/api/comprehensive-analysis`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey 
+      },
+      body: JSON.stringify(analysisData)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[Analysis] AI Server error (${response.status}): ${errorText}`);
+      return { ok: false, status: 502, error: `AI Server error: ${errorText}` }
+    }
+
+    const result = await response.json()
+    console.log('[Analysis] Received response from AI Server:', result.success ? 'Success' : 'Failed');
+    
+    if (!result.success) {
+      console.error('[Analysis] AI logic failed:', result.message);
+      return { ok: false, status: 500, error: result.message || 'AI analysis failed' }
+    }
+
+    if (!result.comprehensive_analysis) {
+        console.error('[Analysis] Response missing comprehensive_analysis:', result);
+        return { ok: false, status: 500, error: 'Invalid response format from AI Server' }
+    }
+
+    // Save analysis results to interview record
+    const { error: updateError } = await supabase
+      .from('interviews')
+      .update({ 
+        audio_analysis: {
+          analysis: result.comprehensive_analysis,
+          metadata: {
+            compatibility_score: result.comprehensive_analysis.compatibility_score,
+            recommendations: result.comprehensive_analysis.recommendations
+          },
+          processed_at: new Date().toISOString()
+        }
+      })
+      .eq('id', interviewId)
+
+    if (updateError) {
+      console.error('[Analysis] Database update failed:', updateError);
+      return { ok: false, status: 500, error: 'Failed to save analysis results' }
+    }
+
+    console.log('[Analysis] Successfully saved analysis results');
+
     return { 
       ok: true, 
       status: 200, 
       data: { 
         queued: false, 
-        message: 'AI analysis functionality is currently disabled'
+        message: 'AI analysis completed successfully',
+        analysis: result.comprehensive_analysis
       } 
     }
   } catch (e: any) {
+    console.error('[Analysis] Unexpected error:', e);
     const msg = String(e?.message || '')
     if (msg.toLowerCase().includes('access denied')) return toForbidden()
     return toInternal(`AI analysis failed: ${msg}`)
