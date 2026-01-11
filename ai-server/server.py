@@ -73,6 +73,29 @@ def err_500(e) -> Any:
     return jsonify({"error": True, "message": "Internal server error"}), 500
 
 
+@app.post("/api/generate")
+def api_generate() -> Any:
+    """نقطة نهاية عامة لتوليد النصوص (بديل لـ Ollama)"""
+    try:
+        data = request.get_json()
+        if not data or "prompt" not in data:
+            return jsonify({"error": True, "message": "No prompt provided"}), 400
+            
+        prompt = data["prompt"]
+        params = data.get("options", {})
+        
+        analyzer = get_huggingface_analyzer()
+        result = analyzer.generate_text(prompt, params)
+        
+        return jsonify({
+            "success": True,
+            "response": result
+        })
+    except Exception as e:
+        LOGGER.error(f"Generation error: {e}")
+        return jsonify({"error": True, "message": str(e)}), 500
+
+
 @app.post("/api/transcribe")
 def api_transcribe() -> Any:
     """

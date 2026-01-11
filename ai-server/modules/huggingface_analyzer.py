@@ -22,7 +22,8 @@ class HuggingFaceAnalyzer:
             "sentiment_analysis": "cardiffnlp/twitter-roberta-base-sentiment-latest",
             "text_summarization": "facebook/bart-large-cnn",
             "text_classification": "facebook/bart-large-mnli",
-            "arabic_nlp": "aubmindlab/bert-base-arabertv02"
+            "arabic_nlp": "aubmindlab/bert-base-arabertv02",
+            "generation": "mistralai/Mistral-7B-Instruct-v0.2"
         }
     
     def _make_api_call(self, model_name: str, payload: Dict) -> Optional[Dict]:
@@ -41,6 +42,34 @@ class HuggingFaceAnalyzer:
             LOGGER.error(f"Error calling Hugging Face API: {e}")
             return None
     
+    def generate_text(self, prompt: str, params: Optional[Dict] = None) -> str:
+        """توليد نص باستخدام نموذج توليدي"""
+        try:
+            payload = {
+                "inputs": f"<s>[INST] {prompt} [/INST]",
+                "parameters": params or {
+                    "max_new_tokens": 512,
+                    "temperature": 0.3,
+                    "top_p": 0.9,
+                    "do_sample": True
+                }
+            }
+            
+            result = self._make_api_call(self.models["generation"], payload)
+            
+            if result and isinstance(result, list) and len(result) > 0:
+                generated = result[0].get("generated_text", "")
+                # تنظيف النص من الـ prompt إذا ظهر
+                if "[/INST]" in generated:
+                    generated = generated.split("[/INST]")[-1].strip()
+                return generated
+                
+            return ""
+            
+        except Exception as e:
+            LOGGER.error(f"Error generating text: {e}")
+            return ""
+
     def analyze_question(self, question_text: str) -> Dict[str, Any]:
         """تحليل نوع السؤال"""
         try:
