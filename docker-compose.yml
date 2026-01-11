@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  ai-server:
+    build:
+      context: .
+      dockerfile: ai-server/Dockerfile
+    ports:
+      - "5001:10000"
+    env_file:
+      - .env
+    environment:
+      - PORT=10000
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "5002:5002"
+    env_file:
+      - .env
+    environment:
+      - PORT=5002
+      - AI_SERVER_URL=http://ai-server:10000
+    depends_on:
+      - ai-server
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:10000"
+    env_file:
+      - .env
+    environment:
+      - PORT=10000
+      - NEXT_PUBLIC_API_URL=http://localhost:5002
+      - NEXT_PUBLIC_AI_SERVER_URL=http://localhost:5001
+    depends_on:
+      - backend
+    restart: always
