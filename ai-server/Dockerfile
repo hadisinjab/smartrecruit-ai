@@ -23,4 +23,4 @@ COPY ai-server/ ./
 
 EXPOSE 10000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:10000", "--workers", "2", "--timeout", "120", "server:app"]
+CMD gunicorn --bind 0.0.0.0:10000 server:app
