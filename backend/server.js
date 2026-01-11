@@ -23,9 +23,9 @@ const app = express();
 /**
  * إعداد CORS والميدلوير الأساسية
  */
-const corsOrigin = process.env.CORS_ORIGIN || true; // Default to reflecting origin
+const corsOrigin = process.env.CORS_ORIGIN || '*'; // Allow all origins by default or use specific env var
 app.use(cors({
-  origin: corsOrigin,
+  origin: corsOrigin === '*' ? '*' : corsOrigin.split(','),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
