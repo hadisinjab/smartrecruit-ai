@@ -88,6 +88,26 @@ router.post('/analyze/:applicationId', async (req, res) => {
       });
     }
 
+    // DEBUG: Log fetched data structure
+    console.log('[Evaluation] Fetched Application Data:', {
+        id: application.id,
+        interviews_count: application.interviews?.length || 0,
+        assignments_count: application.assignments?.length || 0,
+        resumes_count: application.resumes?.length || 0,
+        answers_count: application.answers?.length || 0,
+        job_title: application.job_forms?.title
+    });
+
+    if (application.interviews?.length > 0) {
+        console.log('[Evaluation] Interview Data:', {
+            id: application.interviews[0].id,
+            has_url: !!application.interviews[0].audio_or_video_url,
+            url: application.interviews[0].audio_or_video_url
+        });
+    } else {
+        console.log('[Evaluation] No interviews found in DB relation');
+    }
+
     // Normalize answers to include type from joined questions
     if (application.answers) {
       application.answers = application.answers.map(a => {
