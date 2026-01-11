@@ -234,7 +234,7 @@ async function analyzeTranscript(transcript, segments, jobContext) {
   };
 
   try {
-    console.log('Sending interview transcript to AI Server for comprehensive analysis...');
+    console.log(`[AnalyzeInterview] Sending interview transcript to AI Server: ${AI_SERVER_URL}/api/comprehensive-analysis`);
     const response = await fetch(`${AI_SERVER_URL}/api/comprehensive-analysis`, {
       method: 'POST',
       headers: { 
@@ -246,19 +246,25 @@ async function analyzeTranscript(transcript, segments, jobContext) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[AnalyzeInterview] AI Server error status: ${response.status}`);
       throw new Error(`AI Server error: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();
+    console.log('[AnalyzeInterview] Received response from AI Server:', result.success ? 'Success' : 'Failed');
     
     if (!result.success) {
       throw new Error(result.message || 'Analysis failed');
     }
 
-    return result.analysis;
+    if (!result.comprehensive_analysis) {
+        console.warn('[AnalyzeInterview] Result missing comprehensive_analysis property, dumping keys:', Object.keys(result));
+    }
+
+    return result.comprehensive_analysis || result.analysis; // Fallback just in case
 
   } catch (error) {
-    console.error('AI Server analysis failed, falling back to basic metrics...');
+    console.error('[AnalyzeInterview] AI Server analysis failed:', error);
     // Fallback to basic analysis if AI server fails
     return {
       overall_score: 75,

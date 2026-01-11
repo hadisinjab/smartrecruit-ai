@@ -137,19 +137,31 @@ router.post('/analyze/:applicationId', async (req, res) => {
     if (application.interviews && application.interviews.length > 0) {
       const interview = application.interviews[0];
       if (interview.audio_or_video_url) {
-        console.log('Starting Interview Analysis...');
+        console.log(`[Evaluation] Starting Interview Analysis for URL: ${interview.audio_or_video_url}`);
         try {
           const tempPath = await downloadFile(interview.audio_or_video_url);
+          console.log(`[Evaluation] File downloaded to: ${tempPath}`);
+          
           // analyzeInterview handles extraction if needed
           interviewResult = await analyzeInterview(tempPath, 'video', jobContext);
+          
+          console.log('[Evaluation] Interview Analysis Result:', interviewResult ? 'Has Data' : 'Null');
+          if (interviewResult && interviewResult.error) {
+             console.error('[Evaluation] Interview Result contained error:', interviewResult.error);
+          }
+
           // Cleanup handled inside analyzeInterview if passed as path? 
           // analyzeInterview doesn't auto-delete input path if string, so we delete here
           if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         } catch (e) {
-          console.error('Interview analysis failed:', e);
+          console.error('[Evaluation] Interview analysis failed with exception:', e);
           interviewResult = { error: e.message };
         }
+      } else {
+        console.log('[Evaluation] Interview found but no audio/video URL');
       }
+    } else {
+        console.log('[Evaluation] No interviews found for application');
     }
 
     // --- 3. تحليل الواجب ---
