@@ -439,6 +439,22 @@ router.post('/analyze/:applicationId', async (req, res) => {
     // 3. Assignment Metrics
     let assignmentScore = assignmentResult?.evaluation?.overall_score || 0;
 
+    // 3.1 Long Interview Metrics
+    let interviewScore = 0;
+    let interviewSummary = 'N/A';
+    if (interviewResult && !interviewResult.error) {
+        // Check for AI Server format
+        if (interviewResult.compatibility_score !== undefined) {
+            interviewScore = interviewResult.compatibility_score;
+            interviewSummary = "Comprehensive AI Analysis completed.";
+        } 
+        // Check for Fallback format
+        else if (interviewResult.overall_score !== undefined) {
+            interviewScore = interviewResult.overall_score;
+            interviewSummary = interviewResult.summary || "Basic analysis completed.";
+        }
+    }
+
     // 4. Resume Metrics (Simple Skill Match for now)
     let resumeScore = 0;
     if (resumeResult?.data?.skills?.technical && jobContext.required_skills.length > 0) {
@@ -459,6 +475,15 @@ router.post('/analyze/:applicationId', async (req, res) => {
     const hasVoice = voiceTranscripts.length > 0;
     const hasResume = !!resumeResult;
     const hasAssignment = !!assignmentResult;
+    const hasInterview = !!(interviewResult && !interviewResult.error);
+
+    console.log('[Evaluation] Calculated Scores:', {
+        text: hasText ? textScore : 'N/A',
+        voice: hasVoice ? voiceScore : 'N/A',
+        interview: hasInterview ? interviewScore : 'N/A',
+        assignment: hasAssignment ? assignmentScore : 'N/A',
+        resume: hasResume ? resumeScore : 'N/A'
+    });
 
     // B. AI Final Decision Prompt
     const finalDecisionPrompt = `
@@ -475,17 +500,21 @@ router.post('/analyze/:applicationId', async (req, res) => {
        ${hasText ? `- Score: ${Math.round(textScore)}/100
        - Summary: ${textAnswersAnalysis?.smart_summary || 'N/A'}` : '- Status: N/A (No text questions)'}
     
-    2. Voice Questions:
+    2. Voice Questions (Short Answers):
        ${hasVoice ? `- Avg Score: ${Math.round(voiceScore)}/100
        - Answer Summaries: ${voiceTranscripts.map((v, i) => `Q${i+1}: ${v.analysis?.answer_quality_summary || 'N/A'}`).join('; ')}
        - Key Weaknesses: ${voiceTranscripts.flatMap(v => v.analysis?.weaknesses || []).join(', ')}` : '- Status: N/A (No voice questions)'}
     
-    3. Resume:
+    3. Long Interview (Video/Audio):
+       ${hasInterview ? `- Score: ${Math.round(interviewScore)}/100
+       - Summary: ${interviewSummary}` : '- Status: N/A (No long interview)'}
+
+    4. Resume:
        ${hasResume ? `- Skill Match Score: ${resumeScore}/100
        - AI Analysis: ${resumeResult?.analysis?.qualification_summary || 'N/A'}
        - Key Skills: ${resumeResult?.data?.skills?.technical?.slice(0, 5).join(', ') || 'N/A'}` : '- Status: N/A (No resume)'}
     
-    4. Assignment:
+    5. Assignment:
        ${hasAssignment ? `- Score: ${Math.round(assignmentScore)}/100
        - Evaluation: ${assignmentResult?.evaluation?.answer_evaluation || 'N/A'}
        - Recommendation: ${assignmentResult?.evaluation?.recommendation || 'N/A'}` : '- Status: N/A (No assignment)'}
@@ -495,7 +524,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
     - Base your decision ONLY on the provided data.
     - Re-distribute the importance/weights to the available stages.
     - If only Resume/Text are available, base decision on skills and communication.
-    - If Voice/Assignment are present, they remain critical.
+    - If Voice/Assignment/Interview are present, they remain critical.
     - CANDIDATE HISTORY FACTOR: If "Previous Applications" > 0, check if this application is better than average. If they are persistent but weak, Reject. If they show improvement, consider Interview.
 
     OUTPUT JSON ONLY:
@@ -503,6 +532,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
       "stage_evaluations": {
         "text": "Excellent|Good|Average|Weak|Bad|N/A",
         "voice": "Excellent|Good|Average|Weak|Bad|N/A",
+        "interview": "Excellent|Good|Average|Weak|Bad|N/A",
         "resume": "Excellent|Good|Average|Weak|Bad|N/A",
         "assignment": "Excellent|Good|Average|Weak|Bad|N/A"
       },
@@ -514,7 +544,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
     `;
 
     let finalDecision = {
-       stage_evaluations: { text: 'N/A', voice: 'N/A', resume: 'N/A', assignment: 'N/A' },
+       stage_evaluations: { text: 'N/A', voice: 'N/A', interview: 'N/A', resume: 'N/A', assignment: 'N/A' },
        final_score: 0,
        decision: 'Review',
        decision_reason: 'Automated calculation only',
