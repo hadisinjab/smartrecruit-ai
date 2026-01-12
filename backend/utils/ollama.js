@@ -74,7 +74,12 @@ export async function generateJSON(prompt, options = {}) {
     });
 
     // محاولة تنظيف النص من أي زيادات (مثل Markdown code blocks)
-    let cleanText = text.trim();
+    let cleanText = (text || '').trim();
+    if (!cleanText) {
+       console.warn('[Ollama] Received empty text from generation');
+       return {}; // Return empty object instead of failing
+    }
+    
     if (cleanText.startsWith('```json')) cleanText = cleanText.replace(/^```json/, '').replace(/```$/, '');
     else if (cleanText.startsWith('```')) cleanText = cleanText.replace(/^```/, '').replace(/```$/, '');
     
@@ -85,9 +90,14 @@ export async function generateJSON(prompt, options = {}) {
       // محاولة استخراج JSON إذا كان مضمناً في نص
       const match = cleanText.match(/\{[\s\S]*\}/);
       if (match) {
-        return JSON.parse(match[0]);
+        try {
+            return JSON.parse(match[0]);
+        } catch (e) { /* ignore nested parse error */ }
       }
-      throw parseError;
+      
+      // Last resort: try to fix common JSON errors (e.g. trailing commas)
+      // For now, just return partial if possible or empty
+      return { raw_output: cleanText, error: "JSON Parse Failed" };
     }
   } catch (e) {
     console.error('JSON Generation Failed:', e.message);

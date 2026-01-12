@@ -23,7 +23,7 @@ class HuggingFaceAnalyzer:
             "text_summarization": "facebook/bart-large-cnn",
             "text_classification": "facebook/bart-large-mnli",
             "arabic_nlp": "aubmindlab/bert-base-arabertv02",
-            "generation": "mistralai/Mistral-7B-Instruct-v0.2"
+            "generation": "HuggingFaceH4/zephyr-7b-beta"
         }
     
     def _make_api_call(self, model_name: str, payload: Dict) -> Optional[Dict]:
@@ -35,7 +35,7 @@ class HuggingFaceAnalyzer:
             if response.status_code == 200:
                 return response.json()
             else:
-                LOGGER.error(f"HF API error: {response.status_code} - {response.text}")
+                LOGGER.error(f"HF API error for {model_name}: {response.status_code} - {response.text}")
                 return None
                 
         except Exception as e:
