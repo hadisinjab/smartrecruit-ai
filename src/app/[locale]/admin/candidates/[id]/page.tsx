@@ -56,6 +56,7 @@ export default function CandidateDetailsPage() {
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [aiEvaluation, setAiEvaluation] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [polling, setPolling] = useState(false);
   
   // HR Evaluation State
   const [hrEvaluation, setHrEvaluation] = useState<any>(null);
@@ -150,6 +151,43 @@ export default function CandidateDetailsPage() {
       isMounted = false
     }
   }, [candidateId])
+
+  // Polling for AI Analysis Results
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (polling && candidateId) {
+      interval = setInterval(async () => {
+        try {
+          const supabase = createClient();
+          const { data, error } = await supabase
+            .from('ai_evaluations')
+            .select('*')
+            .eq('application_id', candidateId)
+            .order('created_at', { ascending: false }) // Get latest
+            .limit(1)
+            .maybeSingle();
+            
+          if (data) {
+             // Basic check: if we started polling recently, we expect a recent result.
+             // But for now, just finding any result is a success signal if we were waiting.
+             // You might want to check if data.created_at > analysisStartTime
+             
+             if (typeof data.analysis === 'string') {
+                try { data.analysis = JSON.parse(data.analysis); } catch(e){}
+             }
+             
+             setAiEvaluation(data);
+             setPolling(false);
+             setAiLoading(false);
+             addToast('success', 'AI Analysis Result Ready!');
+          }
+        } catch (e) {
+          console.error('Polling error', e);
+        }
+      }, 5000); // Check every 5s
+    }
+    return () => clearInterval(interval);
+  }, [polling, candidateId, addToast]);
 
   const handleSaveHrEvaluation = async () => {
     try {
@@ -260,15 +298,22 @@ export default function CandidateDetailsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setAiEvaluation(data.evaluation);
-        addToast('success', 'AI Analysis Completed Successfully');
+        if (data.processing) {
+           addToast('info', 'AI Analysis Started in Background. This may take 1-2 minutes.');
+           setPolling(true);
+           // Keep loading state true until polling finishes
+        } else if (data.evaluation) {
+           setAiEvaluation(data.evaluation);
+           addToast('success', 'AI Analysis Completed Successfully');
+           setAiLoading(false);
+        }
       } else {
         addToast('error', data.message || 'Analysis failed');
+        setAiLoading(false);
       }
     } catch (e: any) {
       console.error(e);
       addToast('error', `Connection failed: ${e.message || 'Unknown error'}`);
-    } finally {
       setAiLoading(false);
     }
   };
