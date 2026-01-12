@@ -219,9 +219,9 @@ export async function transcribeAudio(audioPath) {
  * @returns {Promise<Object>} Analysis results
  */
 async function analyzeTranscript(transcript, segments, jobContext) {
-  const apiKey = process.env.BACKEND_API_KEY;
+  const apiKey = process.env.BACKEND_API_KEY || process.env.AI_API_KEY;
   if (!apiKey) {
-    throw new Error('BACKEND_API_KEY is not set');
+    throw new Error('BACKEND_API_KEY (or AI_API_KEY) is not set');
   }
 
   const analysisData = {

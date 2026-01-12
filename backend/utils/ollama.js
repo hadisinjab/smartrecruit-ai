@@ -5,7 +5,13 @@
 import axios from 'axios';
 
 const AI_SERVER_URL = process.env.AI_SERVER_URL || 'http://localhost:5001';
-const API_KEY = process.env.BACKEND_API_KEY;
+const API_KEY = process.env.BACKEND_API_KEY || process.env.AI_API_KEY;
+
+if (!API_KEY) {
+  console.error('[Ollama] Warning: BACKEND_API_KEY (or AI_API_KEY) is not set! AI requests will likely fail with 401.');
+} else {
+  console.log('[Ollama] API Key is configured (Length:', API_KEY.length, ')');
+}
 
 /**
  * توليد نص عام باستخدام AI Server.
