@@ -32,16 +32,17 @@ class HuggingFaceAnalyzer:
             ]
         }
     
-    def _make_api_call(self, model_name: str, payload: Dict) -> Optional[Dict]:
+    def _make_api_call(self, model_name: str, payload: Dict, use_token: bool = True) -> Optional[Dict]:
         """API call to Hugging Face"""
         try:
             api_url = f"{self.api_base}/{model_name}"
-            response = requests.post(api_url, headers=self.headers, json=payload)
+            headers = self.headers if use_token else {}
+            response = requests.post(api_url, headers=headers, json=payload)
             
             if response.status_code == 200:
                 return response.json()
             else:
-                LOGGER.error(f"HF API error for {model_name}: {response.status_code} - {response.text}")
+                LOGGER.error(f"HF API error for {model_name} (Token={use_token}): {response.status_code} - {response.text}")
                 return None
                 
         except Exception as e:
@@ -66,8 +67,14 @@ class HuggingFaceAnalyzer:
             
             for model in models_to_try:
                 LOGGER.info(f"Trying generation with model: {model}")
-                result = self._make_api_call(model, payload)
+                # Try with token first
+                result = self._make_api_call(model, payload, use_token=True)
                 
+                # If failed (likely auth error), try without token for public models
+                if not result:
+                     LOGGER.info(f"Retrying {model} without token...")
+                     result = self._make_api_call(model, payload, use_token=False)
+
                 if result and isinstance(result, list) and len(result) > 0:
                     generated = result[0].get("generated_text", "")
                     # تنظيف النص
