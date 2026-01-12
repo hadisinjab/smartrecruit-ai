@@ -11,6 +11,7 @@ import time
 import tempfile
 import os
 import mimetypes
+import requests # Added for debug endpoint
 
 from modules.utils import LOGGER, validate_api_key, audio_duration_seconds
 from modules.transcribe import transcribe_audio
@@ -337,6 +338,28 @@ def generate_recommendations(cv_analysis: Dict, job_analysis: Dict, transcript_a
             recommendations.append("ينصح بتحسين النغطة التعبيرية في المقابلات")
     
     return recommendations
+
+
+@app.get("/api/debug-hf")
+def debug_hf() -> Any:
+    """Debug endpoint to check HF connectivity"""
+    try:
+        token = os.getenv("HUGGINGFACE_API_TOKEN")
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        
+        # Test GPT2
+        r = requests.post("https://api-inference.huggingface.co/models/gpt2", 
+                          headers=headers, 
+                          json={"inputs": "Hello, world", "parameters": {"max_new_tokens": 10}})
+                          
+        return jsonify({
+            "status": r.status_code,
+            "raw_response": r.text,
+            "token_present": bool(token),
+            "token_preview": f"{token[:4]}..." if token else None
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 
 def run() -> None:
