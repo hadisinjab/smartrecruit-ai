@@ -348,7 +348,7 @@ def debug_hf() -> Any:
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         
         # Test GPT2
-        r = requests.post("https://router.huggingface.co/models/gpt2", 
+        r = requests.post("https://router.huggingface.co/hf-inference/models/gpt2", 
                           headers=headers, 
                           json={"inputs": "Hello, world", "parameters": {"max_new_tokens": 10}})
                           

@@ -14,7 +14,7 @@ class HuggingFaceAnalyzer:
             raise ValueError("HUGGINGFACE_API_TOKEN not found in environment")
         
         self.headers = {"Authorization": f"Bearer {self.api_token}"}
-        self.api_base = "https://router.huggingface.co/models"
+        self.api_base = "https://router.huggingface.co/hf-inference/models"
         
         # نماذج التحليل المختلفة
         self.models = {
