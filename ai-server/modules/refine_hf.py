@@ -15,7 +15,7 @@ def refine_with_hf(text: str) -> str:
     
     # نموذج مجاني للنصوص العربية والإنجليزية
     model = "google/flan-t5-large"
-    api_url = f"https://api-inference.huggingface.co/models/{model}"
+    api_url = f"https://router.huggingface.co/models/{model}"
     
     headers = {"Authorization": f"Bearer {api_key}"}
     

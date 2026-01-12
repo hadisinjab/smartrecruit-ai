@@ -44,7 +44,7 @@ def _check_api_key() -> None:
     """
     Enforce API key for all routes except health.
     """
-    if request.path == "/health":
+    if request.path == "/health" or request.path == "/api/debug-hf":
         return None
     if not validate_api_key(request.headers):
         return jsonify({"error": True, "message": "Unauthorized"}), 401
@@ -348,7 +348,7 @@ def debug_hf() -> Any:
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         
         # Test GPT2
-        r = requests.post("https://api-inference.huggingface.co/models/gpt2", 
+        r = requests.post("https://router.huggingface.co/models/gpt2", 
                           headers=headers, 
                           json={"inputs": "Hello, world", "parameters": {"max_new_tokens": 10}})
                           
