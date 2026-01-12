@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import axios from 'axios';
 // import { generateJSON } from './ollama.js'; // Replaced with Hugging Face API
 
 const execAsync = promisify(exec);
@@ -158,51 +159,33 @@ async function extractAudioFromVideo(videoPath) {
  * @returns {Promise<Object>} { transcript, segments, duration }
  */
 export async function transcribeAudio(audioPath) {
-  // For now, we'll mock the Python server call or assume it's running
-  // In production, use axios/fetch to call http://localhost:5000/transcribe
-  // Here, we'll try to use a direct fetch if available, or mock for testing if server not up.
-  
   try {
-    // Prepare FormData logic if using fetch (requires 'form-data' package in Node)
-    // For simplicity, let's assume we might need to implement the fetch call
-    // But since we don't have the 'form-data' package installed by default, 
-    // and we have the Python script available locally, we could potentially run it via CLI?
-    // NO, better to stick to the plan: Call the API.
-    
-    // Check if fetch is available (Node 18+)
-    if (!globalThis.fetch) {
-      throw new Error('Node.js version too old, fetch not available');
-    }
-
-    const FormData = (await import('form-data')).default; // Dynamic import
+    const FormData = (await import('form-data')).default;
     const fs = (await import('fs')).default;
     
     const form = new FormData();
-    form.append('audio', fs.createReadStream(audioPath)); // Key must be 'audio' to match server.py
+    form.append('audio', fs.createReadStream(audioPath));
 
     const apiKey = process.env.BACKEND_API_KEY || process.env.AI_API_KEY;
 
-    // NOTE: This assumes ai-server/server.py is running on port 5000
-    // If not running, this will fail. For robustness, we can add a fallback mock.
-    const response = await fetch(WHISPER_API_URL, {
-      method: 'POST',
-      body: form,
+    // Use Axios for better FormData handling
+    const response = await axios.post(WHISPER_API_URL, form, {
       headers: {
         ...form.getHeaders(),
         'x-api-key': apiKey
-      }
+      },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity
     });
 
-    if (!response.ok) {
-      throw new Error(`Whisper API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (data.status === 'success') {
+    const data = response.data;
+    if (data.success || data.status === 'success') { // Handle inconsistent response keys if any
+      // Normalize response structure
+      const transcription = data.transcription || data; 
       return {
-        transcript: data.transcription.text,
-        segments: data.transcription.segments,
-        duration: data.transcription.metadata?.duration || 0 // Assuming metadata has duration
+        transcript: transcription.text || transcription.raw_transcript,
+        segments: transcription.segments || [],
+        duration: transcription.metadata?.duration || 0
       };
     } else {
       throw new Error(data.message || 'Unknown Whisper error');
