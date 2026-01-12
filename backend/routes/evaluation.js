@@ -261,7 +261,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
       const vQMap = {};
       if (vQuestions) vQuestions.forEach(q => vQMap[q.id] = q.label);
 
-      for (const ans of voiceAnswers) {
+      const voiceResults = await Promise.all(voiceAnswers.map(async (ans) => {
         try {
           // Use voice_data if available (preferred), or value as fallback
           let audioUrl = ans.value;
@@ -271,7 +271,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
 
           if (!audioUrl) {
              console.log(`Skipping voice answer ${ans.id}: No audio URL found`);
-             continue;
+             return null;
           }
 
           console.log(`Processing voice answer ${ans.id} (URL: ${audioUrl})...`);
@@ -332,20 +332,27 @@ router.post('/analyze/:applicationId', async (req, res) => {
              
              const analysis = await generateJSON(analysisPrompt, { temperature: 0.2 });
 
-             voiceTranscripts.push({
+             // Cleanup
+             if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+
+             return {
                question_id: ans.question_id,
                question: questionLabel,
                original_transcript: rawTranscript,
                refined_transcript: refinedTranscript,
                audio_url: ans.value,
                analysis: analysis
-             });
+             };
           }
           if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+          return null;
         } catch (e) {
           console.error(`Voice processing failed for ${ans.id}:`, e);
+          return null;
         }
-      }
+      }));
+      
+      voiceTranscripts.push(...voiceResults.filter(Boolean));
 
       // B. Smart Inference for Text Answers ONLY (Iterative Analysis)
       const textAnswers = application.answers.filter(a => ['text', 'long_text'].includes(a.type));
@@ -366,7 +373,7 @@ router.post('/analyze/:applicationId', async (req, res) => {
          const individualAnalyses = [];
 
          // 1. Analyze each Q&A individually
-         for (const ans of textAnswers) {
+         const textResults = await Promise.all(textAnswers.map(async (ans) => {
             const questionLabel = qMap[ans.question_id] || 'Unknown Question';
             const miniPrompt = `
             Evaluate this specific Q&A for a ${jobContext.position} role.
@@ -385,16 +392,19 @@ router.post('/analyze/:applicationId', async (req, res) => {
 
             try {
                const analysis = await generateJSON(miniPrompt, { temperature: 0.1 });
-               individualAnalyses.push({
+               return {
                   question_id: ans.question_id,
                   question: questionLabel,
                   answer: ans.value,
                   analysis: analysis
-               });
+               };
             } catch (e) {
                console.error(`Failed to analyze QA ${ans.id}:`, e);
+               return null;
             }
-         }
+         }));
+         
+         individualAnalyses.push(...textResults.filter(Boolean));
 
          // 2. Aggregate for Final Summary
          const aggregationPrompt = `
