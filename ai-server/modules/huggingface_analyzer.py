@@ -23,7 +23,12 @@ class HuggingFaceAnalyzer:
             "text_summarization": "facebook/bart-large-cnn",
             "text_classification": "facebook/bart-large-mnli",
             "arabic_nlp": "aubmindlab/bert-base-arabertv02",
-            "generation": "HuggingFaceH4/zephyr-7b-beta"
+            "generation": "HuggingFaceH4/zephyr-7b-beta",
+            "generation_fallback": [
+                "mistralai/Mistral-7B-Instruct-v0.2",
+                "google/flan-t5-large",
+                "tiiuae/falcon-7b-instruct"
+            ]
         }
     
     def _make_api_call(self, model_name: str, payload: Dict) -> Optional[Dict]:
@@ -43,7 +48,7 @@ class HuggingFaceAnalyzer:
             return None
     
     def generate_text(self, prompt: str, params: Optional[Dict] = None) -> str:
-        """توليد نص باستخدام نموذج توليدي"""
+        """توليد نص باستخدام نموذج توليدي مع محاولات احتياطية"""
         try:
             payload = {
                 "inputs": f"<s>[INST] {prompt} [/INST]",
@@ -55,14 +60,22 @@ class HuggingFaceAnalyzer:
                 }
             }
             
-            result = self._make_api_call(self.models["generation"], payload)
+            # محاولة النموذج الأساسي
+            models_to_try = [self.models["generation"]] + self.models["generation_fallback"]
             
-            if result and isinstance(result, list) and len(result) > 0:
-                generated = result[0].get("generated_text", "")
-                # تنظيف النص من الـ prompt إذا ظهر
-                if "[/INST]" in generated:
-                    generated = generated.split("[/INST]")[-1].strip()
-                return generated
+            for model in models_to_try:
+                LOGGER.info(f"Trying generation with model: {model}")
+                result = self._make_api_call(model, payload)
+                
+                if result and isinstance(result, list) and len(result) > 0:
+                    generated = result[0].get("generated_text", "")
+                    # تنظيف النص
+                    if "[/INST]" in generated:
+                        generated = generated.split("[/INST]")[-1].strip()
+                    if generated.strip(): # تأكد من أن النص ليس فارغاً
+                        return generated
+                
+                LOGGER.warning(f"Model {model} returned empty or failed. Trying next...")
                 
             return ""
             

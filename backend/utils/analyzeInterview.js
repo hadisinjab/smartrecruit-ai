@@ -172,7 +172,7 @@ export async function transcribeAudio(audioPath) {
     const fs = (await import('fs')).default;
     
     const form = new FormData();
-    form.append('file', fs.createReadStream(audioPath));
+    form.append('audio', fs.createReadStream(audioPath)); // Key must be 'audio' to match server.py
 
     const apiKey = process.env.BACKEND_API_KEY || process.env.AI_API_KEY;
 
