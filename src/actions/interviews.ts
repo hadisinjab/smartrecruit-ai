@@ -227,10 +227,10 @@ export async function triggerInterviewAnalysis(interviewId: string): Promise<Act
 
     // Call AI server for comprehensive analysis
     const aiServerUrl = process.env.AI_SERVER_URL || 'http://localhost:5001'
-    const apiKey = process.env.BACKEND_API_KEY
+    const apiKey = process.env.BACKEND_API_KEY || process.env.AI_API_KEY
     
     if (!apiKey) {
-      console.error('[Analysis] AI API key missing');
+      console.error('[Analysis] AI API key missing (BACKEND_API_KEY or AI_API_KEY)');
       return { ok: false, status: 500, error: 'AI API key not configured' }
     }
 

@@ -174,12 +174,17 @@ export async function transcribeAudio(audioPath) {
     const form = new FormData();
     form.append('file', fs.createReadStream(audioPath));
 
+    const apiKey = process.env.BACKEND_API_KEY || process.env.AI_API_KEY;
+
     // NOTE: This assumes ai-server/server.py is running on port 5000
     // If not running, this will fail. For robustness, we can add a fallback mock.
     const response = await fetch(WHISPER_API_URL, {
       method: 'POST',
       body: form,
-      headers: form.getHeaders() // Important for multipart
+      headers: {
+        ...form.getHeaders(),
+        'x-api-key': apiKey
+      }
     });
 
     if (!response.ok) {
