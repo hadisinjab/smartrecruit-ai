@@ -26,7 +26,22 @@ const app = express();
  */
 const corsOrigin = process.env.CORS_ORIGIN || '*'; // Allow all origins by default or use specific env var
 app.use(cors({
-  origin: corsOrigin === '*' ? '*' : corsOrigin.split(','),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // If wildcard is allowed, return request origin to support credentials
+    if (corsOrigin === '*') {
+       return callback(null, true);
+    }
+    
+    if (corsOrigin.split(',').indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      console.warn(`CORS Blocked: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
