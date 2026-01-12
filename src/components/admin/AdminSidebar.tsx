@@ -120,7 +120,7 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
         icon: <Activity className='w-5 h-5' />,
         label: 'Diagnostics',
         href: '/admin/diagnostics',
-        allowedRoles: ['super-admin'] as const
+        allowedRoles: ['super-admin', 'admin'] as const
       }
     ];
 
