@@ -71,8 +71,14 @@ export async function analyzeInterview(input, inputType, jobContext) {
       }
 
       // Transcribe
-      console.log(`Transcribing audio: ${audioPath}`);
-      transcriptData = await transcribeAudio(audioPath);
+    const stats = fs.statSync(audioPath);
+    console.log(`Transcribing audio: ${audioPath} (Size: ${stats.size} bytes)`);
+    
+    if (stats.size === 0) {
+        throw new Error('Audio file is empty');
+    }
+
+    transcriptData = await transcribeAudio(audioPath);
     }
 
     if (!transcriptData.transcript || transcriptData.transcript.trim().length === 0) {

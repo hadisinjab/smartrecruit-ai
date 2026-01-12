@@ -27,7 +27,8 @@ class HuggingFaceAnalyzer:
             "generation_fallback": [
                 "mistralai/Mistral-7B-Instruct-v0.2",
                 "google/flan-t5-large",
-                "tiiuae/falcon-7b-instruct"
+                "tiiuae/falcon-7b-instruct",
+                "gpt2"
             ]
         }
     
