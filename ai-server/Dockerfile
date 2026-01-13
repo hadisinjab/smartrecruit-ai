@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies in stages
-COPY ai-server/requirements.txt .
+COPY requirements.txt .
 
 # Install numpy and cython first (needed by other packages)
 RUN pip install --no-cache-dir numpy cython
@@ -19,8 +19,8 @@ RUN pip install --no-cache-dir numpy cython
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy AI server files
-COPY ai-server/ ./
+COPY . .
 
-EXPOSE 10000
+EXPOSE 7860
 
-CMD gunicorn --bind 0.0.0.0:$PORT server:app
+CMD gunicorn --bind 0.0.0.0:7860 server:app

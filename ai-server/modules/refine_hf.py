@@ -1,7 +1,6 @@
 """Text refinement using Hugging Face API (مجاني)"""
 import os
-import requests
-from typing import Optional
+from huggingface_hub import InferenceClient
 
 
 def refine_with_hf(text: str) -> str:
@@ -15,9 +14,6 @@ def refine_with_hf(text: str) -> str:
     
     # نموذج مجاني للنصوص العربية والإنجليزية
     model = "google/flan-t5-large"
-    api_url = f"https://router.huggingface.co/hf-inference/models/{model}"
-    
-    headers = {"Authorization": f"Bearer {api_key}"}
     
     prompt = f"""تحسين النص التالي عن طريق:
 - إضافة الترقيم المناسب
@@ -42,15 +38,19 @@ def refine_with_hf(text: str) -> str:
     }
     
     try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            if result and len(result) > 0:
-                refined_text = result[0].get("generated_text", "").strip()
-                if refined_text and refined_text != text:
-                    return refined_text
+        client = InferenceClient(token=api_key)
+        response = client.post(json=payload, model=model)
+        
+        # response is already parsed JSON bytes, need to load it
+        import json
+        result = json.loads(response.decode('utf-8'))
+        
+        if result and len(result) > 0:
+            refined_text = result[0].get("generated_text", "").strip()
+            if refined_text and refined_text != text:
+                return refined_text
         else:
-            print(f"HF API error: {response.status_code} - {response.text}")
+            print(f"HF API returned empty result")
     except Exception as e:
         print(f"HF API error: {e}")
     

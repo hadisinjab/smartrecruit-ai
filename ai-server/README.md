@@ -1,58 +1,25 @@
-# AI Server (Flask)
+---
+title: SmartRecruit AI
+emoji: 🚀
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 5002
+pinned: false
+---
 
-## Requirements
-- Python 3.10+
-- Create environment file `ai-server/.env` (copy from `.env.example`)
+# SmartRecruit AI Server
 
-## Setup
-1. Create a virtual environment and install dependencies:
-   ```bash
-   cd ai-server
-   python -m venv .venv
-   # Windows:
-   .venv\\Scripts\\activate
-   # macOS/Linux:
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. Create environment file:
-   ```bash
-   cp .env.example .env
-   # Then edit values according to your environment
-   ```
-
-## Run
-```bash
-python server.py
-```
+This is the backend AI server for SmartRecruit, powered by Flask and Hugging Face Inference API.
 
 ## Endpoints
-- `GET /health` health check
-- All other routes require API key via header `x-api-key` or `Authorization: Bearer <key>`.
+- `GET /health` - Health check
+- `GET /api/debug-hf` - Debug Hugging Face connectivity
+- `POST /api/transcribe` - Transcribe audio files
+- `POST /api/analyze-cv` - Analyze resumes
+- `POST /api/analyze-job` - Analyze job descriptions
+- `POST /api/analyze-question` - Analyze interview questions
+- `POST /api/comprehensive-analysis` - Full analysis pipeline
 
-### Voice Transcription
-- `POST /api/transcribe`
-  - Fields:
-    - `audio` file (multipart/form-data)
-  - Response:
-    ```json
-    {
-      "success": true,
-      "raw_transcript": "...",
-      "clean_transcript": "...",
-      "segments": [
-        { "start": 0.0, "end": 2.5, "text": "..." }
-      ],
-      "metadata": {
-        "duration": 120.5,
-        "language": "ar",
-        "model": "medium",
-        "processing_time": 15.2
-      }
-    }
-    ```
-
-## Notes
-- If using Ollama locally, ensure it's running and set `OLLAMA_HOST` and `OLLAMA_MODEL` in environment.
-- Ensure FFmpeg is installed for audio processing.
-- faster-whisper may require suitable models and environment; CUDA/ONNXRuntime improves performance.
+## Configuration
+Requires `HUGGINGFACE_API_TOKEN` and `BACKEND_API_KEY` secrets.

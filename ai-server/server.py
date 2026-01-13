@@ -345,16 +345,23 @@ def debug_hf() -> Any:
     """Debug endpoint to check HF connectivity"""
     try:
         token = os.getenv("HUGGINGFACE_API_TOKEN")
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        from huggingface_hub import InferenceClient
+        
+        client = InferenceClient(token=token)
         
         # Test GPT2
-        r = requests.post("https://router.huggingface.co/hf-inference/models/gpt2", 
-                          headers=headers, 
-                          json={"inputs": "Hello, world", "parameters": {"max_new_tokens": 10}})
+        # Using post method to get raw response and avoid model-specific abstractions hiding errors
+        response = client.post(
+            json={"inputs": "Hello, world", "parameters": {"max_new_tokens": 10}},
+            model="gpt2"
+        )
+        
+        import json
+        result = json.loads(response.decode('utf-8'))
                           
         return jsonify({
-            "status": r.status_code,
-            "raw_response": r.text,
+            "status": 200,
+            "raw_response": str(result)[:200], # truncated for safety
             "token_present": bool(token),
             "token_preview": f"{token[:4]}..." if token else None
         })

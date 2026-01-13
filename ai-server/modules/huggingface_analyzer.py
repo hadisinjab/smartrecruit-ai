@@ -1,9 +1,9 @@
 """
-Hugging Face API integration for 5-step analysis
+Hugging Face API integration for 5-step analysis using InferenceClient
 """
 import os
-import requests
 from typing import Dict, List, Optional, Any
+from huggingface_hub import InferenceClient
 from modules.utils import LOGGER
 
 
@@ -13,8 +13,8 @@ class HuggingFaceAnalyzer:
         if not self.api_token:
             raise ValueError("HUGGINGFACE_API_TOKEN not found in environment")
         
-        self.headers = {"Authorization": f"Bearer {self.api_token}"}
-        self.api_base = "https://router.huggingface.co/hf-inference/models"
+        # Initialize the client (handles URL routing automatically)
+        self.client = InferenceClient(token=self.api_token)
         
         # نماذج التحليل المختلفة
         self.models = {
@@ -32,21 +32,22 @@ class HuggingFaceAnalyzer:
             ]
         }
     
-    def _make_api_call(self, model_name: str, payload: Dict, use_token: bool = True) -> Optional[Dict]:
-        """API call to Hugging Face"""
+    def _make_api_call(self, model_name: str, payload: Dict, use_token: bool = True) -> Optional[Any]:
+        """API call to Hugging Face using InferenceClient"""
         try:
-            api_url = f"{self.api_base}/{model_name}"
-            headers = self.headers if use_token else {}
-            response = requests.post(api_url, headers=headers, json=payload)
+            # We use the generic post method to maintain compatibility with existing payload structure
+            # If use_token is False, we create a temporary client without token (though most router endpoints require auth now)
+            client = self.client if use_token else InferenceClient(token=None)
             
-            if response.status_code == 200:
-                return response.json()
-            else:
-                LOGGER.error(f"HF API error for {model_name} (Token={use_token}): {response.status_code} - {response.text}")
-                return None
+            # The client.post method expects json body
+            response = client.post(json=payload, model=model_name)
+            
+            # response is already parsed JSON (bytes or dict/list depending on response)
+            import json
+            return json.loads(response.decode('utf-8'))
                 
         except Exception as e:
-            LOGGER.error(f"Error calling Hugging Face API: {e}")
+            LOGGER.error(f"HF API error for {model_name} (Token={use_token}): {e}")
             return None
     
     def generate_text(self, prompt: str, params: Optional[Dict] = None) -> str:
