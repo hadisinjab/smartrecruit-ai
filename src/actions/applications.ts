@@ -199,7 +199,7 @@ export async function beginApplication(payload: {
       job_form_id: payload.jobId,
       candidate_name: payload.candidateName || null,
       candidate_email: payload.candidateEmail || null,
-      status: 'incomplete',
+      status: 'new',
       is_duplicate: isDuplicate,
       submitted_at: null
     }

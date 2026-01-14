@@ -162,7 +162,7 @@ export interface Database {
           job_form_id?: string | null
           candidate_email?: string | null
           candidate_name?: string | null
-          status?: 'new' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected' | 'duplicate' | 'incomplete'
+          status?: 'new' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected' | 'duplicate'
           is_duplicate?: boolean
           submitted_at?: string | null
           created_at?: string
