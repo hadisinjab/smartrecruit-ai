@@ -6,8 +6,10 @@ import { FormStepComponent } from './form-step';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
-import { recordProgress } from '@/actions/applications';
+import { recordProgress, saveProgress } from '@/actions/applications';
 import { AssignmentStep, type AssignmentConfig, type AssignmentData } from '@/components/applicant/AssignmentStep'
+import { Loader2 } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   steps,
@@ -25,6 +27,8 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [assignmentData, setAssignmentData] = useState<AssignmentData | null>(null)
   const [effectiveApplicationId, setEffectiveApplicationId] = useState<string | null>(applicationId || null)
+  const [isSaving, setIsSaving] = useState(false)
+  const { addToast } = useToast()
 
   const progress = ((currentStep + 1) / steps.length) * 100;
 
@@ -88,6 +92,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
           newErrors[field.id] = 'File upload is required';
           isValid = false;
           return;
+        }
+        if (field.type === 'number') {
+          if (value === undefined || value === null || value === '') {
+            newErrors[field.id] = 'This field is required';
+            isValid = false;
+            return;
+          }
         }
         if ((field.type === 'text' || field.type === 'textarea' || field.type === 'url' || field.type === 'select')) {
           const isEmpty = !value || (typeof value === 'string' && value.trim() === '')
@@ -163,6 +174,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
     // Record progress with richer meta so admins can see what happened even if answers aren't submitted.
     if (appIdForTracking && stepId) {
+      setIsSaving(true)
       const step = steps[currentStep]
       const answeredFieldIds = (step?.fields || [])
         .map((f) => f.id)
@@ -181,6 +193,32 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
         answeredCount: answeredFieldIds.length,
         answeredFieldIds: answeredFieldIds.slice(0, 50),
       }).catch(() => {})
+
+      // Progressive Saving: Save answers for the current step
+      if (stepId !== 'job' && stepId !== 'review') {
+        const currentStepAnswers = step.fields.map(field => {
+          const v = formData[field.id]
+          if (field.type === 'voice') {
+             // Voice data is stored as an object
+             return { questionId: field.id, value: null, voiceData: v || null }
+          }
+          if (field.type === 'file') {
+             // File URL is stored as string
+             return { questionId: field.id, value: typeof v === 'string' ? v : null, voiceData: null }
+          }
+          return { questionId: field.id, value: v == null ? null : String(v), voiceData: null }
+        })
+
+        await saveProgress({
+          applicationId: appIdForTracking,
+          answers: currentStepAnswers
+        }).then((res) => {
+          if (res.success) {
+            addToast('success', 'Page saved successfully', 2000)
+          }
+        }).catch(err => console.error('Progressive save failed:', err))
+      }
+      setIsSaving(false)
     }
 
     if (currentStep < steps.length - 1) {
@@ -404,14 +442,8 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
 
         {/* Navigation */}
         <div className='flex justify-between items-center max-w-2xl mx-auto'>
-          <Button
-            variant='outline'
-            onClick={handlePrevious}
-            disabled={isFirstStep}
-          >
-            <ChevronLeft className='w-4 h-4 me-2 rtl:rotate-180' />
-            Previous
-          </Button>
+          {/* Previous button removed to enforce forward-only navigation */}
+          <div className='w-[100px]'></div>
 
           <div className='flex gap-2'>
             {steps.map((_, index) => (
@@ -428,26 +460,18 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
             ))}
           </div>
 
-          <Button onClick={() => { void handleNext() }} disabled={steps[currentStep].id === 'assignment'}>
+          <Button onClick={() => { void handleNext() }} disabled={steps[currentStep].id === 'assignment' || isSaving}>
+            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {steps[currentStep].id === 'job'
               ? 'Apply'
               : isLastStep
                 ? 'Submit Application'
                 : 'Next'}
-            <ChevronRight className='w-4 h-4 ms-2 rtl:rotate-180' />
+            {!isSaving && <ChevronRight className='w-4 h-4 ms-2 rtl:rotate-180' />}
           </Button>
         </div>
 
-        {/* Start Over Button */}
-        <div className='flex justify-center mt-6'>
-          <Button
-            variant='ghost'
-            onClick={handleStartOver}
-            className='text-gray-600 hover:text-gray-800'
-          >
-            Start Over
-          </Button>
-        </div>
+        {/* Start Over Button - Removed to enforce forward-only navigation */}
       </div>
     </div>
   );

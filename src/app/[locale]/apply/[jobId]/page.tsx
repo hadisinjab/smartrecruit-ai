@@ -22,9 +22,9 @@ export default async function ApplyPage({ params }: PageProps) {
   }
 
   // Separate questions into two groups:
-  // 1. Text questions (text, textarea) - will be shown in text-questions stage
+  // 1. Text questions (text, textarea, number, select) - will be shown in text-questions stage
   // 2. Media questions (voice, file, url) - will be shown in media-questions stage
-  const textQuestions = questions.filter(q => q.type === 'text' || q.type === 'textarea')
+  const textQuestions = questions.filter(q => q.type === 'text' || q.type === 'textarea' || q.type === 'number' || q.type === 'select')
   const mediaQuestions = questions.filter(q => q.type === 'voice' || q.type === 'file' || q.type === 'url')
 
   return (

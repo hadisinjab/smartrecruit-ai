@@ -23,8 +23,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   ] = await Promise.all([
     supabase.from('job_forms').select('*', { count: 'exact', head: true }),
     supabase.from('job_forms').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('applications').select('*', { count: 'exact', head: true }),
-    supabase.from('applications').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()), // New this month
+    supabase.from('applications').select('*', { count: 'exact', head: true }).neq('status', 'incomplete'),
+    supabase.from('applications').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()).neq('status', 'incomplete'), // New this month
     supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'interview'),
     supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'offer'),
     supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', 'hired'),
@@ -60,6 +60,7 @@ export async function getRecentCandidates(limit = 5): Promise<Candidate[]> {
       external_profiles(*),
       hr_evaluations(*)
     `)
+    .neq('status', 'incomplete')
     .order('created_at', { ascending: false })
     .limit(limit)
 

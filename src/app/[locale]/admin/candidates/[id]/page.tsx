@@ -18,6 +18,7 @@ import { Candidate, Evaluation } from '@/types/admin';
 import { useToast } from '@/context/ToastContext';
 import { getAssignmentsByApplication } from '@/actions/assignments'
 import { InterviewsList } from '@/components/admin/interviews/InterviewsList'
+import { InterviewDialog } from '@/components/admin/interviews/InterviewDialog'
 import {
   ArrowLeft,
   Edit3,
@@ -35,6 +36,7 @@ import {
 } from 'lucide-react';
 
 import { createClient } from '@/utils/supabase/client';
+import { useUser } from '@/context/UserContext';
 
 export default function CandidateDetailsPage() {
   const t = useTranslations('Candidates');
@@ -47,6 +49,7 @@ export default function CandidateDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { addToast } = useToast();
+  const { isReviewer } = useUser();
   const candidateId = params.id as string;
   
   const [candidate, setCandidate] = useState<Candidate | null>(null);
@@ -57,6 +60,9 @@ export default function CandidateDetailsPage() {
   const [aiEvaluation, setAiEvaluation] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [polling, setPolling] = useState(false);
+  
+  // Interview Dialog State
+  const [showInterviewDialog, setShowInterviewDialog] = useState(false);
   
   // HR Evaluation State
   const [hrEvaluation, setHrEvaluation] = useState<any>(null);
@@ -75,7 +81,28 @@ export default function CandidateDetailsPage() {
         if (data) {
           setCandidate(data as unknown as Candidate);
           const a = (data as any).answers || [];
-          setAnswers(a);
+          
+          // Separate and sort answers
+          const sortedAnswers = [...a].sort((a, b) => {
+             // Fixed questions order priority
+             const getPriority = (label: string) => {
+               if (label === 'Age') return 1;
+               if (label === 'Education') return 2;
+               if (label === 'Expected Salary') return 3;
+               if (label.startsWith('How experienced are you with')) return 4;
+               return 5; // User defined questions come last
+             };
+             
+             const priorityA = getPriority(a.label || a.questionId);
+             const priorityB = getPriority(b.label || b.questionId);
+             
+             if (priorityA !== priorityB) {
+               return priorityA - priorityB;
+             }
+             return 0; // Maintain original order for same priority
+          });
+
+          setAnswers(sortedAnswers);
           
           // Load existing AI evaluation if available
           const aiEval = (data as any).ai_evaluations?.[0] || null;
@@ -444,7 +471,9 @@ export default function CandidateDetailsPage() {
                 {answers.length === 0 ? (
                   <p className='text-sm text-gray-600'>{t('details.noAnswers')}</p>
                 ) : (
-                  answers.map((ans) => (
+                  answers
+                    .filter(ans => !(isReviewer && (ans.label === 'Expected Salary' || ans.label === 'الراتب المتوقع')))
+                    .map((ans) => (
                     <div key={ans.id} className='p-3 border border-gray-200 rounded-lg'>
                       <p className='text-sm font-medium text-gray-900'>{ans.label || ans.questionId}</p>
                       <div className='mt-1'>
@@ -932,6 +961,17 @@ export default function CandidateDetailsPage() {
                       </p>
                     </div>
                   )}
+                  {hrEvaluation?.hr_decision === 'interview' && (
+                    <div className='pt-2'>
+                      <Button 
+                        size='sm' 
+                        onClick={() => setShowInterviewDialog(true)}
+                        className='bg-green-600 hover:bg-green-700 text-white'
+                      >
+                        <Calendar className='w-3 h-3 mr-1' /> Schedule Interview
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
@@ -968,6 +1008,15 @@ export default function CandidateDetailsPage() {
           </Tabs.Content>
         </Tabs.Root>
       </div>
+      
+      <InterviewDialog
+        open={showInterviewDialog}
+        onOpenChange={setShowInterviewDialog}
+        candidateName={`${candidate.firstName} ${candidate.lastName}`}
+        candidateEmail={candidate.email}
+        jobTitle={candidate.position}
+        candidateId={candidate.id}
+      />
     </AdminLayout>
   );
 }

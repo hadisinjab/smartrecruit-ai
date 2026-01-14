@@ -36,7 +36,7 @@ export async function getIncompleteApplications(): Promise<IncompleteApplication
       external_profiles(*)
     `)
     // Include duplicates as "incomplete" too if they are not submitted yet.
-    .in('status', ['new', 'duplicate'])
+    .in('status', ['new', 'duplicate', 'incomplete'])
     .is('submitted_at', null)
     .order('created_at', { ascending: false })
 

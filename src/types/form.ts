@@ -27,7 +27,7 @@ export interface FormStep {
   fields: FormField[];
 }
 
-export type FormValue = string | number | boolean | File | null | Record<string, any>;
+export type FormValue = string | number | boolean | File | null | undefined | Record<string, any>;
 
 export interface FormData {
   [key: string]: FormValue;

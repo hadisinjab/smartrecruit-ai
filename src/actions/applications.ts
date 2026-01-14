@@ -2,6 +2,22 @@
 
 import { createAdminClient, createClient } from '@/utils/supabase/server'
 import { createNotification, getRecipientsForJob } from '@/lib/notifications'
+import type { Database } from '@/types/supabase.types'
+
+// Create typed Supabase client for this file
+function createTypedClient() {
+  const client = createClient()
+  return client as any as ReturnType<typeof createClient> & {
+    from: (table: keyof Database['public']['Tables']) => any
+  }
+}
+
+function createTypedAdminClient() {
+  const client = createAdminClient()
+  return client as any as ReturnType<typeof createAdminClient> & {
+    from: (table: keyof Database['public']['Tables']) => any
+  }
+}
 
 type ApplyJob = {
   id: string
@@ -53,7 +69,7 @@ export async function getJobForApplication(jobId: string): Promise<{
   error: string | null
 }> {
   try {
-    const supabase = createClient()
+    const supabase = createTypedClient()
 
     // Public can only see active jobs due to RLS policy.
     const { data: job, error: jobError } = await supabase
@@ -68,10 +84,10 @@ export async function getJobForApplication(jobId: string): Promise<{
     }
 
     // If policy changes or staff sees non-active jobs, enforce active/deadline here for apply UX.
-    if ((job as any).status && (job as any).status !== 'active') {
+    if (job.status && job.status !== 'active') {
       return { job: null, questions: [], error: 'Job is not available for applications' }
     }
-    if ((job as any).deadline && new Date((job as any).deadline).getTime() <= Date.now()) {
+    if (job.deadline && new Date(job.deadline).getTime() <= Date.now()) {
       return { job: null, questions: [], error: 'The application deadline has passed' }
     }
 
@@ -89,7 +105,9 @@ export async function getJobForApplication(jobId: string): Promise<{
       }
     }
 
-    const mapped: ApplyQuestion[] = (questions || []).map((q: any) => ({
+    console.log('[getJobForApplication] Fetched questions:', JSON.stringify(questions, null, 2))
+
+    const mapped: ApplyQuestion[] = (questions || []).map((q) => ({
       id: q.id,
       type: normalizeQuestionType(q.type),
       label: q.label,
@@ -104,20 +122,20 @@ export async function getJobForApplication(jobId: string): Promise<{
         id: job.id,
         title: job.title,
         description: job.description,
-        department: (job as any).department ?? null,
-        location: (job as any).location ?? null,
-        type: (job as any).type ?? null,
-        salary_min: (job as any).salary_min ?? null,
-        salary_max: (job as any).salary_max ?? null,
-        salary_currency: (job as any).salary_currency ?? null,
-        requirements: (job as any).requirements ?? null,
-        benefits: (job as any).benefits ?? null,
-        deadline: (job as any).deadline ?? null,
-        assignment_enabled: (job as any).assignment_enabled ?? false,
-        assignment_required: (job as any).assignment_required ?? false,
-        assignment_type: (job as any).assignment_type ?? null,
-        assignment_description: (job as any).assignment_description ?? null,
-        assignment_weight: (job as any).assignment_weight ?? null,
+        department: job.department ?? null,
+        location: job.location ?? null,
+        type: job.type ?? null,
+        salary_min: job.salary_min ?? null,
+        salary_max: job.salary_max ?? null,
+        salary_currency: job.salary_currency ?? null,
+        requirements: job.requirements ?? null,
+        benefits: job.benefits ?? null,
+        deadline: job.deadline ?? null,
+        assignment_enabled: job.assignment_enabled ?? false,
+        assignment_required: job.assignment_required ?? false,
+        assignment_type: job.assignment_type ?? null,
+        assignment_description: job.assignment_description ?? null,
+        assignment_weight: job.assignment_weight ?? null,
       },
       questions: mapped,
       error: null,
@@ -134,7 +152,7 @@ export async function beginApplication(payload: {
 }): Promise<{ applicationId: string | null; error: string | null }> {
   try {
     // Use admin client to bypass RLS for application creation
-    const supabase = createAdminClient()
+    const supabase = createTypedAdminClient()
     // Always create a NEW application record.
     // But if candidateName OR candidateEmail matches a prior application for the same job,
     // mark it as duplicate so staff can see the repetition.
@@ -150,7 +168,7 @@ export async function beginApplication(payload: {
 
     if (orParts.length) {
       // Use admin client for duplicate checks (public anon client often can't SELECT due to RLS).
-      const admin = createAdminClient()
+      const admin = createTypedAdminClient()
       const { data: existing } = await admin
         .from('applications')
         .select('id,submitted_at,candidate_email,candidate_name,created_at')
@@ -162,14 +180,14 @@ export async function beginApplication(payload: {
       const rows = existing || []
       if (rows.length) {
         isDuplicate = true
-        matchedApplicationIds = rows.map((r: any) => r.id).filter(Boolean).slice(0, 25)
+        matchedApplicationIds = rows.map((r) => r.id).filter(Boolean).slice(0, 25)
         const emailMatch = !!rows.find(
-          (r: any) =>
+          (r) =>
             candidateEmail &&
             String(r.candidate_email || '').toLowerCase() === candidateEmail.toLowerCase()
         )
         const nameMatch = !!rows.find(
-          (r: any) =>
+          (r) =>
             candidateName &&
             String(r.candidate_name || '').toLowerCase() === candidateName.toLowerCase()
         )
@@ -177,21 +195,21 @@ export async function beginApplication(payload: {
       }
     }
 
-    const insertPayload: any = {
+    const insertPayload = {
       job_form_id: payload.jobId,
       candidate_name: payload.candidateName || null,
       candidate_email: payload.candidateEmail || null,
-      status: isDuplicate ? 'duplicate' : 'new',
+      status: 'incomplete',
       is_duplicate: isDuplicate,
       submitted_at: null
     }
 
     const { data: app, error } = await supabase
       .from('applications')
-      // @ts-ignore
       .insert(insertPayload)
       .select('id')
-      .single() as any
+      .single()
+    
     if (error || !app?.id) {
       return { applicationId: null, error: error?.message || 'Failed to begin application' }
     }
@@ -213,6 +231,62 @@ export async function beginApplication(payload: {
   }
 }
 
+export async function saveProgress(payload: {
+  applicationId: string
+  answers: Array<{
+    questionId: string
+    value?: string | null
+    voiceData?: any
+  }>
+}): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = createTypedAdminClient()
+
+    // Process answers sequentially to avoid race conditions
+    for (const ans of payload.answers) {
+      // Manual "Upsert": Try to find existing answer first
+      // This avoids errors if the DB lacks a unique constraint on (application_id, question_id)
+      const { data: existing } = await supabase
+        .from('answers')
+        .select('id')
+        .eq('application_id', payload.applicationId)
+        .eq('question_id', ans.questionId)
+        .maybeSingle()
+
+      let error = null
+
+      if (existing) {
+        // Update
+        const { error: updErr } = await supabase
+          .from('answers')
+          .update({
+            value: ans.value ?? null,
+            voice_data: ans.voiceData ?? null
+          })
+          .eq('id', existing.id)
+        error = updErr
+      } else {
+        // Insert
+        const { error: insErr } = await supabase
+          .from('answers')
+          .insert({
+            application_id: payload.applicationId,
+            question_id: ans.questionId,
+            value: ans.value ?? null,
+            voice_data: ans.voiceData ?? null
+          })
+        error = insErr
+      }
+
+      if (error) console.error('Error saving answer:', error)
+    }
+
+    return { success: true, error: null }
+  } catch (e: any) {
+    return { success: false, error: e?.message || 'Failed to save progress' }
+  }
+}
+
 export async function submitApplication(payload: {
   applicationId?: string | null
   jobId: string
@@ -227,7 +301,7 @@ export async function submitApplication(payload: {
 }): Promise<{ applicationId: string | null; error: string | null }> {
   try {
     // Use admin client to bypass RLS
-    const supabase = createAdminClient()
+    const supabase = createTypedAdminClient()
 
     const candidateEmail = String(payload.candidateEmail || '').trim()
     const candidateName = String(payload.candidateName || '').trim()
@@ -238,9 +312,9 @@ export async function submitApplication(payload: {
     if (candidateName) orParts.push(`candidate_name.ilike.${candidateName}`)
 
     const { data: existingApps } = await (async () => {
-      if (!orParts.length) return { data: [] as any[] }
+      if (!orParts.length) return { data: [] }
       // Use admin client for duplicate checks (public anon client often can't SELECT due to RLS).
-      const admin = createAdminClient()
+      const admin = createTypedAdminClient()
       return await admin
         .from('applications')
         .select('id,submitted_at,status,candidate_email,candidate_name,created_at')
@@ -251,7 +325,7 @@ export async function submitApplication(payload: {
     })()
 
     const excludeId = payload.applicationId || null
-    const others = (existingApps || []).filter((a: any) => !excludeId || a.id !== excludeId)
+    const others = (existingApps || []).filter((a) => !excludeId || a.id !== excludeId)
     // Mark as duplicate if ANY prior application exists for the same email/name (submitted or not).
     const isDuplicateByHistory = others.length > 0
 
@@ -264,7 +338,7 @@ export async function submitApplication(payload: {
       const isDuplicate = isDuplicateByHistory
       const status: 'new' | 'duplicate' = isDuplicate ? 'duplicate' : 'new'
       
-      const updatePayload: any = {
+      const updatePayload = {
         candidate_name: payload.candidateName,
         candidate_email: payload.candidateEmail,
         status,
@@ -274,12 +348,12 @@ export async function submitApplication(payload: {
 
       const { data: updated, error: updError } = await supabase
         .from('applications')
-        // @ts-ignore
         .update(updatePayload)
         .eq('id', payload.applicationId)
-          .select('id')
-          .single() as any
-        if (updError || !updated?.id) {
+        .select('id')
+        .single()
+        
+      if (updError || !updated?.id) {
         return { applicationId: null, error: updError?.message || 'Failed to finalize application' }
       }
       appId = updated.id
@@ -288,7 +362,7 @@ export async function submitApplication(payload: {
       const isDuplicate = isDuplicateByHistory
       const status: 'new' | 'duplicate' = isDuplicate ? 'duplicate' : 'new'
 
-      const insertPayload: any = {
+      const insertPayload = {
         job_form_id: payload.jobId,
         candidate_name: payload.candidateName,
         candidate_email: payload.candidateEmail,
@@ -299,10 +373,10 @@ export async function submitApplication(payload: {
 
       const { data: app, error: appError } = await supabase
         .from('applications')
-        // @ts-ignore
         .insert(insertPayload)
         .select('id')
-        .single() as any
+        .single()
+        
       if (appError || !app?.id) {
         return { applicationId: null, error: appError?.message || 'Failed to create application' }
       }
@@ -330,9 +404,20 @@ export async function submitApplication(payload: {
           voice_data: a.voiceData ?? null
         }))
 
-      const { error: ansError } = await supabase.from('answers').insert(rows as any)
-      if (ansError) {
-        return { applicationId: appId, error: ansError.message || 'Failed to save answers' }
+      // Manual "Upsert" for final submission as well
+      for (const row of rows) {
+        const { data: existing } = await supabase
+          .from('answers')
+          .select('id')
+          .eq('application_id', row.application_id)
+          .eq('question_id', row.question_id)
+          .maybeSingle()
+
+        if (existing && existing.id) {
+          await supabase.from('answers').update(row).eq('id', existing.id)
+        } else {
+          await supabase.from('answers').insert(row)
+        }
       }
     }
 
@@ -340,7 +425,7 @@ export async function submitApplication(payload: {
       const { error: resumeError } = await supabase.from('resumes').insert({
         application_id: appId,
         file_url: payload.resumeUrl
-      } as any)
+      })
 
       if (resumeError) {
         return { applicationId: appId, error: resumeError.message || 'Failed to save resume' }
@@ -360,7 +445,7 @@ export async function submitApplication(payload: {
         job_id: payload.jobId,
         job_title: job?.title || null,
         action_url: actionUrl,
-      } as any
+      }
 
       await Promise.all(
         recipients.map((userId) =>
@@ -405,13 +490,13 @@ export async function recordProgress(
   meta: any = null
 ): Promise<{ error: string | null }> {
   try {
-    const supabase = createAdminClient()
+    const supabase = createTypedAdminClient()
     const now = new Date().toISOString()
 
     // Best effort: update last-progress fields on the application row (requires DB columns).
     // If the columns don't exist yet, this will error and we'll silently fall back to just touching updated_at.
     
-    const progressUpdate: any = {
+    const progressUpdate = {
       updated_at: now,
       last_progress_step: stepId,
       last_progress_event: eventType,
@@ -421,23 +506,20 @@ export async function recordProgress(
 
     const upd = await supabase
       .from('applications')
-      // @ts-ignore
       .update(progressUpdate)
       .eq('id', applicationId)
 
     if (upd.error) {
       // Fallback: at least touch updated_at for "recent activity" views.
-      const fallbackUpdate: any = { updated_at: now }
-      // @ts-ignore
+      const fallbackUpdate = { updated_at: now }
       await supabase.from('applications').update(fallbackUpdate).eq('id', applicationId)
     }
 
     // Best effort: write a history event (requires table).
-    const eventInsert: any = { application_id: applicationId, step_id: stepId, event_type: eventType, meta }
+    const eventInsert = { application_id: applicationId, step_id: stepId, event_type: eventType, meta }
     try {
       await supabase
         .from('application_progress_events')
-        // @ts-ignore
         .insert(eventInsert)
     } catch (e) {}
 

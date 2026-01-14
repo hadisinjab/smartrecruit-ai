@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Mic, MicOff, Upload, Link as LinkIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createClient } from '@/utils/supabase/client'
+import { useToast } from '@/context/ToastContext'
 
 export const TextQuestion: React.FC<QuestionComponentProps> = ({
   field,
@@ -116,12 +117,14 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
   const [isRevealed, setIsRevealed] = useState(false);
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null)
+  const { addToast } = useToast()
 
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const [localAudioUrl, setLocalAudioUrl] = useState<string | null>(null)
 
   const savedAudioUrl =
     value && typeof value === 'object'
@@ -256,6 +259,7 @@ export const VoiceQuestion: React.FC<QuestionComponentProps> = ({
       onChange(voiceJson)
       setHasRecorded(true)
       onUploadComplete?.(field.id, voiceJson)
+      addToast('success', 'Voice answer recorded')
     } finally {
       setUploading(false)
     }
@@ -414,6 +418,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const { addToast } = useToast()
 
   const uploadFile = async (file: File) => {
     const supabase = createClient()
@@ -492,6 +497,7 @@ export const FileUploadQuestion: React.FC<QuestionComponentProps> = ({
           size: file.size,
           created_at: new Date().toISOString(),
         })
+        addToast('success', 'File uploaded successfully')
       } finally {
         setUploading(false)
       }
@@ -722,7 +728,7 @@ export const SelectQuestion: React.FC<QuestionComponentProps> = ({
         {field.required && <span className='text-red-500 ms-1'>*</span>}
       </Label>
       <Select
-        value={value as string || ''}
+        value={value as string || undefined}
         onValueChange={(newValue) => onChange(newValue)}
       >
         <SelectTrigger className={error ? 'border-red-500' : ''}>

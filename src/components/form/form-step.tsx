@@ -33,7 +33,7 @@ export const FormStepComponent: React.FC<FormStepComponentProps> = ({
   const renderQuestion = (field: any) => {
     const commonProps = {
       field,
-      value: formData[field.id] || (field.type === 'voice' ? false : field.type === 'file' ? null : field.type === 'select' ? '' : ''),
+      value: formData[field.id] || (field.type === 'voice' ? false : field.type === 'file' ? null : field.type === 'select' ? undefined : ''),
       onChange: (value: FormValue) => onFieldChange(field.id, value),
       rtl,
       error: errors[field.id],

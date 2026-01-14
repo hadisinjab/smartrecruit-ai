@@ -12,7 +12,14 @@ import { deleteJob, getJobs } from '@/actions/jobs';
 import { Job } from '@/types/admin';
 import { Plus, Search, MapPin, Calendar, Users, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
-import { exportToCSV } from '@/utils/exportUtils';
+import { exportToCSV, exportToExcel, exportToPDF } from '@/utils/exportUtils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Download } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useSearch } from '@/context/SearchContext';
 import {
@@ -247,15 +254,34 @@ export default function JobsPage() {
       subtitle={t('subtitle')}
       actions={
         <div className='flex space-x-3'>
-          <Button 
-            variant='outline'
-            onClick={() => {
-              exportToCSV(jobs, 'jobs-data');
-              addToast('success', 'Jobs data exported successfully');
-            }}
-          >
-            {t('exportData')}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant='outline'>
+                <Download className='w-4 h-4 mr-2' />
+                {t('exportData')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {
+                exportToCSV(jobs, 'jobs-data');
+                addToast('success', 'Jobs data exported successfully');
+              }}>
+                CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                exportToExcel(jobs, 'jobs-data');
+                addToast('success', 'Jobs data exported successfully');
+              }}>
+                Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                exportToPDF(jobs, 'jobs-data');
+                addToast('success', 'Jobs data exported successfully');
+              }}>
+                PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {!isReviewer && (
             <Button 
               className='flex items-center space-x-2'

@@ -22,7 +22,8 @@ import {
   FileText, 
   AlignLeft, 
   Upload, 
-  Link as LinkIcon 
+  Link as LinkIcon,
+  List
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
@@ -146,7 +147,7 @@ export default function CreateJobPage() {
     const pageNumber = isTextQuestion ? 3 : 4
 
     const newField: FormField = {
-      id: `field-${Date.now()}`,
+      id: `field-${crypto.randomUUID()}`,
       type,
       label: tCreate('questionText'),
       required: true,
@@ -254,6 +255,7 @@ export default function CreateJobPage() {
       case 'voice': return <Mic className="w-4 h-4" />;
       case 'file': return <Upload className="w-4 h-4" />;
       case 'url': return <LinkIcon className="w-4 h-4" />;
+      case 'select': return <List className="w-4 h-4" />;
       default: return <AlignLeft className="w-4 h-4" />;
     }
   };
@@ -454,7 +456,53 @@ export default function CreateJobPage() {
                             <Label htmlFor={`req-${field.id}`} className="cursor-pointer">{tCreate('required')}</Label>
                           </div>
                           
-                          {/* Config inputs based on type */}
+                          {/* Options for Select Questions */}
+                          {field.type === 'select' && (
+                            <div className="w-full mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                              <Label className="text-xs text-gray-500 mb-2 block">Options</Label>
+                              <div className="space-y-2">
+                                {(field.options || []).map((opt, optIndex) => (
+                                  <div key={optIndex} className="flex gap-2">
+                                    <Input
+                                      value={typeof opt === 'string' ? opt : opt.label}
+                                      onChange={(e) => {
+                                        const newOptions = [...(field.options || [])];
+                                        const val = e.target.value;
+                                        newOptions[optIndex] = { label: val, value: val };
+                                        updateQuestion(index, { options: newOptions });
+                                      }}
+                                      placeholder={`Option ${optIndex + 1}`}
+                                      className="bg-white"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        const newOptions = field.options?.filter((_, i) => i !== optIndex);
+                                        updateQuestion(index, { options: newOptions });
+                                      }}
+                                      disabled={(field.options || []).length <= 1}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newOptions = [...(field.options || []), { label: '', value: '' }];
+                                    updateQuestion(index, { options: newOptions });
+                                  }}
+                                  className="mt-2"
+                                >
+                                  <Plus className="w-4 h-4 mr-1" /> Add Option
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Voice Duration Config */}
                           {field.type === 'voice' && (
                             <div className="flex items-center gap-2">
                                <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
@@ -531,6 +579,9 @@ export default function CreateJobPage() {
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => addQuestion('file')}>
                   <Upload className="w-4 h-4 mr-2" /> {tCreate('fileUpload')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => addQuestion('select')}>
+                  <List className="w-4 h-4 mr-2" /> {tCreate('multipleChoice')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => addQuestion('url')}>
                   <LinkIcon className="w-4 h-4 mr-2" /> {tCreate('urlLink')}

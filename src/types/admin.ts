@@ -51,6 +51,7 @@ export interface Candidate {
   location: string;
   position: string;
   experience: number;
+  age?: number; // Added age field
   // Note: applications table uses 'new' / 'duplicate' early in the funnel too.
   status: 'new' | 'duplicate' | 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
   appliedDate: string;

@@ -18,7 +18,7 @@ export default async function ApplyPage({ params }: PageProps) {
     return <ErrorPage error={error || 'Job not found'} />
   }
 
-  const textQuestions = questions.filter(q => q.type === 'text' || q.type === 'textarea')
+  const textQuestions = questions.filter(q => q.type === 'text' || q.type === 'textarea' || q.type === 'number' || q.type === 'select')
   const mediaQuestions = questions.filter(q => q.type === 'voice' || q.type === 'file' || q.type === 'url')
 
   return (
