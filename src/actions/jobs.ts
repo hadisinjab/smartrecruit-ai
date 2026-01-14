@@ -476,7 +476,7 @@ export async function createJob(formData: any) {
 
   // 2. Generate Fixed Questions
   const nextIndex = mappedUserQuestions.length + 1;
-  const fixedQuestions = getFixedQuestions(formData.benefits, nextIndex).map(q => ({
+  const fixedQuestions = getFixedQuestions(nextIndex).map(q => ({
     ...q,
     job_form_id: data.id
   }));
@@ -550,7 +550,7 @@ export async function createJob(formData: any) {
   return { data }
 }
 
-function getFixedQuestions(benefits: string[] | undefined, startIndex: number) {
+function getFixedQuestions(startIndex: number) {
   const fixed: {
     page_number: number;
     type: string;
@@ -590,22 +590,6 @@ function getFixedQuestions(benefits: string[] | undefined, startIndex: number) {
     config: { is_fixed: true },
     order_index: index++
   });
-
-  // Benefits
-  if (benefits && Array.isArray(benefits)) {
-    for (const benefit of benefits) {
-      if (typeof benefit === 'string' && benefit.trim().length > 0) {
-        fixed.push({
-          page_number: 1,
-          type: 'text',
-          label: `How experienced are you with ${benefit.trim()}?`,
-          required: true,
-          config: { is_fixed: true },
-          order_index: index++
-        });
-      }
-    }
-  }
 
   return fixed;
 }
@@ -717,7 +701,7 @@ export async function updateJob(id: string, formData: any) {
 
     // 2. Generate Fixed Questions
     const nextIndex = mappedUserQuestions.length + 1;
-    const fixedQuestions = getFixedQuestions(formData.benefits, nextIndex).map(q => ({
+    const fixedQuestions = getFixedQuestions(nextIndex).map(q => ({
       ...q,
       job_form_id: id
     }));
