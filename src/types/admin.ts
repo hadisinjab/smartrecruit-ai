@@ -33,6 +33,14 @@ export interface Job {
   hiringManager: string;
   creatorName?: string; // New field for creator's name
   organizationName?: string; // New field for organization name (Super Admin only)
+  evaluation_criteria?: {
+    id: string;
+    type: string;
+    label: string;
+    required: boolean;
+    pageNumber: number;
+    options?: any[];
+  }[];
 }
 
 export interface Candidate {
@@ -74,6 +82,12 @@ export interface Candidate {
   organizationName?: string;
   jobOwnerName?: string;
   ai_evaluations?: any[];
+  answers?: {
+    id: string;
+    question_id: string;
+    value: string | number;
+    type: string;
+  }[];
 }
 
 export interface Evaluation {

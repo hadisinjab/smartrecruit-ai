@@ -306,6 +306,8 @@ export async function getJobById(id: string): Promise<Job | null> {
     console.error('Error fetching questions:', questionsError);
   }
 
+  console.log('Raw questions from DB:', questions);
+
   // Get hiring manager name if hiring_manager_name is a user ID
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   let hiringManagerName = jobData.hiring_manager_name || ''
@@ -362,14 +364,19 @@ export async function getJobById(id: string): Promise<Job | null> {
     hiringManager: hiringManagerName,
     hiring_manager_id: hiringManagerId, // Keep ID for editing
     created_by: jobData.created_by, // Add created_by for getting organization users
-    evaluation_criteria: questions?.map(q => ({
-      id: q.id,
-      type: q.type,
-      label: q.label,
-      required: q.required,
-      pageNumber: q.page_number,
-      options: q.config?.options || []
-    })) || []
+    evaluation_criteria: questions?.map(q => {
+      console.log('Raw question from DB:', q);
+      console.log('Question label:', q.label);
+      console.log('Question label type:', typeof q.label);
+      return {
+        id: q.id,
+        type: q.type,
+        label: q.label,
+        required: q.required,
+        pageNumber: q.page_number,
+        options: q.config?.options || []
+      };
+    }) || []
   } as Job & { created_by?: string; hiring_manager_id?: string }
 }
 

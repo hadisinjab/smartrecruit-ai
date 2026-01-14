@@ -175,7 +175,13 @@ export async function getCandidates(jobId?: string) {
         notes: latestHrEval.hr_notes || '',
         nextAction: latestHrEval.hr_decision || 'Review',
         nextActionDate: latestHrEval.next_action_date || null
-      }
+      },
+      answers: app.answers?.map((answer: any) => ({
+        id: answer.id,
+        question_id: answer.question_id,
+        value: answer.value,
+        type: answer.type
+      })) || []
     } as any;
 
     if (session.role === 'super-admin') {

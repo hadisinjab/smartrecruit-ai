@@ -71,6 +71,9 @@
     "searchPlaceholder": "Search candidates...",
     "allJobs": "All Jobs",
     "selectJob": "Select Job",
+    "selectQuestion": "Select Question",
+    "allQuestions": "All Questions",
+    "filterByAnswer": "Filter by Answer",
     "count": "{count} candidates",
     "stats": {
       "totalCandidates": "Total Candidates",
