@@ -8,14 +8,14 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { DataTable, Column } from '@/components/admin/DataTable';
 import { Card } from '@/components/ui/admin-card';
-import { getCandidates } from '@/actions/candidates';
+import { getCandidates, getCandidatesForExport } from '@/actions/candidates';
 import { getJobs } from '@/actions/jobs';
 import { getJob } from '@/actions/jobs';
 import { Candidate, Job } from '@/types/admin';
 import { Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/context/ToastContext';
-import { exportToCSV, exportToExcel, exportToPDF } from '@/utils/exportUtils';
+import { exportData, transformCandidateToReviewerData } from '@/utils/exportUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -576,24 +576,39 @@ export default function CandidatesPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => {
-                    exportToCSV(filteredCandidates, 'candidates');
-                    addToast('success', 'Candidates exported successfully');
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      addToast('info', 'Preparing complete reviewer data export...');
+                      const ids = filteredCandidates.map(c => c.id);
+                      const fullData = await getCandidatesForExport(ids);
+                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
+                      exportData(transformedData, 'candidates_reviewer_complete', 'xlsx');
+                      addToast('success', 'Reviewer data exported successfully');
+                    } catch (error) {
+                      console.error('Export failed:', error);
+                      addToast('error', 'Failed to export data');
+                    }
                   }}>
-                    CSV
+                    {t('Common.exportReviewerComplete')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
-                    exportToExcel(filteredCandidates, 'candidates');
-                    addToast('success', 'Candidates exported successfully');
-                  }}>
-                    Excel
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    exportToPDF(filteredCandidates, 'candidates');
-                    addToast('success', 'Candidates exported successfully');
-                  }}>
-                    PDF
-                  </DropdownMenuItem>
+                     exportData(filteredCandidates, 'candidates', 'csv');
+                     addToast('success', 'Candidates exported successfully');
+                   }}>
+                     CSV
+                   </DropdownMenuItem>
+                   <DropdownMenuItem onClick={() => {
+                     exportData(filteredCandidates, 'candidates', 'xlsx');
+                     addToast('success', 'Candidates exported successfully');
+                   }}>
+                     Excel
+                   </DropdownMenuItem>
+                   <DropdownMenuItem onClick={() => {
+                     exportData(filteredCandidates, 'candidates', 'pdf');
+                     addToast('success', 'Candidates exported successfully');
+                   }}>
+                     PDF
+                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

@@ -21,6 +21,7 @@
     "add": "إضافة",
     "filter": "تصفية",
     "export": "تصدير",
+    "exportReviewerComplete": "تصدير بيانات المراجع (كامل)",
     "last": "آخر نشاط",
     "min": "دقيقة",
     "loading": "جاري التحميل...",
@@ -90,8 +91,9 @@
       "newApplications": "طلبات جديدة"
     },
     "details": {
-      "backToCandidates": "العودة إلى المرشحين",
-      "editCandidate": "تعديل المرشح",
+        "backToCandidates": "العودة إلى المرشحين",
+        "export": "تصدير",
+        "editCandidate": "تعديل المرشح",
       "experience": "الخبرة",
       "yearsOfExperience": "{years} سنوات خبرة",
       "skillsAndTags": "المهارات والوسوم",
@@ -159,7 +161,14 @@
       "pleaseSelectDate": "يرجى تحديد تاريخ الإجراء",
       "aiAnalysisSuccess": "تم إكمال تحليل الذكاء الاصطناعي بنجاح",
       "aiAnalysisFail": "فشل التحليل",
-      "connectionFail": "فشل الاتصال"
+      "connectionFail": "فشل الاتصال",
+      "recommendation": "التوصية",
+      "recommendation_reason": "السبب",
+      "generated_interview_questions": "أسئلة المقابلة المولدة",
+      "criteria_based_questions": "أسئلة مبنية على المعايير",
+      "job_specific_questions": "أسئلة خاصة بالوظيفة",
+      "employer_defined_questions": "أسئلة محددة من قبل صاحب العمل",
+      "investigative_questions": "أسئلة استقصائية"
     },
     "Interviews": {
       "title": "المقابلات",

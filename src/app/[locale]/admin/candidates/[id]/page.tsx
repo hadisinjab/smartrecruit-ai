@@ -12,13 +12,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as Tabs from '@radix-ui/react-tabs';
-import { getCandidateById } from '@/actions/candidates';
+import { getCandidateById, getCandidateForExport } from '@/actions/candidates';
 import { addHrEvaluation, getHrEvaluation } from '@/actions/hr-evaluations';
 import { Candidate, Evaluation } from '@/types/admin';
 import { useToast } from '@/context/ToastContext';
-import { getAssignmentsByApplication } from '@/actions/assignments'
-import { InterviewsList } from '@/components/admin/interviews/InterviewsList'
-import { InterviewDialog } from '@/components/admin/interviews/InterviewDialog'
+import { getAssignmentsByApplication } from '@/actions/assignments';
+import { InterviewsList } from '@/components/admin/interviews/InterviewsList';
+import { InterviewDialog } from '@/components/admin/interviews/InterviewDialog';
+import { transformCandidateToReviewerData, exportData } from '@/utils/exportUtils';
+import { getSystemSettings } from '@/actions/settings';
 import {
   ArrowLeft,
   Edit3,
@@ -345,6 +347,27 @@ export default function CandidateDetailsPage() {
     }
   };
 
+  const handleExport = async () => {
+    if (!candidateId) return;
+    try {
+      const settings = await getSystemSettings();
+      const exportFormat = settings?.export?.defaultFormat || 'csv';
+
+      const fullCandidateData = await getCandidateForExport(candidateId);
+      if (fullCandidateData) {
+        const transformedData = transformCandidateToReviewerData(
+          fullCandidateData,
+          fullCandidateData.assignments || [],
+          fullCandidateData.ai_evaluations?.[0] || null
+        );
+        exportData([transformedData], `candidate-${candidate?.firstName}-${candidate?.lastName}`, exportFormat);
+      }
+    } catch (error) {
+      console.error('Failed to export candidate data:', error);
+      addToast('error', t('exportError'));
+    }
+  };
+
   return (
     <AdminLayout
       title={`${candidate.firstName} ${candidate.lastName}`}
@@ -357,7 +380,7 @@ export default function CandidateDetailsPage() {
     >
       <div className='space-y-6'>
         {/* Header with Navigation */}
-        <div className='flex items-center space-x-4'>
+        <div className='flex items-center justify-between'>
           <Button
             variant='ghost'
             onClick={() => router.push('/admin/candidates')}
@@ -365,6 +388,10 @@ export default function CandidateDetailsPage() {
           >
             <ArrowLeft className='w-4 h-4' />
             <span>{t('details.backToCandidates')}</span>
+          </Button>
+          <Button variant='outline' onClick={handleExport}>
+            <Download className='mr-2 h-4 w-4' />
+            {t('export')}
           </Button>
         </div>
 
@@ -653,207 +680,50 @@ export default function CandidateDetailsPage() {
           </Tabs.Content>
           
           <Tabs.Content value='ai' className='space-y-6'>
-            <Card className='p-6 bg-purple-50 border-purple-100'>
-              <div className='flex items-center justify-between mb-4'>
-                <div className='flex items-center space-x-2'>
-                  <Bot className='w-5 h-5 text-purple-600' />
-                  <h2 className='text-lg font-semibold text-purple-900'>{tEval('aiEvaluation')}</h2>
-                </div>
-                <Button 
-                  onClick={handleAnalyze} 
-                  disabled={aiLoading}
-                  className='bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50'
-                >
-                  {aiLoading ? (
-                    <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      Analyzing (Running 5 Stages)...
-                    </>
-                  ) : (
-                    tCommon('startAnalysis') || 'Start Analysis'
-                  )}
+            {aiLoading && <p>{t('details.analyzing')}</p>}
+            {!aiLoading && !aiEvaluation && (
+              <div className='text-center p-8 border-2 border-dashed rounded-lg'>
+                <p className='mb-4 text-gray-600'>{t('details.noAnalysisYet')}</p>
+                <Button onClick={handleAnalyze} disabled={aiLoading}>
+                  {aiLoading ? t('details.analyzing') : tCommon('startAnalysis')}
                 </Button>
               </div>
-              
-              {!aiEvaluation && !aiLoading && (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No analysis generated yet. Click &quot;Start Analysis&quot; to begin the 5-stage evaluation.</p>
-                </div>
-              )}
-
-              {aiEvaluation && aiEvaluation.analysis?.final_decision && (
-                <div className='space-y-6 animate-in fade-in duration-500'>
-                  <p className='text-sm text-purple-700 italic'>
-                    {tEval('aiDisclaimer')}
-                  </p>
-
-                  {/* 1. Final Decision Banner (Stage 5 Output) */}
-                  <div className={`p-6 rounded-xl border-2 shadow-sm ${
-                    aiEvaluation.analysis.final_decision.decision === 'Interview' ? 'bg-green-50 border-green-200' :
-                    aiEvaluation.analysis.final_decision.decision === 'Reject' ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+            )}
+            {aiEvaluation && (
+              <div className='space-y-6'>
+                {/* Recommendation Section */}
+                <div className='p-4 bg-gray-50 rounded-lg'>
+                  <h3 className='text-md font-semibold text-gray-800 mb-2'>{t('details.recommendation')}</h3>
+                  <p className={`text-lg font-bold ${
+                    aiEvaluation.recommendation === 'Make Offer' ? 'text-green-600' :
+                    aiEvaluation.recommendation === 'Proceed to Interview' ? 'text-blue-600' :
+                    'text-red-600'
                   }`}>
-                    <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="px-2 py-1 bg-purple-600 text-white text-xs font-bold uppercase rounded">Stage 5</span>
-                          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">Final Decision</h3>
-                        </div>
-                        <div className="text-3xl font-extrabold flex flex-wrap items-center gap-3">
-                          <span className={
-                            aiEvaluation.analysis.final_decision.decision === 'Interview' ? 'text-green-700' :
-                            aiEvaluation.analysis.final_decision.decision === 'Reject' ? 'text-red-700' : 'text-gray-700'
-                          }>
-                            {aiEvaluation.analysis.final_decision.decision}
-                          </span>
-                          <span className="text-lg font-medium text-gray-500 bg-white px-3 py-1 rounded-full border">
-                            Score: {aiEvaluation.analysis.final_decision.final_score}/100
-                          </span>
-                        </div>
-                        <p className="mt-3 text-gray-800 text-lg leading-relaxed font-medium">
-                          {aiEvaluation.analysis.final_decision.decision_reason}
-                        </p>
-                        <div className="mt-4 flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">Recommended Action:</span>
-                          <span className="px-3 py-1 bg-white rounded border border-gray-300 text-sm font-medium shadow-sm">
-                            {aiEvaluation.analysis.final_decision.action_item}
-                          </span>
-                        </div>
-                      </div>
+                    {aiEvaluation.recommendation || 'N/A'}
+                  </p>
+                  <p className='text-sm text-gray-600 mt-1'>{aiEvaluation.recommendation_reason}</p>
+                </div>
+
+                {/* Generated Questions Section */}
+                {aiEvaluation.generated_interview_questions && (
+                  <div className='p-4 bg-gray-50 rounded-lg'>
+                    <h3 className='text-md font-semibold text-gray-800 mb-4'>{t('details.generated_interview_questions')}</h3>
+                    <div className='space-y-4'>
+                      {Object.entries(aiEvaluation.generated_interview_questions).map(([category, questions]) => (
+                        (questions as string[]).length > 0 && (
+                          <div key={category}>
+                            <h4 className='font-semibold text-gray-700 mb-2'>{t(`details.${category}` as any)}</h4>
+                            <ul className='list-disc list-inside space-y-1 text-gray-600'>
+                              {(questions as string[]).map((q, i) => <li key={i}>{q}</li>)}
+                            </ul>
+                          </div>
+                        )
+                      ))}
                     </div>
                   </div>
-
-                  {/* 2. Four Stages Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Stage 1: Text */}
-                    <Card className="p-4 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 1</h4>
-                      <h3 className="text-md font-bold text-gray-800 mb-2">Text Questions</h3>
-                      <div className="text-2xl font-bold text-blue-700 mb-2">
-                        {aiEvaluation.analysis.final_decision.stage_evaluations?.text || 'N/A'}
-                      </div>
-                      <p className="text-xs text-gray-500 line-clamp-3">
-                        {aiEvaluation.analysis.qa_analysis?.smart_summary || 'Analysis of text responses.'}
-                      </p>
-                    </Card>
-
-                    {/* Stage 2: Voice */}
-                    <Card className="p-4 border-l-4 border-l-purple-500 hover:shadow-md transition-shadow">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 2</h4>
-                      <h3 className="text-md font-bold text-gray-800 mb-2">Voice Questions</h3>
-                      <div className="text-2xl font-bold text-purple-700 mb-2">
-                        {aiEvaluation.analysis.final_decision.stage_evaluations?.voice || 'N/A'}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {aiEvaluation.analysis.voice_transcripts?.length || 0} answers analyzed.
-                        {aiEvaluation.analysis.voice_transcripts?.length > 0 && (
-                           <span className="block mt-1 italic">&quot;{aiEvaluation.analysis.voice_transcripts[0]?.analysis?.relevance || 'Analyzed'}&quot;</span>
-                        )}
-                      </p>
-                    </Card>
-
-                    {/* Stage 3: Resume */}
-                    <Card className="p-4 border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 3</h4>
-                      <h3 className="text-md font-bold text-gray-800 mb-2">Resume</h3>
-                      <div className="text-2xl font-bold text-yellow-700 mb-2">
-                        {aiEvaluation.analysis.final_decision.stage_evaluations?.resume || 'N/A'}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {aiEvaluation.analysis.resume?.data?.skills?.technical?.length || 0} skills identified.
-                      </p>
-                    </Card>
-
-                    {/* Stage 4: Assignment */}
-                    <Card className="p-4 border-l-4 border-l-pink-500 hover:shadow-md transition-shadow">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">Stage 4</h4>
-                      <h3 className="text-md font-bold text-gray-800 mb-2">Assignment</h3>
-                      <div className="text-2xl font-bold text-pink-700 mb-2">
-                        {aiEvaluation.analysis.final_decision.stage_evaluations?.assignment || 'N/A'}
-                      </div>
-                      <p className="text-xs text-gray-500 line-clamp-3">
-                        {aiEvaluation.analysis.assignment?.evaluation?.recommendation || 'Evaluated'}
-                      </p>
-                    </Card>
-                  </div>
-
-                  {/* Detailed Analysis Sections */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Strengths */}
-                    <Card className='p-6 border-green-100 bg-green-50/30'>
-                      <h2 className='text-lg font-semibold text-green-900 mb-4'>{t('details.keyStrengths')}</h2>
-                      <div className='space-y-2 text-sm text-gray-700'>
-                        {aiEvaluation.strengths && aiEvaluation.strengths.length > 0 ? (
-                          aiEvaluation.strengths.map((s: string, i: number) => (
-                            <div key={i} className="flex items-start bg-white p-2 rounded border border-green-100 shadow-sm">
-                              <span className="text-green-500 mr-2 font-bold">✓</span>
-                              {s}
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-gray-500">{t('details.noStrengths')}</p>
-                        )}
-                      </div>
-                    </Card>
-
-                    {/* Weaknesses */}
-                    <Card className='p-6 border-red-100 bg-red-50/30'>
-                      <h2 className='text-lg font-semibold text-red-900 mb-4'>{t('details.areasForImprovement')}</h2>
-                      <div className='space-y-2 text-sm text-gray-700'>
-                        {aiEvaluation.weaknesses && aiEvaluation.weaknesses.length > 0 ? (
-                          aiEvaluation.weaknesses.map((w: string, i: number) => (
-                            <div key={i} className="flex items-start bg-white p-2 rounded border border-red-100 shadow-sm">
-                              <span className="text-red-500 mr-2 font-bold">⚠</span>
-                              {w}
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-gray-500">{t('details.noWeaknesses')}</p>
-                        )}
-                      </div>
-                    </Card>
-                  </div>
-                  
-                  {/* Detailed Voice Analysis */}
-                  {aiEvaluation.analysis.voice_transcripts && aiEvaluation.analysis.voice_transcripts.length > 0 && (
-                    <Card className="p-6 border-purple-100 bg-purple-50/30">
-                       <h2 className="text-lg font-semibold text-purple-900 mb-3">{t('details.detailedVoiceAnalysis')}</h2>
-                       <div className="space-y-4">
-                          {aiEvaluation.analysis.voice_transcripts.map((vt: any, idx: number) => (
-                             <div key={idx} className="bg-white p-4 rounded border border-purple-100 shadow-sm">
-                                <h3 className="font-semibold text-gray-800 text-sm mb-2">{vt.question || `${t('details.question')} ${idx + 1}`}</h3>
-                                <div className="flex items-center gap-2 mb-2">
-                                   <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                                      (vt.analysis?.quality_score || 0) >= 70 ? 'bg-green-100 text-green-800' : 
-                                      (vt.analysis?.quality_score || 0) >= 40 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                                   }`}>
-                                      {t('details.score')}: {vt.analysis?.quality_score || 0}/100
-                                   </span>
-                                   <span className="text-xs text-gray-500">
-                                      {vt.analysis?.relevance} {t('details.relevance')}
-                                   </span>
-                                </div>
-                                <p className="text-sm text-gray-700 font-medium">
-                                   {vt.analysis?.answer_quality_summary || t('details.noSummary')}
-                                </p>
-                             </div>
-                          ))}
-                       </div>
-                    </Card>
-                  )}
-
-                  {/* Detailed Assignment Feedback if available */}
-                  {aiEvaluation.analysis.assignment?.evaluation?.answer_evaluation && (
-                    <Card className="p-6 border-pink-100 bg-pink-50/30">
-                       <h2 className="text-lg font-semibold text-pink-900 mb-3">{t('details.detailedAssignmentFeedback')}</h2>
-                       <p className="text-gray-800 text-sm leading-relaxed bg-white p-4 rounded border border-pink-100">
-                          {aiEvaluation.analysis.assignment.evaluation.answer_evaluation}
-                       </p>
-                    </Card>
-                  )}
-                  
-                </div>
-              )}
-            </Card>
+                )}
+              </div>
+            )}
           </Tabs.Content>
           
           <Tabs.Content value='hr' className='space-y-6'>

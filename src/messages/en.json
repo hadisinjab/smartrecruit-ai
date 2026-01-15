@@ -21,6 +21,7 @@
     "add": "Add",
     "filter": "Filter",
     "export": "Export",
+    "exportReviewerComplete": "Reviewer Export (Complete)",
     "last": "Last",
     "min": "min",
     "loading": "Loading...",
@@ -67,6 +68,7 @@
     "title": "Candidates",
     "subtitle": "Manage and review candidate applications",
     "addCandidate": "Add Candidate",
+    "export": "Export",
     "filters": "Filters",
     "searchPlaceholder": "Search candidates...",
     "allJobs": "All Jobs",
@@ -152,7 +154,14 @@
       "pleaseSelectDate": "Please select an action date",
       "aiAnalysisSuccess": "AI Analysis Completed Successfully",
       "aiAnalysisFail": "Analysis failed",
-      "connectionFail": "Connection failed"
+      "connectionFail": "Connection failed",
+      "recommendation": "Recommendation",
+      "recommendation_reason": "Reason",
+      "generated_interview_questions": "Generated Interview Questions",
+      "criteria_based_questions": "Criteria-Based Questions",
+      "job_specific_questions": "Job-Specific Questions",
+      "employer_defined_questions": "Employer-Defined Questions",
+      "investigative_questions": "Investigative Questions"
     },
     "Interviews": {
       "title": "Interviews",

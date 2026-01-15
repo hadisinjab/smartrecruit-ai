@@ -377,37 +377,61 @@ async function processEvaluation(application, applicationId) {
         });
 
         const finalDecisionPrompt = `
-        You are a Senior Hiring Manager. Make a final hiring decision for this candidate based on the AVAILABLE evaluation stages.
-        
-        Job Position: ${jobContext.position}
-        Required Skills: ${jobContext.required_skills.join(', ')}
+        You are a highly experienced Senior Hiring Manager and an expert in recruitment strategy. Your task is to conduct a final, comprehensive evaluation of a candidate and prepare for the next steps.
 
-        CANDIDATE HISTORY:
-        - Previous Applications: ${previousApplicationsCount}
+        **1. Context:**
+        - **Job Position:** ${jobContext.position}
+        - **Required Skills:** ${jobContext.required_skills.join(', ')}
+        - **Employer's Key Criteria:** ${jobContext.key_topics.join(', ')}
+        - **Candidate History:** This candidate has ${previousApplicationsCount} previous applications with us.
 
-        STAGES DATA:
-        1. Text Questions: ${hasText ? `- Score: ${Math.round(textScore)}/100, Summary: ${textAnswersAnalysis?.smart_summary || 'N/A'}` : 'N/A'}
-        2. Voice Questions: ${hasVoice ? `- Avg Score: ${Math.round(voiceScore)}/100` : 'N/A'}
-        3. Long Interview: ${hasInterview ? `- Score: ${Math.round(interviewScore)}/100, Summary: ${interviewSummary}` : 'N/A'}
-        4. Resume: ${hasResume ? `- Skill Match: ${resumeScore}/100` : 'N/A'}
-        5. Assignment: ${hasAssignment ? `- Score: ${Math.round(assignmentScore)}/100` : 'N/A'}
+        **2. Candidate's Evaluated Data:**
+        - **Resume Data:** ${hasResume ? JSON.stringify(resumeResult.data).slice(0, 2000) : 'N/A'}
+        - **Resume Analysis:** ${hasResume && resumeResult.analysis ? `Skill Match: ${resumeScore}/100. ${resumeResult.analysis.qualification_summary}. Missing skills: ${resumeResult.analysis.missing_critical_skills.join(', ')}` : 'N/A'}
+        - **Q&A Analysis:** ${hasText ? `Score: ${Math.round(textScore)}/100. Summary: ${textAnswersAnalysis?.smart_summary}. Strengths: ${textAnswersAnalysis?.strengths.join(', ')}. Weaknesses: ${textAnswersAnalysis?.weaknesses.join(', ')}` : 'N/A'}
+        - **Voice Questions Analysis:** ${hasVoice ? `Avg Score: ${Math.round(voiceScore)}/100` : 'N/A'}
+        - **Technical Assignment:** ${hasAssignment ? `Score: ${Math.round(assignmentScore)}/100. Strengths: ${assignmentResult?.evaluation?.strengths.join(', ')}. Weaknesses: ${assignmentResult?.evaluation?.weaknesses.join(', ')}` : 'N/A'}
+        - **Long-form Interview:** ${hasInterview ? `Score: ${Math.round(interviewScore)}/100. Summary: ${interviewSummary}` : 'N/A'}
 
-        OUTPUT JSON ONLY:
+        **3. Your Tasks:**
+
+        **TASK A: Generate Interview Questions**
+        Based on ALL the data above, generate a set of smart, targeted interview questions. Avoid asking about skills already clearly demonstrated in the resume or assignment. Focus on probing weaknesses, missing information, and aligning with job-specific needs.
+
+        **TASK B: Make a Final Recommendation**
+        Synthesize all scores and qualitative data to calculate a final score and make a clear recommendation. Be decisive. For exceptional candidates who exceed all criteria, you can recommend "Make Offer".
+
+        **4. Output Format:**
+        You MUST output ONLY a valid JSON object. Do not add any text or markdown before or after the JSON.
+
         {
-          "stage_evaluations": { "text": "...", "voice": "...", "interview": "...", "resume": "...", "assignment": "..." },
-          "final_score": 0-100,
-          "decision": "Interview|Reject",
-          "decision_reason": "...",
-          "action_item": "..."
+          "final_score": "A single, calculated score from 0-100 based on a weighted average of the available stage scores.",
+          "recommendation": "Choose ONE: 'Proceed to Interview' | 'Make Offer' | 'Reject'.",
+          "recommendation_reason": "A detailed, multi-sentence justification for your recommendation, referencing specific strengths or weaknesses from the data.",
+          "action_item": "A concise, actionable next step for the HR team (e.g., 'Schedule final interview with the hiring manager', 'Send rejection email', 'Prepare offer letter').",
+          "generated_interview_questions": {
+            "criteria_based_questions": [
+              "Generate 1-2 questions based on the candidate's CV and any information that seems missing or requires clarification (e.g., gaps in employment, vague project descriptions)."
+            ],
+            "job_specific_questions": [
+              "Generate 1-2 questions that directly test the core 'Required Skills' for the job, especially those not fully covered in the assignment or resume."
+            ],
+            "employer_defined_questions": [
+              "Generate 1 question based on the 'Employer's Key Criteria' to assess cultural fit or specific priorities."
+            ],
+            "investigative_questions": [
+              "Generate 1-2 probing questions to explore the 'Weaknesses' or 'Missing Skills' identified in the analysis. Frame them constructively."
+            ]
+          }
         }
         `;
 
         let finalDecision = {
-           stage_evaluations: { text: 'N/A', voice: 'N/A', interview: 'N/A', resume: 'N/A', assignment: 'N/A' },
            final_score: 0,
-           decision: 'Review',
-           decision_reason: 'Automated calculation only',
-           action_item: 'Review Manually'
+           recommendation: 'Review',
+           recommendation_reason: 'Automated calculation only',
+           action_item: 'Review Manually',
+           generated_interview_questions: {}
         };
 
         try {
@@ -435,7 +459,9 @@ async function processEvaluation(application, applicationId) {
              ...(assignmentResult?.evaluation?.weaknesses || []),
              ...(textAnswersAnalysis?.red_flags || [])
           ].slice(0, 5),
-          recommendation: finalDecision.decision,
+          recommendation: finalDecision.recommendation, // Updated field
+          recommendation_reason: finalDecision.recommendation_reason, // New field
+          generated_interview_questions: finalDecision.generated_interview_questions, // New field
           analysis: {
             interview: interviewResult,
             assignment: assignmentResult,

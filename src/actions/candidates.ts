@@ -424,3 +424,126 @@ export async function getCandidateById(id: string) {
 
   return base;
 }
+
+export async function getCandidatesForExport(candidateIds: string[]) {
+  const supabase = createClient()
+  await requireStaff() // Reviewer or above
+
+  if (!candidateIds || candidateIds.length === 0) return []
+
+  // Fetch applications with all related data
+  const { data: applications, error } = await supabase
+    .from('applications')
+    .select(`
+      *,
+      job_form:job_forms(
+        title,
+        created_by,
+        organization_id,
+        organizations(name),
+        creator:users(full_name)
+      ),
+      resumes(*),
+      external_profiles(*),
+      hr_evaluations(*),
+      ai_evaluations(*),
+      answers(*),
+      assignments(*)
+    `)
+    .in('id', candidateIds)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching candidates for export:', error)
+    throw new Error('Failed to fetch candidates for export')
+  }
+
+  // Fetch question metadata to enrich answers with labels
+  // We need all questions for the job forms involved
+  const jobFormIds = [...new Set(applications.map(a => a.job_form_id))]
+  const { data: questions } = await supabase
+    .from('questions')
+    .select('id,type,label')
+    .in('job_form_id', jobFormIds)
+
+  const qMap = new Map<string, { label: string; type: string }>()
+  ;(questions || []).forEach((q: any) => {
+    qMap.set(q.id, { label: q.label, type: q.type })
+  })
+
+  return applications.map(app => {
+    const latestHrEval = app.hr_evaluations?.[0] || {};
+    const aiEval = app.ai_evaluations?.[0] || {};
+    
+    // Enrich answers with labels
+    const enrichedAnswers = (app.answers || []).map((ans: any) => ({
+      ...ans,
+      label: qMap.get(ans.question_id)?.label || ans.question_id
+    }));
+
+    return {
+      ...app,
+      firstName: app.candidate_name?.split(' ')[0] || 'Unknown',
+      lastName: app.candidate_name?.split(' ').slice(1).join(' ') || '',
+      email: app.candidate_email || '',
+      position: app.job_form?.title || 'Unknown Position',
+      status: app.status || 'applied',
+      appliedDate: app.created_at,
+      experience: 0, // Placeholder
+      rating: latestHrEval.hr_score || 0,
+      hrFields: {
+        priority: 'medium',
+        notes: latestHrEval.hr_notes || '',
+        nextAction: latestHrEval.hr_decision || 'Review',
+        nextActionDate: latestHrEval.next_action_date || null
+      },
+      hr_score: latestHrEval.hr_score,
+      hr_decision: latestHrEval.hr_decision,
+      hr_notes: latestHrEval.hr_notes,
+      answers: enrichedAnswers,
+      assignments: app.assignments || [],
+      ai_evaluations: [aiEval],
+      organizationName: app.job_form?.organizations?.name,
+      jobOwnerName: app.job_form?.creator?.full_name
+    };
+  });
+}
+
+export async function getCandidateForExport(candidateId: string) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) throw new Error('Unauthorized');
+
+  const { data: application, error } = await supabase
+    .from('applications')
+    .select(
+      `
+      *,
+      job_form:job_forms!inner(
+        title,
+        created_by,
+        organization_id,
+        organizations(name),
+        creator:users(full_name)
+      ),
+      resumes(*),
+      external_profiles(*),
+      hr_evaluations(*),
+      ai_evaluations(*),
+      answers(*, questions(label)),
+      assignments(*)
+    `
+    )
+    .eq('id', candidateId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching candidate for export:', error);
+    throw new Error('Failed to fetch candidate for export');
+  }
+
+  return application;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { useUser } from '@/context/UserContext';
@@ -19,6 +19,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   subtitle,
   actions
 }) => {
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const { role, isLoading, user } = useUser();
   const router = useRouter();
 
@@ -57,12 +58,17 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   return (
     <div className='flex h-screen bg-gray-50'>
       {/* Sidebar */}
-      <AdminSidebar user={user} />
+      <AdminSidebar 
+        user={user} 
+        isOpen={isSidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+      />
       
       {/* Main Content */}
       <div className='flex-1 flex flex-col overflow-hidden'>
         {/* Header */}
         <AdminHeader 
+          onMenuClick={() => setSidebarOpen(true)}
           title={title}
           subtitle={subtitle}
           actions={isReadOnly ? null : actions}

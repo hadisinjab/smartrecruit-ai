@@ -14,7 +14,8 @@ import {
   AlertCircle,
   UserCog,
   Activity,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
 import { AdminUser } from '@/types/admin';
 import { createClient } from '@/utils/supabase/client';
@@ -25,13 +26,14 @@ interface SidebarItemProps {
   label: string;
   href: string;
   isActive?: boolean;
+  onClick?: () => void;
 }
 
 type AllowedRole = 'super-admin' | 'admin' | 'reviewer';
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }) => {
+const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive, onClick }) => {
   return (
-    <Link href={href}>
+    <Link href={href} onClick={onClick}>
       <div
         className={cn(
           'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -47,7 +49,13 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, isActive }
   );
 };
 
-export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => {
+interface AdminSidebarProps {
+  user: AdminUser | null;
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ user, isOpen, onClose }) => {
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('Sidebar');
@@ -151,59 +159,87 @@ export const AdminSidebar: React.FC<{ user: AdminUser | null }> = ({ user }) => 
   };
 
   return (
-    <div className='w-64 bg-white border-r border-gray-200 h-full flex flex-col'>
-      {/* Logo */}
-      <div className='p-6 border-b border-gray-200'>
-        <h1 className='text-xl font-bold text-gray-900'>SmartRecruit AI</h1>
-        <p className='text-sm text-gray-600'>{tCommon('adminPanel')}</p>
-      </div>
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
 
-      {/* Navigation */}
-      <nav className='flex-1 p-4 space-y-1'>
-        {navigationItems.map((item) => (
-          <SidebarItem
-            key={item.href}
-            icon={item.icon}
-            label={item.label}
-            href={item.href}
-            isActive={pathname === item.href}
-          />
-        ))}
-      </nav>
-
-      {/* User Section */}
-      <div className='p-4 border-t border-gray-200'>
-        <div className='flex items-center space-x-3 mb-3'>
-          <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
-            <span className='text-white text-sm font-medium'>
-              {(currentUser?.name || '?').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-            </span>
-          </div>
+      {/* Sidebar Container */}
+      <div className={cn(
+        'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-full',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}>
+        {/* Logo & Close Button */}
+        <div className='p-6 border-b border-gray-200 flex items-center justify-between'>
           <div>
-            <p className='text-sm font-medium text-gray-900'>{currentUser?.name || '...'}</p>
-            <p className='text-xs text-gray-600'>{getRoleDisplayName(userRole)}</p>
+            <h1 className='text-xl font-bold text-gray-900'>SmartRecruit AI</h1>
+            <p className='text-sm text-gray-600'>{tCommon('adminPanel')}</p>
           </div>
+          <button 
+            onClick={onClose}
+            className="md:hidden p-1 rounded-md hover:bg-gray-100 text-gray-500"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        
-        {/* Role indicator for restricted access */}
-        
-        <button
-          className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'
-          onClick={async () => {
-            try {
-              const supabase = createClient();
-              await supabase.auth.signOut();
-              // Ensure in-memory user state is cleared immediately.
-              await refreshUser().catch(() => {});
-            } catch {}
-            router.replace('/admin/login');
-            router.refresh();
-          }}
-        >
-          <LogOut className='w-5 h-5' />
-          <span>{tCommon('logout')}</span>
-        </button>
+
+        {/* Navigation */}
+        <nav className='flex-1 p-4 space-y-1 overflow-y-auto'>
+          {navigationItems.map((item) => (
+            <SidebarItem
+              key={item.href}
+              icon={item.icon}
+              label={item.label}
+              href={item.href}
+              isActive={pathname === item.href}
+              onClick={() => {
+                // Close sidebar on mobile when item is clicked
+                if (window.innerWidth < 768 && onClose) {
+                  onClose();
+                }
+              }}
+            />
+          ))}
+        </nav>
+
+        {/* User Section */}
+        <div className='p-4 border-t border-gray-200'>
+          <div className='flex items-center space-x-3 mb-3'>
+            <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center'>
+              <span className='text-white text-sm font-medium'>
+                {(currentUser?.name || '?').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <p className='text-sm font-medium text-gray-900 truncate max-w-[140px]'>{currentUser?.name || '...'}</p>
+              <p className='text-xs text-gray-600'>{getRoleDisplayName(userRole)}</p>
+            </div>
+          </div>
+          
+          {/* Role indicator for restricted access */}
+          
+          <button
+            className='flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors'
+            onClick={async () => {
+              try {
+                const supabase = createClient();
+                await supabase.auth.signOut();
+                // Ensure in-memory user state is cleared immediately.
+                await refreshUser().catch(() => {});
+              } catch {}
+              router.replace('/admin/login');
+              router.refresh();
+            }}
+          >
+            <LogOut className='w-5 h-5' />
+            <span>{tCommon('logout')}</span>
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 };

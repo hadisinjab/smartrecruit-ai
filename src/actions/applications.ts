@@ -2,6 +2,7 @@
 
 import { createAdminClient, createClient } from '@/utils/supabase/server'
 import { createNotification, getRecipientsForJob } from '@/lib/notifications'
+import { sendApplicationConfirmationEmail } from '@/actions/email'
 import type { Database } from '@/types/supabase.types'
 
 // Create typed Supabase client for this file
@@ -472,6 +473,20 @@ export async function submitApplication(payload: {
             })
           )
         )
+      }
+
+      // Send confirmation email to candidate
+      try {
+        await sendApplicationConfirmationEmail({
+          candidateEmail: payload.candidateEmail,
+          candidateName: payload.candidateName,
+          jobTitle: job?.title || 'the position',
+          jobDescription: job?.description,
+          answers: payload.answers,
+        })
+      } catch (emailError) {
+        console.error('[email] Failed to send confirmation email:', emailError)
+        // Don't fail the application submission if email fails
       }
     } catch (e) {
       console.error('[notifications] submitApplication:', e)
