@@ -124,12 +124,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ user, isOpen, onClos
         href: '/admin/settings',
         allowedRoles: ['admin', 'super-admin'] as const
       },
-      {
-        icon: <Activity className='w-5 h-5' />,
-        label: 'Diagnostics',
-        href: '/admin/diagnostics',
-        allowedRoles: ['super-admin', 'admin'] as const
-      }
+
     ];
 
     // Filter items based on user role
