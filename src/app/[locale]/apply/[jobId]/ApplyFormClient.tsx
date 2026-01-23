@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { MultiStepForm } from '@/components/form/multi-step-form'
 import type { FormField, FormStep, FormData } from '@/types/form'
 import type { ApplyQuestion } from '@/actions/applications'
-import { submitApplication, beginApplication } from '@/actions/applications'
+import { submitApplication, beginApplication, saveProgress } from '@/actions/applications'
 import { createAssignment } from '@/actions/assignments'
 import { createClient } from '@/utils/supabase/client'
 import { Card } from '@/components/ui/card'
@@ -23,6 +23,8 @@ type ApplyJob = {
   requirements?: any
   benefits?: any
   deadline?: string | null
+  assignment_enabled?: boolean | null
+  assignment_timing?: string | null
 }
 
 interface Props {
@@ -89,8 +91,14 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         required: true,
         validation: {
           pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-          message: 'Please enter a valid email address'
+          message: 'Invalid email format'
         }
+      },
+      {
+        id: 'desired_salary',
+        type: 'number',
+        label: 'Desired Salary',
+        required: false
       }
     ]
 
@@ -213,7 +221,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       {
         id: 'candidate',
         title: 'Application Information',
-        description: 'Provide your name and email.',
+        description: 'Provide your application information.',
         fields: baseFields
       }
     ]
@@ -237,7 +245,14 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     }
 
     const assignmentEnabled = !!(job as any)?.assignment_enabled
-    if (assignmentEnabled) {
+    const assignmentTiming = (job as any)?.assignment_timing
+    console.log('--- ApplyFormClient Debug ---')
+    console.log('Job ID:', job.id)
+    console.log('assignmentEnabled:', assignmentEnabled)
+    console.log('assignmentTiming:', assignmentTiming)
+    console.log('-----------------------------')
+
+    if (assignmentEnabled && assignmentTiming === 'before') {
       s.push({
         id: 'assignment',
         title: 'Assignment',
@@ -262,19 +277,23 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     setSubmitError(null)
     setSubmitting(true)
     try {
-      const candidateName = String(data.candidate_name || '').trim()
-      const candidateEmail = String(data.candidate_email || '').trim()
-      if (!candidateName || !candidateEmail) {
-        setSubmitError('Please provide your name and email.')
-        return
-      }
-      if (!applicationId) {
+      const candidateName = String(data.candidate_name || '')
+      const candidateEmail = String(data.candidate_email || '')
+
+      let appId = applicationId
+      if (!appId) {
         const started = await beginApplication({ jobId, candidateName, candidateEmail })
         if (started.error) {
           setSubmitError(started.error)
           return
         }
+        appId = started.applicationId
         setApplicationId(started.applicationId)
+      }
+
+      if (!appId) {
+        setSubmitError('Failed to create application.')
+        return
       }
 
       // Upload resume if any file-question provided a File
@@ -311,19 +330,31 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         return { questionId: q.id, value: v == null ? null : String(v), voiceData: null }
       })
 
+      const desiredSalary = data.desired_salary ? Number(data.desired_salary) : undefined
+
       const res = await submitApplication({
-        applicationId: applicationId || undefined,
-        jobId,
-        candidateName,
-        candidateEmail,
-        answers,
-        resumeUrl
-      })
+        applicationId: appId
+      });
 
       if (res.error) {
         setSubmitError(res.error)
         return
       }
+
+      // Save answers separately. This is a non-blocking call.
+      const { error: progressError } = await saveProgress({
+        applicationId: appId,
+        answers
+      });
+
+      if (progressError) {
+        // Note: we don't block submission, just log this
+        console.error('Failed to save answers progress:', progressError);
+      }
+
+      // We also save other details that are not part of the initial application creation.
+      const supabase = createClient();
+      await supabase.from('applications').update({ resume_url: resumeUrl, desired_salary: desiredSalary }).eq('id', appId);
 
       // Save assignment (optional)
       const assignmentEnabled = !!(job as any)?.assignment_enabled
@@ -350,7 +381,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         const hasAny = !!textFields || (Array.isArray(linkFields) && linkFields.length > 0)
         if (hasAny || required) {
           const created = await createAssignment({
-            application_id: res.applicationId as string,
+            application_id: appId as string,
             type: assignmentType,
             text_fields: textFields || undefined,
             link_fields: linkFields || undefined,
@@ -411,19 +442,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
               }
             : null
         }
-        onFirstStepComplete={async (data) => {
-          try {
-            const name = String(data.candidate_name || '').trim()
-            const email = String(data.candidate_email || '').trim()
-            if (!applicationId && name && email) {
-              const res = await beginApplication({ jobId, candidateName: name, candidateEmail: email })
-              if (!res.error) {
-                setApplicationId(res.applicationId)
-                return res.applicationId
-              }
-            }
-          } catch {}
-        }}
+
       />
 
       {submitting && (

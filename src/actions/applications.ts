@@ -62,8 +62,9 @@ export async function getJobForApplication(jobId: string): Promise<{
   job: (ApplyJob & {
     assignment_enabled?: boolean | null
     assignment_required?: boolean | null
-    assignment_type?: 'text_only' | 'text_and_links' | null
+    assignment_type?: 'text_only' | 'text_and_links' | 'video_upload' | null
     assignment_description?: string | null
+    assignment_timing?: 'before_interview' | 'after_interview' | null
     assignment_weight?: number | null
   }) | null
   questions: ApplyQuestion[]
@@ -75,8 +76,7 @@ export async function getJobForApplication(jobId: string): Promise<{
     // Public can only see active jobs due to RLS policy.
     const { data: job, error: jobError } = await supabase
       .from('job_forms')
-      // Select all to keep compatibility across schema variants (some deployments add salary/requirements/etc.).
-      .select('*')
+      .select('*, assignment_enabled, assignment_timing')
       .eq('id', jobId)
       .single()
 
@@ -108,7 +108,9 @@ export async function getJobForApplication(jobId: string): Promise<{
 
     console.log('[getJobForApplication] Fetched questions:', JSON.stringify(questions, null, 2))
 
-    const mapped: ApplyQuestion[] = (questions || []).map((q) => ({
+    const mapped: ApplyQuestion[] = (questions || [])
+      .filter((q) => !q.config?.is_fixed) // Filter out fixed questions (Age, Salary, Education)
+      .map((q) => ({
       id: q.id,
       type: normalizeQuestionType(q.type),
       label: q.label,
@@ -136,6 +138,7 @@ export async function getJobForApplication(jobId: string): Promise<{
         assignment_required: job.assignment_required ?? false,
         assignment_type: job.assignment_type ?? null,
         assignment_description: job.assignment_description ?? null,
+        assignment_timing: job.assignment_timing ?? null,
         assignment_weight: job.assignment_weight ?? null,
       },
       questions: mapped,
@@ -150,6 +153,10 @@ export async function beginApplication(payload: {
   jobId: string
   candidateName?: string
   candidateEmail?: string
+  candidatePhone?: string
+  candidateAge?: number
+  candidateExperience?: number
+  desiredSalary?: number
 }): Promise<{ applicationId: string | null; error: string | null }> {
   try {
     // Use admin client to bypass RLS for application creation
@@ -159,6 +166,10 @@ export async function beginApplication(payload: {
     // mark it as duplicate so staff can see the repetition.
     const candidateEmail = String(payload.candidateEmail || '').trim()
     const candidateName = String(payload.candidateName || '').trim()
+    const candidatePhone = String(payload.candidatePhone || '').trim()
+    const candidateAge = payload.candidateAge || null
+    const candidateExperience = payload.candidateExperience || null
+
     const orParts: string[] = []
     if (candidateEmail) orParts.push(`candidate_email.ilike.${candidateEmail}`)
     if (candidateName) orParts.push(`candidate_name.ilike.${candidateName}`)
@@ -192,30 +203,32 @@ export async function beginApplication(payload: {
             candidateName &&
             String(r.candidate_name || '').toLowerCase() === candidateName.toLowerCase()
         )
-        matchedBy = emailMatch && nameMatch ? 'email_or_name' : emailMatch ? 'email' : 'name'
+        if (emailMatch && nameMatch) matchedBy = 'email_or_name'
+        else if (emailMatch) matchedBy = 'email'
+        else if (nameMatch) matchedBy = 'name'
       }
-    }
-
-    const insertPayload = {
-      job_form_id: payload.jobId,
-      candidate_name: payload.candidateName || null,
-      candidate_email: payload.candidateEmail || null,
-      status: 'new',
-      is_duplicate: isDuplicate,
-      submitted_at: null
     }
 
     const { data: app, error } = await supabase
       .from('applications')
-      .insert(insertPayload)
+      .insert({
+        job_form_id: payload.jobId,
+        candidate_name: candidateName,
+        candidate_email: candidateEmail,
+        candidate_phone: candidatePhone,
+        candidate_age: candidateAge,
+        experience: candidateExperience,
+        desired_salary: payload.desiredSalary || null,
+        is_duplicate: isDuplicate,
+        duplicate_of: matchedApplicationIds,
+      })
       .select('id')
       .single()
-    
-    if (error || !app?.id) {
-      return { applicationId: null, error: error?.message || 'Failed to begin application' }
+
+    if (error || !app) {
+      return { applicationId: null, error: error?.message || 'Failed to create application' }
     }
 
-    // Mark begin (best effort) so admins can see an application started even if user leaves early.
     await recordProgress(app.id, 'candidate', isDuplicate ? 'begin_duplicate' : 'begin', {
       candidateEmail: candidateEmail || null,
       candidateName: candidateName || null,
@@ -243,8 +256,14 @@ export async function saveProgress(payload: {
   try {
     const supabase = createTypedAdminClient()
 
-    // Process answers sequentially to avoid race conditions
     for (const ans of payload.answers) {
+      // Defensive check for valid UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ans.questionId);
+      if (!isUUID) {
+        console.warn(`Skipping progress save for invalid questionId: "${ans.questionId}"`);
+        continue;
+      }
+
       // Manual "Upsert": Try to find existing answer first
       // This avoids errors if the DB lacks a unique constraint on (application_id, question_id)
       const { data: existing } = await supabase
@@ -289,212 +308,86 @@ export async function saveProgress(payload: {
 }
 
 export async function submitApplication(payload: {
-  applicationId?: string | null
-  jobId: string
-  candidateName: string
-  candidateEmail: string
-  answers: Array<{
-    questionId: string
-    value?: string | null
-    voiceData?: any
-  }>
-  resumeUrl?: string | null
-}): Promise<{ applicationId: string | null; error: string | null }> {
+  applicationId: string
+  assignment?: {
+    text?: string | null
+    links?: string[] | null
+    video_url?: string | null
+  }
+}): Promise<{ success: boolean; error: string | null }> {
   try {
-    // Use admin client to bypass RLS
     const supabase = createTypedAdminClient()
 
-    const candidateEmail = String(payload.candidateEmail || '').trim()
-    const candidateName = String(payload.candidateName || '').trim()
+    const { data: app, error: appErr } = await supabase
+      .from('applications')
+      .select('*, job_forms(*)')
+      .eq('id', payload.applicationId)
+      .single()
 
-    // Look for existing applications by same email OR name for this job (ignore empty values)
-    const orParts: string[] = []
-    if (candidateEmail) orParts.push(`candidate_email.ilike.${candidateEmail}`)
-    if (candidateName) orParts.push(`candidate_name.ilike.${candidateName}`)
-
-    const { data: existingApps } = await (async () => {
-      if (!orParts.length) return { data: [] }
-      // Use admin client for duplicate checks (public anon client often can't SELECT due to RLS).
-      const admin = createTypedAdminClient()
-      return await admin
-        .from('applications')
-        .select('id,submitted_at,status,candidate_email,candidate_name,created_at')
-        .eq('job_form_id', payload.jobId)
-        .or(orParts.join(','))
-        .order('created_at', { ascending: false })
-        .limit(200)
-    })()
-
-    const excludeId = payload.applicationId || null
-    const others = (existingApps || []).filter((a) => !excludeId || a.id !== excludeId)
-    // Mark as duplicate if ANY prior application exists for the same email/name (submitted or not).
-    const isDuplicateByHistory = others.length > 0
-
-    let appId: string | null = null
-
-    // Finalize the specific in-progress application if provided; otherwise fallback to creating a new one.
-    if (payload.applicationId) {
-      appId = payload.applicationId
-
-      const isDuplicate = isDuplicateByHistory
-      const status: 'new' | 'duplicate' = isDuplicate ? 'duplicate' : 'new'
-      
-      const updatePayload = {
-        candidate_name: payload.candidateName,
-        candidate_email: payload.candidateEmail,
-        status,
-        is_duplicate: isDuplicate,
-        submitted_at: new Date().toISOString()
-      }
-
-      const { data: updated, error: updError } = await supabase
-        .from('applications')
-        .update(updatePayload)
-        .eq('id', payload.applicationId)
-        .select('id')
-        .single()
-        
-      if (updError || !updated?.id) {
-        return { applicationId: null, error: updError?.message || 'Failed to finalize application' }
-      }
-      appId = updated.id
-    } else {
-      // Insert new application (legacy fallback)
-      const isDuplicate = isDuplicateByHistory
-      const status: 'new' | 'duplicate' = isDuplicate ? 'duplicate' : 'new'
-
-      const insertPayload = {
-        job_form_id: payload.jobId,
-        candidate_name: payload.candidateName,
-        candidate_email: payload.candidateEmail,
-        status,
-        is_duplicate: isDuplicate,
-        submitted_at: new Date().toISOString()
-      }
-
-      const { data: app, error: appError } = await supabase
-        .from('applications')
-        .insert(insertPayload)
-        .select('id')
-        .single()
-        
-      if (appError || !app?.id) {
-        return { applicationId: null, error: appError?.message || 'Failed to create application' }
-      }
-      appId = app.id
+    if (appErr || !app) {
+      return { success: false, error: 'Application not found' }
     }
 
-    if (!appId) {
-      return { applicationId: null, error: 'Unexpected error: missing application id' }
+    if (app.submitted_at) {
+      return { success: false, error: 'Application has already been submitted' }
     }
 
-    // Persist final progress state (best effort).
-    await recordProgress(appId, 'submitted', 'submit', {
-      duplicate: isDuplicateByHistory,
-      matchedBy: isDuplicateByHistory ? 'email_or_name' : null,
-      matchedApplicationIds: others.map((o: any) => o.id).filter(Boolean).slice(0, 25),
+    const { error } = await supabase
+      .from('applications')
+      .update({
+        submitted_at: new Date().toISOString(),
+        assignment_text: payload.assignment?.text,
+        assignment_links: payload.assignment?.links,
+        assignment_video_url: payload.assignment?.video_url,
+      })
+      .eq('id', payload.applicationId)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    await recordProgress(payload.applicationId, 'review', 'submit', {
+      assignment: !!payload.assignment,
     }).catch(() => {})
 
-    if (payload.answers?.length) {
-      const rows = payload.answers
-        .filter((a) => a.questionId)
-        .map((a) => ({
-          application_id: appId,
-          question_id: a.questionId,
-          value: a.value ?? null,
-          voice_data: a.voiceData ?? null
-        }))
-
-      // Manual "Upsert" for final submission as well
-      for (const row of rows) {
-        const { data: existing } = await supabase
-          .from('answers')
-          .select('id')
-          .eq('application_id', row.application_id)
-          .eq('question_id', row.question_id)
-          .maybeSingle()
-
-        if (existing && existing.id) {
-          await supabase.from('answers').update(row).eq('id', existing.id)
-        } else {
-          await supabase.from('answers').insert(row)
-        }
-      }
-    }
-
-    if (payload.resumeUrl) {
-      const { error: resumeError } = await supabase.from('resumes').insert({
-        application_id: appId,
-        file_url: payload.resumeUrl
-      })
-
-      if (resumeError) {
-        return { applicationId: appId, error: resumeError.message || 'Failed to save resume' }
-      }
-    }
-
-    // Notifications:
-    // - application_completed (always)
-    // - duplicate_application (if flagged)
+    // Send notifications
     try {
-      const { recipients, job } = await getRecipientsForJob(payload.jobId)
-      const actionUrl = `/admin/candidates/${appId}`
-
-      const baseMeta = {
-        application_id: appId,
-        candidate_name: payload.candidateName,
-        job_id: payload.jobId,
-        job_title: job?.title || null,
-        action_url: actionUrl,
-      }
-
-      await Promise.all(
-        recipients.map((userId) =>
+      const notificationData = await getRecipientsForJob(app.job_form_id)
+      if (notificationData.recipients.length > 0) {
+        const notificationPromises = notificationData.recipients.map((userId: string) =>
           createNotification({
             user_id: userId,
-            type: 'application_completed',
-            title: 'Application completed',
-            content: `${payload.candidateName} submitted an application for ${job?.title || 'a job'}.`,
-            metadata: baseMeta,
+            type: 'new_application',
+            title: `New Application: ${app.candidate_name || 'Unknown'}`,
+            content: `A new application was submitted for the "${
+              notificationData.job?.title || 'Unknown Job'
+            }" position.`,
+
+            metadata: {
+              url: `/admin/applications/${payload.applicationId}`,
+              entityType: 'application',
+              entityId: payload.applicationId,
+            },
           })
         )
-      )
-
-      const isDuplicate = isDuplicateByHistory
-      if (isDuplicate) {
-        await Promise.all(
-          recipients.map((userId) =>
-            createNotification({
-              user_id: userId,
-              type: 'duplicate_application',
-              title: 'Duplicate application detected',
-              content: `${payload.candidateName} submitted a duplicate application for ${job?.title || 'a job'}.`,
-              metadata: baseMeta,
-            })
-          )
-        )
-      }
-
-      // Send confirmation email to candidate
-      try {
-        await sendApplicationConfirmationEmail({
-          candidateEmail: payload.candidateEmail,
-          candidateName: payload.candidateName,
-          jobTitle: job?.title || 'the position',
-          jobDescription: job?.description,
-          answers: payload.answers,
-        })
-      } catch (emailError) {
-        console.error('[email] Failed to send confirmation email:', emailError)
-        // Don't fail the application submission if email fails
+        await Promise.all(notificationPromises)
       }
     } catch (e) {
-      console.error('[notifications] submitApplication:', e)
+      console.error('Failed to send notifications:', e)
     }
 
-    return { applicationId: appId, error: null }
+    // Send confirmation email
+    if (app.candidate_email && app.job_forms?.title) {
+      await sendApplicationConfirmationEmail({
+        candidateEmail: app.candidate_email,
+        candidateName: app.candidate_name || 'Applicant',
+        jobTitle: app.job_forms.title,
+      })
+    }
+
+    return { success: true, error: null }
   } catch (e: any) {
-    return { applicationId: null, error: e?.message || 'Unexpected error' }
+    return { success: false, error: e?.message || 'Failed to submit' }
   }
 }
 
@@ -541,5 +434,29 @@ export async function recordProgress(
     return { error: null }
   } catch (e: any) {
     return { error: e?.message || 'Unexpected error' }
+  }
+}
+
+export async function getApplicationIdByEmail(jobId: string, email: string): Promise<{ applicationId: string | null; error: string | null }> {
+  try {
+    const supabase = createTypedAdminClient();
+    const { data, error } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('job_form_id', jobId)
+      .eq('candidate_email', email)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.error('Error fetching application by email:', error);
+      return { applicationId: null, error: 'Application not found' };
+    }
+
+    return { applicationId: data.id, error: null };
+  } catch (e: any) {
+    console.error('Unexpected error in getApplicationIdByEmail:', e);
+    return { applicationId: null, error: e?.message || 'Unexpected error' };
   }
 }

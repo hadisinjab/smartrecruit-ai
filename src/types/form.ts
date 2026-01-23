@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export interface FormField {
   id: string;
-  type: 'text' | 'number' | 'textarea' | 'voice' | 'file' | 'url' | 'select';
+  type: 'text' | 'number' | 'textarea' | 'voice' | 'file' | 'url' | 'select' | 'email' | 'tel';
   label: string;
   placeholder?: string;
   required?: boolean;
@@ -45,7 +45,7 @@ export interface MultiStepFormProps {
   assignmentConfig?: {
     enabled: boolean
     required: boolean
-    type: 'text_only' | 'text_and_links'
+    type: 'text_only' | 'text_and_links' | 'video_upload'
     description: string
   } | null;
 }

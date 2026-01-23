@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/admin-card';
 import { Switch } from '@/components/ui/switch'
 import { FormStep, FormField } from '@/types/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { 
   ArrowLeft, 
   Plus, 
@@ -26,7 +27,8 @@ import {
   Copy,
   ExternalLink,
   CheckCircle,
-  List
+  List,
+  Hash
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useUser } from '@/context/UserContext';
@@ -36,6 +38,8 @@ import { Loader2 } from 'lucide-react';
 export default function EditJobPage({ params }: { params: { id: string; locale?: string } }) {
   const t = useTranslations('Jobs');
   const tCreate = useTranslations('Jobs.create');
+  console.log('tCreate function:', tCreate);
+  console.log('beforeInterview key:', tCreate('assignment.timing.options.beforeInterview'));
   const tCommon = useTranslations('Common');
   const router = useRouter();
   const { addToast } = useToast();
@@ -72,9 +76,10 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
     hiringManager: '',
     assignment_enabled: false,
     assignment_required: false,
-    assignment_type: 'text_only' as 'text_only' | 'text_and_links',
+    assignment_type: 'text_only' as 'text_only' | 'text_and_links' | 'video_upload',
     assignment_description: '',
-    assignment_weight: ''
+    assignment_weight: '',
+    assignment_timing: 'before' as 'before' | 'after'
   });
 
   const [formSteps, setFormSteps] = useState<FormStep[]>([
@@ -120,6 +125,16 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
         setUsersLoading(false);
         
         // Transform fetched data to state format
+        const validAssignmentTypes = ['text_only', 'text_and_links', 'video_upload'];
+        let assignmentType = (job as any).assignment_type || 'text_only';
+        
+        // Map legacy values or reset invalid ones
+        if (!validAssignmentTypes.includes(assignmentType)) {
+            if (assignmentType === 'url_link') assignmentType = 'text_and_links';
+            else if (assignmentType === 'file_upload') assignmentType = 'video_upload';
+            else assignmentType = 'text_only';
+        }
+
         setJobData({
             title: job.title,
             department: job.department,
@@ -138,9 +153,10 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             hiringManager: (job as any).hiring_manager_id || job.hiring_manager_name || '',
             assignment_enabled: !!(job as any).assignment_enabled,
             assignment_required: !!(job as any).assignment_required,
-            assignment_type: ((job as any).assignment_type || 'text_only') as any,
+            assignment_type: assignmentType as any,
             assignment_description: String((job as any).assignment_description || ''),
-            assignment_weight: String((job as any).assignment_weight ?? '')
+            assignment_weight: String((job as any).assignment_weight ?? ''),
+            assignment_timing: (job as any).assignment_timing || 'before'
         });
 
         // If there are questions, load them into formSteps
@@ -289,7 +305,8 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
         assignment_required: !!jobData.assignment_required,
         assignment_type: jobData.assignment_enabled ? jobData.assignment_type : null,
         assignment_description: jobData.assignment_enabled ? jobData.assignment_description : null,
-        assignment_weight: jobData.assignment_enabled && jobData.assignment_weight !== '' ? parseInt(jobData.assignment_weight as any) : null
+        assignment_weight: jobData.assignment_enabled && jobData.assignment_weight !== '' ? parseInt(jobData.assignment_weight as any) : null,
+        assignment_timing: jobData.assignment_enabled ? jobData.assignment_timing : 'before'
       };
 
       await updateJob(params.id, formData);
@@ -309,6 +326,8 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
     switch (type) {
       case 'text': return <AlignLeft className="w-4 h-4" />;
       case 'textarea': return <FileText className="w-4 h-4" />;
+      case 'number': return <Hash className="w-4 h-4" />;
+      case 'select': return <List className="w-4 h-4" />;
       case 'voice': return <Mic className="w-4 h-4" />;
       case 'file': return <Upload className="w-4 h-4" />;
       case 'url': return <LinkIcon className="w-4 h-4" />;
@@ -480,6 +499,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                 <h3 className="text-lg font-semibold text-blue-900">{tCreate('formBuilder')}</h3>
                 <p className="text-sm text-blue-700">{tCreate('formBuilderDesc')}</p>
               </div>
+
             </div>
 
             <div className="space-y-4 mb-6">
@@ -508,7 +528,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center space-x-2">
                           <input 
                             type="checkbox" 
@@ -617,9 +637,6 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                              />
                           </div>
                         )}
-                      </div>
-
-                      <div className="absolute top-0 right-0 p-4">
                         <Button variant="ghost" size="icon" onClick={() => removeQuestion(index)}>
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
@@ -644,8 +661,11 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                 <AlignLeft className="w-4 h-4 mr-2" /> {tCreate('shortText')}
               </Button>
               <Button variant="outline" size="sm" onClick={() => addQuestion('textarea')}>
-                <FileText className="w-4 h-4 mr-2" /> {tCreate('longText')}
-              </Button>
+                    <FileText className="w-4 h-4 mr-2" /> {tCreate('textArea')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => addQuestion('number')}>
+                    <Hash className="w-4 h-4 mr-2" /> {tCreate('numberInput')}
+                  </Button>
               <Button variant="outline" size="sm" onClick={() => addQuestion('voice')} className="border-orange-200 text-orange-700 hover:bg-orange-50">
                 <Mic className="w-4 h-4 mr-2" /> {tCreate('voiceRecording')}
               </Button>
@@ -723,61 +743,85 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
 
           {/* Assignment Configuration */}
           <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Assignment Configuration</h3>
+            <h3 className="text-lg font-semibold mb-4">{tCreate('assignment.title')}</h3>
 
-            <div className="flex items-center space-x-3 mb-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="assignment-enabled" className="cursor-pointer flex-grow">{tCreate('assignment.enable')}</Label>
               <Switch
-                checked={!!(jobData as any).assignment_enabled}
-                onCheckedChange={(checked) => setJobData({ ...(jobData as any), assignment_enabled: checked })}
+                id="assignment-enabled"
+                checked={!!jobData.assignment_enabled}
+                onCheckedChange={(checked) => setJobData({ ...jobData, assignment_enabled: checked })}
               />
-              <Label className="cursor-pointer">Enable Assignment for this job</Label>
             </div>
 
-            {!!(jobData as any).assignment_enabled && (
-              <div className="space-y-4">
-                <div>
-                  <Label>Assignment Task Description</Label>
-                  <Textarea
-                    placeholder="e.g., Build a REST API using Node.js..."
-                    value={(jobData as any).assignment_description}
-                    onChange={(e) => setJobData({ ...(jobData as any), assignment_description: e.target.value })}
-                    rows={4}
+            {jobData.assignment_enabled && (
+              <div className="space-y-4 pt-4 border-t border-gray-200 mt-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="assignment-required" className="cursor-pointer flex-grow">{tCreate('assignment.required')}</Label>
+                  <Switch
+                    id="assignment-required"
+                    checked={!!jobData.assignment_required}
+                    onCheckedChange={(checked) => setJobData({ ...jobData, assignment_required: checked })}
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>{tCreate('assignment.timing.label')}</Label>
+                  <RadioGroup 
+                    value={jobData.assignment_timing} 
+                    onValueChange={(val) => {
+                      console.log('assignment_timing changed:', val);
+                      setJobData({...jobData, assignment_timing: val as any});
+                    }}
+                    className="flex items-center space-x-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="before" id="before" />
+                      <Label htmlFor="before">{tCreate('assignment.timing.options.beforeInterview')}</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="after" id="after" />
+                    <Label htmlFor="after">{tCreate('assignment.timing.options.afterInterview')}</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
                 <div>
-                  <Label>Assignment Type</Label>
+                  <Label>{tCreate('assignment.type.label')}</Label>
                   <Select
-                    value={(jobData as any).assignment_type}
-                    onValueChange={(value) => setJobData({ ...(jobData as any), assignment_type: value as any })}
+                    value={(jobData as any).assignment_type || 'text_only'}
+                    onValueChange={(value) => setJobData({ ...jobData, assignment_type: value as any })}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder={tCreate('assignment.type.placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="text_only">Text Only (explanation/code)</SelectItem>
-                      <SelectItem value="text_and_links">Text + Links (GitHub, Video, Demo)</SelectItem>
+                      <SelectItem value="text_only">{tCreate('assignment.type.options.text_only')}</SelectItem>
+                      <SelectItem value="text_and_links">{tCreate('assignment.type.options.text_and_links')}</SelectItem>
+                      <SelectItem value="video_upload">{tCreate('assignment.type.options.video_upload')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="flex items-center space-x-3">
-                  <Switch
-                    checked={!!(jobData as any).assignment_required}
-                    onCheckedChange={(checked) => setJobData({ ...(jobData as any), assignment_required: checked })}
-                  />
-                  <Label className="cursor-pointer">Make assignment required</Label>
-                </div>
-
                 <div>
-                  <Label>Assignment Weight (optional)</Label>
+                  <Label>{tCreate('assignment.description.label')}</Label>
+                  <Textarea
+                    value={(jobData as any).assignment_description || ''}
+                    onChange={(e) => setJobData({ ...jobData, assignment_description: e.target.value })}
+                    placeholder={tCreate('assignment.description.placeholder')}
+                    rows={4}
+                  />
+                </div>
+                
+                <div>
+                  <Label>{tCreate('assignment.weight.label')}</Label>
                   <Input
                     type="number"
-                    value={(jobData as any).assignment_weight}
-                    onChange={(e) => setJobData({ ...(jobData as any), assignment_weight: e.target.value })}
-                    placeholder="e.g. 30"
+                    value={(jobData as any).assignment_weight || ''}
+                    onChange={(e) => setJobData({ ...jobData, assignment_weight: e.target.value })}
+                    placeholder="e.g. 25"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Used later for AI scoring.</p>
+                  <p className="text-xs text-gray-500 mt-1">{tCreate('assignment.weight.hint')}</p>
                 </div>
               </div>
             )}

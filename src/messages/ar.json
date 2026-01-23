@@ -75,6 +75,17 @@
     "selectQuestion": "اختر السؤال",
     "allQuestions": "كل الأسئلة",
     "filterByAnswer": "تصفية حسب الإجابة",
+    "filterBy": {
+      "name": "تصفية حسب الاسم",
+      "age": "تصفية حسب العمر",
+      "phone": "تصفية حسب الرقم",
+      "experience": "تصفية حسب سنوات الخبرة",
+      "email": "تصفية حسب البريد الإلكتروني",
+      "ageMin": "العمر (من)",
+      "ageMax": "العمر (إلى)",
+      "expMin": "الخبرة (من)",
+      "expMax": "الخبرة (إلى)"
+    },
     "selectAnswer": "اختر الإجابة",
     "search": "بحث",
     "clear": "مسح",
@@ -168,7 +179,8 @@
       "criteria_based_questions": "أسئلة مبنية على المعايير",
       "job_specific_questions": "أسئلة خاصة بالوظيفة",
       "employer_defined_questions": "أسئلة محددة من قبل صاحب العمل",
-      "investigative_questions": "أسئلة استقصائية"
+      "investigative_questions": "أسئلة استقصائية",
+      "desiredSalary": "الراتب المتوقع"
     },
     "Interviews": {
       "title": "المقابلات",
@@ -253,6 +265,8 @@
       "addQuestion": "إضافة سؤال:",
       "shortText": "نص قصير",
       "longText": "نص طويل",
+      "textArea": "مساحة نصية",
+      "numberInput": "إدخال رقم",
       "voiceRecording": "تسجيل صوتي",
       "fileUpload": "رفع ملف",
       "urlLink": "رابط",
@@ -265,7 +279,39 @@
       "salaryRange": "نطاق الراتب",
       "min": "الحد الأدنى",
       "max": "الحد الأقصى",
-      "currency": "العملة"
+      "currency": "العملة",
+      "assignment": {
+        "title": "إعدادات المهمة",
+        "enable": "تفعيل المهمة",
+        "required": "المهمة مطلوبة",
+        "timing": {
+          "label": "توقيت المهمة",
+          "options": {
+            "beforeInterview": "قبل المقابلة",
+            "afterInterview": "بعد المقابلة"
+          }
+        },
+        "type": {
+          "label": "نوع المهمة",
+          "select": "اختر النوع",
+          "options": {
+            "textOnly": "نص فقط",
+            "url": "رابط",
+            "file": "رفع ملف",
+            "video": "رفع فيديو"
+          }
+        },
+        "description": {
+          "label": "وصف المهمة",
+          "placeholder": "أدخل تعليمات المهمة هنا..."
+        },
+        "weight": {
+          "label": "وزن المهمة",
+          "hint": "مدى مساهمة هذه المهمة في النتيجة الإجمالية (0-100%)"
+        }
+      },
+      "createSuccess": "تم إنشاء الوظيفة بنجاح",
+      "createError": "فشل إنشاء الوظيفة"
     }
   },
   "Incomplete": {
@@ -556,6 +602,13 @@
     "subtitle": "ابق على اطلاع بآخر المستجدات",
     "markAllAsRead": "تحديد الكل كمقروء",
     "showUnreadOnly": "عرض غير المقروء فقط",
+    "applicationIdRequired": "معرف الطلب مطلوب",
+    "enterApplicationId": "أدخل معرف طلبك",
+    "applicationIdPlaceholder": "مثال: 12345",
+    "emailIsRequired": "البريد الإلكتروني مطلوب",
+    "applicationNotFound": "لم يتم العثور على طلب لهذا البريد الإلكتروني والوظيفة",
+    "enterYourEmail": "أدخل عنوان بريدك الإلكتروني",
+    "emailPlaceholder": "مثال: you@example.com",
     "filterAll": "الكل",
     "filterByType": "تصفية حسب النوع",
     "empty": "لا توجد إشعارات",

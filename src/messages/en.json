@@ -76,6 +76,17 @@
     "selectQuestion": "Select Question",
     "allQuestions": "All Questions",
     "filterByAnswer": "Filter by Answer",
+    "filterBy": {
+      "name": "Filter by Name",
+      "age": "Filter by Age",
+      "phone": "Filter by Phone",
+      "experience": "Filter by Experience",
+      "email": "Filter by Email",
+      "ageMin": "Age (Min)",
+      "ageMax": "Age (Max)",
+      "expMin": "Exp (Min)",
+      "expMax": "Exp (Max)"
+    },
     "count": "{count} candidates",
     "stats": {
       "totalCandidates": "Total Candidates",
@@ -161,7 +172,8 @@
       "criteria_based_questions": "Criteria-Based Questions",
       "job_specific_questions": "Job-Specific Questions",
       "employer_defined_questions": "Employer-Defined Questions",
-      "investigative_questions": "Investigative Questions"
+      "investigative_questions": "Investigative Questions",
+      "desiredSalary": "Desired Salary"
     },
     "Interviews": {
       "title": "Interviews",
@@ -245,6 +257,8 @@
       "addQuestion": "Add Question:",
       "shortText": "Short Text",
       "longText": "Long Text",
+      "textArea": "Text Area",
+      "numberInput": "Number Input",
       "voiceRecording": "Voice Recording",
       "fileUpload": "File Upload",
       "urlLink": "URL / Link",
@@ -257,7 +271,36 @@
       "salaryRange": "Salary Range",
       "min": "Min",
       "max": "Max",
-      "currency": "Currency"
+      "currency": "Currency",
+      "assignment": {
+        "title": "Assignment Configuration",
+        "enable": "Enable Assignment",
+        "required": "Assignment is Required",
+        "timing": {
+          "label": "Assignment Timing",
+          "options": {
+            "beforeInterview": "Before Interview",
+            "afterInterview": "After Interview"
+          }
+        },
+        "type": {
+          "label": "Assignment Type",
+          "placeholder": "Select assignment type",
+          "options": {
+            "text_only": "Text Only",
+            "text_and_links": "Text & Links",
+            "video_upload": "Video Upload"
+          }
+        },
+        "description": {
+          "label": "Assignment Description",
+          "placeholder": "Provide instructions for the assignment..."
+        },
+        "weight": {
+          "label": "Assignment Weight",
+          "hint": "How much this assignment contributes to the overall score (0-100%)"
+        }
+      }
     }
   },
   "Incomplete": {
@@ -550,6 +593,13 @@
     "subtitle": "Stay updated with what matters",
     "markAllAsRead": "Mark all as read",
     "showUnreadOnly": "Show unread only",
+    "applicationIdRequired": "Application ID is required",
+    "enterApplicationId": "Enter your Application ID",
+    "applicationIdPlaceholder": "e.g., 12345",
+    "emailIsRequired": "Email is required",
+    "applicationNotFound": "Application not found for this email and job",
+    "enterYourEmail": "Enter your email address",
+    "emailPlaceholder": "e.g., you@example.com",
     "filterAll": "All",
     "filterByType": "Filter by type",
     "empty": "No notifications",
@@ -657,5 +707,11 @@
       "compliance": "Export Compliance",
       "complianceDesc": "Data anonymization helps ensure compliance with GDPR and other privacy regulations. Enable both personal data inclusion and anonymization for maximum compliance."
     }
+  },
+  "Assignment": {
+    "welcomeTitle": "Your Next Career Move",
+    "job": "Job",
+    "jobDescription": "You are about to start the assignment for the following job:",
+    "startAssignment": "Start Assignment"
   }
 }

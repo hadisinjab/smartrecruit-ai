@@ -53,6 +53,8 @@ export const FormStepComponent: React.FC<FormStepComponentProps> = ({
 
     switch (field.type) {
       case 'text':
+      case 'email':
+      case 'tel':
         return <TextQuestion key={field.id} {...commonProps} />;
       case 'number':
         return <NumberQuestion key={field.id} {...commonProps} />;

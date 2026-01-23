@@ -1,4 +1,4 @@
-export type AssignmentType = 'text_only' | 'text_and_links'
+export type AssignmentType = 'text_only' | 'text_and_links' | 'video_upload'
 
 /**
  * DB shape (as stored in Postgres). `link_fields` is stored as a JSON string in a TEXT column.

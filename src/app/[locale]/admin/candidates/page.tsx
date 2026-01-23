@@ -31,106 +31,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-// QuestionFilter component for dynamic question filtering
-interface QuestionFilterProps {
-  selectedQuestion: any;
-  questionFilterValue: string;
-  questionFilterMin: string;
-  questionFilterMax: string;
-  setQuestionFilterValue: (value: string) => void;
-  setQuestionFilterMin: (value: string) => void;
-  setQuestionFilterMax: (value: string) => void;
-  t: any;
-}
-
-function QuestionFilter({
-  selectedQuestion,
-  questionFilterValue,
-  questionFilterMin,
-  questionFilterMax,
-  setQuestionFilterValue,
-  setQuestionFilterMin,
-  setQuestionFilterMax,
-  t
-}: QuestionFilterProps) {
-  if (!selectedQuestion) return null;
-
-  const getLabelText = (label: any) => {
-    if (!label) return 'Unknown Question';
-    if (typeof label === 'object') {
-      return label.label || label.value || JSON.stringify(label);
-    }
-    return String(label);
-  };
-
-  switch (selectedQuestion.type) {
-    case 'number':
-      return (
-        <div className="flex gap-2 items-center w-full sm:w-[220px] flex-shrink-0">
-          <div className="w-full">
-            <input
-              type="number"
-              placeholder={t('min')}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-              value={questionFilterMin}
-              onChange={(e) => setQuestionFilterMin(e.target.value)}
-            />
-          </div>
-          <span className="text-gray-500 text-sm">-</span>
-          <div className="w-full">
-            <input
-              type="number"
-              placeholder={t('max')}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-              value={questionFilterMax}
-              onChange={(e) => setQuestionFilterMax(e.target.value)}
-            />
-          </div>
-        </div>
-      );
-      
-    case 'select':
-      const options = selectedQuestion.options || [];
-      return (
-        <div className="w-full sm:w-[220px] flex-shrink-0">
-          <Select value={questionFilterValue} onValueChange={setQuestionFilterValue}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={t('selectAnswer')} />
-            </SelectTrigger>
-            <SelectContent className="max-h-[200px] overflow-y-auto w-[220px]">
-              <SelectItem value="all">{t('allAnswers')}</SelectItem>
-              {options.map((option: any, index: number) => {
-                const optionText = getLabelText(option);
-                return (
-                  <SelectItem key={index} value={optionText}>
-                    <div className="max-w-[180px] truncate" title={optionText}>
-                      {optionText}
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-      );
-      
-    case 'text':
-    case 'textarea':
-    default:
-      return (
-        <div className="w-full sm:w-[220px] flex-shrink-0">
-          <input
-            type="text"
-            placeholder={t('searchAnswer')}
-            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-            value={questionFilterValue}
-            onChange={(e) => setQuestionFilterValue(e.target.value)}
-          />
-        </div>
-      );
-  }
-}
-
 export default function CandidatesPage() {
   const t = useTranslations('Candidates');
   const tCommon = useTranslations('Common');
@@ -142,15 +42,13 @@ export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>('all');
-  const [selectedQuestionId, setSelectedQuestionId] = useState<string>('all');
-  const [questionFilterValue, setQuestionFilterValue] = useState<string>('all');
-  const [questionFilterMin, setQuestionFilterMin] = useState<string>('');
-  const [questionFilterMax, setQuestionFilterMax] = useState<string>('');
-  const [jobQuestions, setJobQuestions] = useState<any[]>([]);
-  const [shouldApplyFilters, setShouldApplyFilters] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filterName, setFilterName] = useState('');
+  const [filterAge, setFilterAge] = useState({ min: '', max: '' });
+  const [filterPhone, setFilterPhone] = useState('');
+  const [filterExperience, setFilterExperience] = useState({ min: '', max: '' });
+  const [filterEmail, setFilterEmail] = useState('');
   // Filters state - using strings to allow empty/inactive state
   const router = useRouter();
 
@@ -174,36 +72,6 @@ export default function CandidatesPage() {
     loadJobs();
   }, []);
 
-  // Load questions when job is selected
-  useEffect(() => {
-    async function loadQuestions() {
-      if (selectedJobId && selectedJobId !== 'all') {
-        try {
-          const job = await getJob(selectedJobId);
-          if (job && job.evaluation_criteria) {
-            console.log('Loaded questions:', job.evaluation_criteria);
-            console.log('First question structure:', job.evaluation_criteria[0]);
-            console.log('First question label:', job.evaluation_criteria[0]?.label);
-            setJobQuestions(job.evaluation_criteria);
-          } else {
-            setJobQuestions([]);
-          }
-        } catch (error) {
-          console.error('Failed to load questions:', error);
-          setJobQuestions([]);
-        }
-      } else {
-        setJobQuestions([]);
-        setSelectedQuestionId('all');
-        setQuestionFilterValue('all');
-        setQuestionFilterMin('');
-        setQuestionFilterMax('');
-        setShouldApplyFilters(false);
-      }
-    }
-    loadQuestions();
-  }, [selectedJobId]);
-
   useEffect(() => {
     async function loadCandidates() {
       setLoading(true);
@@ -225,64 +93,48 @@ export default function CandidatesPage() {
   useEffect(() => {
     let filtered = [...candidates];
 
-    // Apply search
-    if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
+    // Apply specific filters
+    if (filterName) {
+      const lowerName = filterName.toLowerCase().trim();
       filtered = filtered.filter(candidate =>
-        candidate.firstName.toLowerCase().includes(lowerSearch) ||
-        candidate.lastName.toLowerCase().includes(lowerSearch) ||
-        candidate.email.toLowerCase().includes(lowerSearch) ||
-        candidate.position.toLowerCase().includes(lowerSearch)
+        candidate.firstName.toLowerCase().startsWith(lowerName) ||
+        candidate.lastName.toLowerCase().startsWith(lowerName)
       );
     }
 
-    // Apply question filter only when search is triggered
-    if (shouldApplyFilters && selectedQuestionId && selectedQuestionId !== 'all') {
-      console.log('Applying filters for question:', selectedQuestionId);
-      console.log('Filter values:', { questionFilterValue, questionFilterMin, questionFilterMax });
-      
+    if (filterAge.min || filterAge.max) {
+      const minAge = filterAge.min ? parseInt(filterAge.min, 10) : -Infinity;
+      const maxAge = filterAge.max ? parseInt(filterAge.max, 10) : Infinity;
       filtered = filtered.filter(candidate => {
-        // Find the answer for the selected question
-        const answer = candidate.answers?.find((ans: any) => ans.question_id === selectedQuestionId);
-        console.log('Candidate answer:', candidate.firstName, answer);
-        
-        if (!answer || !answer.value) return false;
-        
-        // Get question type to determine filtering logic
-        const question = jobQuestions.find(q => q.id === selectedQuestionId);
-        if (!question) return false;
-
-        const answerValue = String(answer.value).toLowerCase();
-
-        switch (question.type) {
-          case 'number':
-            // For numeric questions, check if value is within range
-            const numericValue = parseFloat(String(answer.value));
-            if (isNaN(numericValue)) return false;
-            
-            const min = questionFilterMin ? parseFloat(questionFilterMin) : -Infinity;
-            const max = questionFilterMax ? parseFloat(questionFilterMax) : Infinity;
-            
-            return numericValue >= min && numericValue <= max;
-            
-          case 'select':
-            // For select questions, check exact match, but allow "all" to pass through
-            if (questionFilterValue === 'all') return true;
-            const filterValue = questionFilterValue.toLowerCase();
-            return answerValue === filterValue;
-            
-          case 'text':
-          case 'textarea':
-          default:
-            // For text questions, check if the answer contains the filter text
-            const textFilterValue = questionFilterValue.toLowerCase();
-            return answerValue.includes(textFilterValue);
-        }
+        if (candidate.age === undefined || candidate.age === null) return false;
+        return candidate.age >= minAge && candidate.age <= maxAge;
       });
     }
 
+    if (filterPhone) {
+      filtered = filtered.filter(candidate =>
+        candidate.phone?.includes(filterPhone)
+      );
+    }
+
+    if (filterExperience.min || filterExperience.max) {
+      const minExp = filterExperience.min ? parseInt(filterExperience.min, 10) : -Infinity;
+      const maxExp = filterExperience.max ? parseInt(filterExperience.max, 10) : Infinity;
+      filtered = filtered.filter(candidate => {
+        if (candidate.experience === undefined || candidate.experience === null) return false;
+        return candidate.experience >= minExp && candidate.experience <= maxExp;
+      });
+    }
+
+    if (filterEmail) {
+      const lowerEmail = filterEmail.toLowerCase();
+      filtered = filtered.filter(candidate =>
+        candidate.email.toLowerCase().includes(lowerEmail)
+      );
+    }
+
     setFilteredCandidates(filtered);
-  }, [candidates, searchTerm, selectedQuestionId, shouldApplyFilters, questionFilterValue, questionFilterMin, questionFilterMax, jobQuestions]);
+  }, [candidates, filterName, filterAge, filterPhone, filterExperience, filterEmail]);
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -305,19 +157,6 @@ export default function CandidatesPage() {
       low: 'text-green-600'
     };
     return colors[priority as keyof typeof colors] || 'text-gray-600';
-  };
-
-  const handleSearch = () => {
-    setShouldApplyFilters(true);
-  };
-
-  const handleClearFilters = () => {
-    setSelectedJobId('all');
-    setSelectedQuestionId('all');
-    setQuestionFilterValue('all');
-    setQuestionFilterMin('');
-    setQuestionFilterMax('');
-    setShouldApplyFilters(false);
   };
 
   const candidateColumns: Column<Candidate>[] = [
@@ -449,7 +288,6 @@ export default function CandidatesPage() {
               <div className="w-full sm:w-[220px] flex-shrink-0">
                 <Select value={selectedJobId} onValueChange={(value) => {
                   setSelectedJobId(value);
-                  setShouldApplyFilters(false);
                 }}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={t('selectJob')} />
@@ -467,104 +305,69 @@ export default function CandidatesPage() {
                 </Select>
               </div>
 
-              {/* Question Selection - Only show when a job is selected */}
-              {selectedJobId !== 'all' && jobQuestions.length > 0 && (
-                <div className="w-full sm:w-[220px] flex-shrink-0">
-                  <Select value={selectedQuestionId} onValueChange={(value) => {
-                    setSelectedQuestionId(value);
-                    setQuestionFilterValue('all');
-                    setQuestionFilterMin('');
-                    setQuestionFilterMax('');
-                    setShouldApplyFilters(false);
-                  }}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={t('selectQuestion')} />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px] overflow-y-auto w-[220px]">
-                      <SelectItem value="all">{t('allQuestions')}</SelectItem>
-                      {jobQuestions.map((question) => {
-                        try {
-                          console.log('Question object:', question);
-                          console.log('Question label:', question.label);
-                          console.log('Question label type:', typeof question.label);
-                          
-                          // Handle case where label might be an object or string
-                          let labelText = 'Unknown Question';
-                          
-                          if (question.label) {
-                            if (typeof question.label === 'object' && question.label !== null) {
-                              // If it's an object, try to get label or value property
-                              labelText = question.label.label || question.label.value || JSON.stringify(question.label);
-                            } else if (typeof question.label === 'string') {
-                              labelText = question.label;
-                            } else {
-                              // For any other type, convert to string
-                              labelText = String(question.label);
-                            }
-                          }
-                          
-                          console.log('Final labelText:', labelText);
-                          
-                          return (
-                            <SelectItem key={question.id} value={question.id}>
-                              <div className="max-w-[200px] truncate" title={labelText}>
-                                {labelText}
-                              </div>
-                            </SelectItem>
-                          );
-                        } catch (error) {
-                          console.error('Error rendering question:', error);
-                          return (
-                            <SelectItem key={question.id} value={question.id}>
-                              <div className="max-w-[200px] truncate" title="Unknown Question">
-                                Unknown Question
-                              </div>
-                            </SelectItem>
-                          );
-                        }
-                      })}  {/* Added missing closing brace for map function */}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Question Filter - Show different inputs based on question type */}
-              {selectedQuestionId !== 'all' && selectedQuestionId && (
-                <QuestionFilter 
-                  selectedQuestion={jobQuestions.find(q => q.id === selectedQuestionId)}
-                  questionFilterValue={questionFilterValue}
-                  questionFilterMin={questionFilterMin}
-                  questionFilterMax={questionFilterMax}
-                  setQuestionFilterValue={setQuestionFilterValue}
-                  setQuestionFilterMin={setQuestionFilterMin}
-                  setQuestionFilterMax={setQuestionFilterMax}
-                  t={t}
-                />
-              )}
-
               <div className='relative w-full sm:w-[220px] flex-shrink-0'>
-                <Search className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4' />
                 <input
                   type='text'
-                  placeholder={t('searchPlaceholder')}
-                  className='w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={t('filterBy.name')}
+                  className='w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                  value={filterName}
+                  onChange={(e) => setFilterName(e.target.value)}
+                />
+              </div>
+              <div className='relative w-full sm:w-[220px] flex-shrink-0 flex items-center gap-2'>
+                <input
+                  type='number'
+                  placeholder={t('filterBy.ageMin')}
+                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                  value={filterAge.min}
+                  onChange={(e) => setFilterAge(prev => ({ ...prev, min: e.target.value }))}
+                />
+                <span className="text-gray-500">-</span>
+                <input
+                  type='number'
+                  placeholder={t('filterBy.ageMax')}
+                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                  value={filterAge.max}
+                  onChange={(e) => setFilterAge(prev => ({ ...prev, max: e.target.value }))}
+                />
+              </div>
+              <div className='relative w-full sm:w-[220px] flex-shrink-0'>
+                <input
+                  type='text'
+                  placeholder={t('filterBy.phone')}
+                  className='w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                  value={filterPhone}
+                  onChange={(e) => setFilterPhone(e.target.value)}
+                />
+              </div>
+              <div className='relative w-full sm:w-[220px] flex-shrink-0 flex items-center gap-2'>
+                <input
+                  type='number'
+                  placeholder={t('filterBy.expMin')}
+                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                  value={filterExperience.min}
+                  onChange={(e) => setFilterExperience(prev => ({ ...prev, min: e.target.value }))}
+                />
+                <span className="text-gray-500">-</span>
+                <input
+                  type='number'
+                  placeholder={t('filterBy.expMax')}
+                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                  value={filterExperience.max}
+                  onChange={(e) => setFilterExperience(prev => ({ ...prev, max: e.target.value }))}
+                />
+              </div>
+              <div className='relative w-full sm:w-[220px] flex-shrink-0'>
+                <input
+                  type='email'
+                  placeholder={t('filterBy.email')}
+                  className='w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                  value={filterEmail}
+                  onChange={(e) => setFilterEmail(e.target.value)}
                 />
               </div>
             </div>
             <div className='flex gap-2 flex-wrap'>
-              {/* Search and Clear buttons */}
-              {selectedQuestionId !== 'all' && selectedQuestionId && (
-                <>
-                  <Button onClick={handleSearch} className='bg-blue-600 hover:bg-blue-700 text-sm px-3 py-1.5'>
-                    {t('search')}
-                  </Button>
-                  <Button onClick={handleClearFilters} variant='outline' className='text-sm px-3 py-1.5'>
-                    {t('clear')}
-                  </Button>
-                </>
-              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -668,7 +471,7 @@ export default function CandidatesPage() {
           data={filteredCandidates}
           columns={candidateColumns}
           onRowClick={(candidate) => router.push(`/admin/candidates/${candidate.id}`)}
-          emptyText={tCommon('search')}
+          emptyText={t('details.notFound')}
         />
 
       </div>

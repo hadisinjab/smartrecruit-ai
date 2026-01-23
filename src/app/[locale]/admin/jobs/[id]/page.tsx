@@ -343,6 +343,73 @@ export default function JobDetailsPage() {
               </div>
             </Card>
 
+            {/* Assignment Link (After Interview) */}
+            {(job as any)?.assignment_enabled && (job as any)?.assignment_timing === 'after' && (
+              <Card className='p-6'>
+                <h2 className='text-lg font-semibold text-gray-900 mb-4'>Assignment Link (After Interview)</h2>
+                <div className='space-y-3'>
+                  <div className='flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border border-gray-200'>
+                    <LinkIcon className='w-5 h-5 text-gray-400 flex-shrink-0' />
+                    <input
+                      type='text'
+                      readOnly
+                      value={
+                        typeof window !== 'undefined'
+                          ? `${window.location.origin}/${locale}/assignment/${jobId}`
+                          : `/${locale}/assignment/${jobId}`
+                      }
+                      className='flex-1 bg-transparent border-none outline-none text-sm text-gray-700 font-mono'
+                    />
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => {
+                        const assignmentLink =
+                          typeof window !== 'undefined'
+                            ? `${window.location.origin}/${locale}/assignment/${jobId}`
+                            : `/${locale}/assignment/${jobId}`
+                        navigator.clipboard.writeText(assignmentLink)
+                        setLinkCopied(true)
+                        setTimeout(() => setLinkCopied(false), 2000)
+                      }}
+                      className='flex-shrink-0'
+                    >
+                      {linkCopied ? (
+                        <>
+                          <CheckCircle className='w-4 h-4 mr-1 text-green-600' />
+                          <span className='text-green-600'>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className='w-4 h-4 mr-1' />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <Button
+                    variant='outline'
+                    className='w-full'
+                    onClick={() => {
+                    const assignmentLink =
+                      typeof window !== 'undefined'
+                        ? `${window.location.origin}/${locale}/assignment/${jobId}`
+                        : `/${locale}/assignment/${jobId}`
+                    window.open(assignmentLink, '_blank')
+                  }}
+                  >
+                    <ExternalLink className='w-4 h-4 mr-2' />
+                    Open Assignment Link
+                  </Button>
+
+                  <p className='text-xs text-gray-500'>
+                    This link is for candidates who have completed their interview. They will need to provide their application ID to proceed.
+                  </p>
+                </div>
+              </Card>
+            )}
+
             {/* Job Stats */}
             <Card className='p-6'>
               <h2 className='text-lg font-semibold text-gray-900 mb-4'>Job Statistics</h2>

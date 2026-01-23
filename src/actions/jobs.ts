@@ -419,51 +419,57 @@ export async function createJob(formData: any) {
   // Generate application link - will be set after job creation
   // For now, we'll generate it after getting the job ID
   
+  console.log('--- createJob Payload Debug ---');
+  console.log('assignment_enabled:', formData.assignment_enabled);
+  console.log('assignment_type (raw):', formData.assignment_type);
+  console.log('assignment_timing:', formData.assignment_timing);
+
+  const payload = {
+    title: formData.title,
+    description: formData.description,
+    department: formData.department,
+    location: formData.location,
+    type: formData.type,
+    status: formData.status || 'draft',
+    salary_min: formData.salary_min,
+    salary_max: formData.salary_max,
+    salary_currency: formData.salary_currency,
+    requirements: formData.requirements,
+    benefits: formData.benefits,
+    deadline: formData.deadline,
+    hiring_manager_name: formData.hiring_manager_name,
+    created_by: session.id,
+    evaluation_criteria: formData.evaluation_criteria || {},
+    assignment_enabled: !!formData.assignment_enabled,
+    assignment_required: !!formData.assignment_required,
+    assignment_type: formData.assignment_type || null,
+    assignment_description: formData.assignment_description || null,
+    assignment_weight: formData.assignment_weight ?? null,
+    assignment_timing: formData.assignment_timing || 'before',
+    organization_id: userRow.organization_id
+  };
+
+  console.log('assignment_type (final payload):', payload.assignment_type);
+  console.log('-------------------------------');
+
   const { data, error } = await supabase
     .from('job_forms')
-    .insert({
-      title: formData.title,
-      description: formData.description,
-      department: formData.department,
-      location: formData.location,
-      type: formData.type,
-      status: formData.status || 'draft',
-      salary_min: formData.salary_min,
-      salary_max: formData.salary_max,
-      salary_currency: formData.salary_currency,
-      requirements: formData.requirements,
-      benefits: formData.benefits,
-      deadline: formData.deadline,
-      hiring_manager_name: formData.hiring_manager_name,
-      created_by: session.id,
-      evaluation_criteria: formData.evaluation_criteria || {},
-      assignment_enabled: !!formData.assignment_enabled,
-      assignment_required: !!formData.assignment_required,
-      assignment_type: formData.assignment_type || null,
-      assignment_description: formData.assignment_description || null,
-      assignment_weight: formData.assignment_weight ?? null,
-      organization_id: userRow.organization_id
-    })
+    .insert(payload)
     .select()
     .single()
 
   if (error) {
-    console.error('Error creating job:', error)
+    console.error('Error creating job:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     // Return the error instead of throwing to let frontend handle it gracefully
     return { error: error.message || 'Failed to create job', details: error }
   }
 
-  // Insert questions (User defined + Fixed)
+  // Insert questions (User defined)
   const userQuestionsList = (formData.questions && Array.isArray(formData.questions)) ? formData.questions : [];
   
-  // 1. Filter and Map User Questions
+  // 1. Map User Questions
   const mappedUserQuestions = userQuestionsList
-    .filter((q: any) => 
-        q.label !== 'Expected Salary' && 
-        q.label !== 'Education' && 
-        q.label !== 'Age' &&
-        !String(q.label || '').startsWith('How experienced are you with')
-    )
     .map((q: any, index: number) => ({
       job_form_id: data.id,
       page_number: q.pageNumber || 1,
@@ -474,21 +480,11 @@ export async function createJob(formData: any) {
       order_index: index + 1
     }));
 
-  // 2. Generate Fixed Questions
-  const nextIndex = mappedUserQuestions.length + 1;
-  const fixedQuestions = getFixedQuestions(nextIndex).map(q => ({
-    ...q,
-    job_form_id: data.id
-  }));
-
-  // 3. Combine All Questions
-  const allQuestions = [...mappedUserQuestions, ...fixedQuestions];
-
-  // 4. Insert into Database
-  if (allQuestions.length > 0) {
+  // 2. Insert into Database
+  if (mappedUserQuestions.length > 0) {
     const { error: questionsError } = await supabase
       .from('questions')
-      .insert(allQuestions);
+      .insert(mappedUserQuestions);
 
     if (questionsError) {
        console.error('Error creating questions:', questionsError);
@@ -496,8 +492,8 @@ export async function createJob(formData: any) {
   }
 
   // Update evaluation_criteria to match questions for backward compatibility
-  if (allQuestions.length > 0) {
-    const evaluationCriteria = allQuestions.map((q: any) => ({
+  if (mappedUserQuestions.length > 0) {
+    const evaluationCriteria = mappedUserQuestions.map((q: any) => ({
       id: q.id || `temp-${Date.now()}-${Math.random()}`,
       type: q.type,
       label: q.label,
@@ -547,52 +543,10 @@ export async function createJob(formData: any) {
   }
 
   revalidatePath('/admin/jobs')
+  revalidatePath(`/apply/${data.id}`) // Ensure apply page is revalidated
   return { data }
 }
 
-function getFixedQuestions(startIndex: number) {
-  const fixed: {
-    page_number: number;
-    type: string;
-    label: string;
-    required: boolean;
-    config: any;
-    order_index: number;
-  }[] = [];
-  let index = startIndex;
-
-  // Age
-  fixed.push({
-    page_number: 1,
-    type: 'number',
-    label: 'Age',
-    required: true,
-    config: { is_fixed: true },
-    order_index: index++
-  });
-
-  // Expected Salary
-  fixed.push({
-    page_number: 1,
-    type: 'number',
-    label: 'Expected Salary',
-    required: true,
-    config: { is_fixed: true },
-    order_index: index++
-  });
-
-  // Education
-  fixed.push({
-    page_number: 1,
-    type: 'text',
-    label: 'Education',
-    required: true,
-    config: { is_fixed: true },
-    order_index: index++
-  });
-
-  return fixed;
-}
 
 export async function updateJob(id: string, formData: any) {
   const supabase = createClient()
@@ -649,6 +603,7 @@ export async function updateJob(id: string, formData: any) {
           assignment_type: formData.assignment_type || null,
           assignment_description: formData.assignment_description || null,
           assignment_weight: formData.assignment_weight ?? null,
+          assignment_timing: formData.assignment_timing || 'before',
           updated_at: new Date().toISOString(),
         } as any)
         .eq('id', id)
@@ -667,28 +622,87 @@ export async function updateJob(id: string, formData: any) {
 
   // Update questions if provided or if we need to update fixed questions
   if ((formData.questions && Array.isArray(formData.questions)) || formData.benefits) {
-    // Delete existing questions
-    const { error: deleteError } = await supabase
+    // --- Smart Question Synchronization ---
+    const admin = createAdminClient() // Use admin for elevated privileges
+
+    // 1. Get existing questions from DB
+    const { data: existingQuestions, error: fetchError } = await admin
       .from('questions')
-      .delete()
+      .select('id, label')
       .eq('job_form_id', id)
 
-    if (deleteError) {
-      console.error('Error deleting old questions:', deleteError)
-      // Continue anyway, but log the error
+    if (fetchError) {
+      console.error('Error fetching existing questions:', fetchError)
+      throw new Error('Could not retrieve existing questions to update.')
     }
 
-    // Prepare new questions
-    const userQuestionsList = (formData.questions && Array.isArray(formData.questions)) ? formData.questions : [];
-  
-    // 1. Filter and Map User Questions
-    const mappedUserQuestions = userQuestionsList
-      .filter((q: any) => 
-          q.label !== 'Expected Salary' && 
-          q.label !== 'Education' && 
-          q.label !== 'Age' &&
-          !String(q.label || '').startsWith('How experienced are you with')
-      )
+    const newQuestions = (formData.questions || []).filter((q: any) => q.label)
+    const existingQuestionMap = new Map((existingQuestions || []).map((q: any) => [q.id, q]))
+    const newQuestionMap = new Map(newQuestions.filter((q: any) => q.id).map((q: any) => [q.id, q]))
+
+    // 2. Identify questions to delete
+    const questionsToDelete = (existingQuestions || []).filter((q: any) => !newQuestionMap.has(q.id))
+
+    if (questionsToDelete.length > 0) {
+      const deletableQuestionIds: string[] = []
+      const undeletableQuestionLabels: string[] = []
+
+      // Check each question for existing answers before deleting
+      for (const q of questionsToDelete) {
+        const { count, error: answerCountError } = await admin
+          .from('answers')
+          .select('*', { count: 'exact', head: true })
+          .eq('question_id', q.id)
+
+        if (answerCountError) {
+          console.error(`Error checking answers for question ${q.id}:`, answerCountError)
+          continue // Skip deletion on error to be safe
+        }
+
+        if (count === 0) {
+          deletableQuestionIds.push(q.id)
+        } else {
+          undeletableQuestionLabels.push(q.label)
+        }
+      }
+
+      // If some questions have answers and cannot be deleted, throw an error
+      if (undeletableQuestionLabels.length > 0) {
+        throw new Error(
+          `Cannot delete questions with existing answers: "${undeletableQuestionLabels.join('", "')}"`
+        )
+      }
+
+      // Proceed with deletion if all are clear
+      if (deletableQuestionIds.length > 0) {
+        const { error: deleteError } = await admin
+          .from('questions')
+          .delete()
+          .in('id', deletableQuestionIds)
+
+        if (deleteError) {
+          console.error('Failed to delete questions:', deleteError)
+          throw new Error('An error occurred while removing old questions.')
+        }
+      }
+    }
+
+    // 3. Identify questions to update and insert
+    const questionsToUpdate = newQuestions
+      .filter((q: any) => q.id && newQuestionMap.has(q.id))
+      .map((q: any, index: number) => ({
+        id: q.id,
+        job_form_id: id,
+        page_number: q.pageNumber || 1,
+        type: q.type,
+        label: q.label,
+        required: q.required || false,
+        config: q.options ? { options: q.options } : {},
+        order_index: newQuestions.findIndex((nq: any) => nq.id === q.id) + 1
+      }))
+
+    const questionsToInsert = newQuestions
+      .filter((q: any) => !q.id)
       .map((q: any, index: number) => ({
         job_form_id: id,
         page_number: q.pageNumber || 1,
@@ -696,41 +710,38 @@ export async function updateJob(id: string, formData: any) {
         label: q.label,
         required: q.required || false,
         config: q.options ? { options: q.options } : {},
-        order_index: index + 1
-      }));
+        order_index: newQuestions.findIndex((nq: any) => nq.label === q.label && !nq.id) + 1
+      }))
 
-    // 2. Generate Fixed Questions
-    const nextIndex = mappedUserQuestions.length + 1;
-    const fixedQuestions = getFixedQuestions(nextIndex).map(q => ({
-      ...q,
-      job_form_id: id
-    }));
-
-    // 3. Combine All Questions
-    const allQuestions = [...mappedUserQuestions, ...fixedQuestions];
-
-    // 4. Insert into Database
-    if (allQuestions.length > 0) {
-      const { error: questionsError } = await supabase
-        .from('questions')
-        .insert(allQuestions)
-
-      if (questionsError) {
-        console.error('Error updating questions:', questionsError)
-        // Don't throw here to avoid failing the whole update, but log it
+    // 4. Perform DB operations
+    if (questionsToUpdate.length > 0) {
+      const { error: updateError } = await admin.from('questions').upsert(questionsToUpdate)
+      if (updateError) {
+        console.error('Failed to update questions:', updateError)
+        throw new Error('Failed to update questions')
       }
+    }
 
-      // Sync evaluation_criteria to match questions
-      const evaluationCriteria = allQuestions.map((q: any) => ({
+    if (questionsToInsert.length > 0) {
+      const { error: insertError } = await admin.from('questions').insert(questionsToInsert)
+      if (insertError) {
+        console.error('Failed to insert new questions:', insertError)
+        throw new Error('Failed to add new questions')
+      }
+    }
+
+    // 5. Sync evaluation_criteria to match questions
+    if (newQuestions.length > 0) {
+      const evaluationCriteria = newQuestions.map((q: any) => ({
         id: q.id || `temp-${Date.now()}-${Math.random()}`,
         type: q.type,
         label: q.label,
         required: q.required || false,
-        pageNumber: q.page_number || 1,
-        options: q.config?.options || []
+        pageNumber: q.pageNumber || 1,
+        options: q.options || []
       }));
 
-      await supabase
+      await admin
         .from('job_forms')
         .update({ evaluation_criteria: evaluationCriteria })
         .eq('id', id);

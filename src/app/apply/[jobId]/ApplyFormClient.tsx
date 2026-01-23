@@ -73,26 +73,6 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
   const [applicationId, setApplicationId] = useState<string | null>(null)
 
   const steps: FormStep[] = useMemo(() => {
-    const baseFields: FormField[] = [
-      {
-        id: 'candidate_name',
-        type: 'text',
-        label: 'Full name',
-        placeholder: 'Enter your full name',
-        required: true
-      },
-      {
-        id: 'candidate_email',
-        type: 'text',
-        label: 'Email',
-        placeholder: 'you@example.com',
-        required: true,
-        validation: {
-          pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-          message: 'Please enter a valid email address'
-        }
-      }
-    ]
 
     const formatMoney = (amount: any, currency: string) => {
       const n = typeof amount === 'number' ? amount : Number(amount)
@@ -210,13 +190,50 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         ),
         fields: []
       },
+    ]
+
+    const baseFields: FormField[] = [
       {
-        id: 'candidate',
-        title: 'Application Information',
-        description: 'Provide your name and email.',
-        fields: baseFields
+        id: 'candidate_name',
+        type: 'text',
+        label: 'Full name',
+        placeholder: 'Enter your full name',
+        required: true
+      },
+      {
+        id: 'candidate_email',
+        type: 'text',
+        label: 'Email',
+        placeholder: 'you@example.com',
+        required: true,
+        validation: {
+          pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+          message: 'Please enter a valid email address'
+        }
+      },
+      { id: 'candidate_phone', type: 'tel', label: 'Phone Number', required: true },
+      { id: 'candidate_age', type: 'number', label: 'Age', required: true },
+      {
+        id: 'candidate_experience',
+        type: 'number',
+        label: 'Years of Experience',
+        required: true
+      },
+      {
+        id: 'desired_salary',
+        type: 'number',
+        label: 'Desired Salary',
+        placeholder: 'Enter your desired salary',
+        required: false
       }
     ]
+
+    s.splice(1, 0, {
+      id: 'candidate',
+      title: 'Your Information',
+      description: 'Please provide your contact and basic information.',
+      fields: baseFields
+    })
 
     if (textQuestions.length) {
       s.push({
@@ -245,7 +262,8 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     }
 
     const assignmentEnabled = !!(job as any)?.assignment_enabled
-    if (assignmentEnabled) {
+    const assignmentTiming = (job as any)?.assignment_timing
+    if (assignmentEnabled && assignmentTiming === 'before') {
       s.push({
         id: 'assignment',
         title: 'Assignment',
@@ -272,17 +290,29 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     try {
       const candidateName = String(data.candidate_name || '').trim()
       const candidateEmail = String(data.candidate_email || '').trim()
+      const candidatePhone = String(data.candidate_phone || '').trim()
+      const candidateAge = Number(data.candidate_age || 0)
+      const candidateExperience = Number(data.candidate_experience || 0)
+      const desiredSalary = Number(data.desired_salary || 0)
+
       if (!candidateName || !candidateEmail) {
         setSubmitError('Please provide your name and email.')
         return
       }
-      if (!applicationId) {
-        const started = await beginApplication({ jobId, candidateName, candidateEmail })
+      let app_id = applicationId
+      if (!app_id) {
+        const started = await beginApplication({ jobId, candidateName, candidateEmail, candidatePhone, candidateAge, candidateExperience, desiredSalary })
         if (started.error) {
           setSubmitError(started.error)
           return
         }
         setApplicationId(started.applicationId)
+        app_id = started.applicationId
+      }
+
+      if (!app_id) {
+        setSubmitError('Failed to get application ID')
+        return
       }
 
       // Ensure file-answers have URLs (FileUploadQuestion uploads immediately, but keep a fallback here)
@@ -332,12 +362,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       })
 
       const res = await submitApplication({
-        applicationId: applicationId || undefined,
-        jobId,
-        candidateName,
-        candidateEmail,
-        answers,
-        resumeUrl
+        applicationId: app_id,
       })
 
       if (res.error) {
@@ -370,7 +395,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         const hasAny = !!textFields || (Array.isArray(linkFields) && linkFields.length > 0)
         if (hasAny || required) {
           const created = await createAssignment({
-            application_id: res.applicationId as string,
+            application_id: app_id,
             type: assignmentType,
             text_fields: textFields || undefined,
             link_fields: linkFields || undefined,
@@ -433,8 +458,21 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
           try {
             const name = String(data.candidate_name || '').trim()
             const email = String(data.candidate_email || '').trim()
+            const phone = String(data.candidate_phone || '').trim()
+            const age = Number(data.candidate_age || 0)
+            const experience = Number(data.candidate_experience || 0)
+            const desiredSalary = Number(data.desired_salary || 0)
+
             if (!applicationId && name && email) {
-              const res = await beginApplication({ jobId, candidateName: name, candidateEmail: email })
+              const res = await beginApplication({ 
+                jobId, 
+                candidateName: name, 
+                candidateEmail: email,
+                candidatePhone: phone,
+                candidateAge: age,
+                candidateExperience: experience,
+                desiredSalary
+              })
               if (!res.error) {
                 setApplicationId(res.applicationId)
                 return res.applicationId

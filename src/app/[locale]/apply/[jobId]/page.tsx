@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import ApplyFormClient from './ApplyFormClient'
 import ErrorPage from './ErrorPage'
 
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   params: {
     jobId: string

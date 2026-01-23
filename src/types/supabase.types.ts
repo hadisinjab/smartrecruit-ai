@@ -36,6 +36,9 @@ export interface Database {
           job_form_id: string
           candidate_name: string | null
           candidate_email: string | null
+          candidate_phone: string | null
+          candidate_age: number | null
+          experience: number | null
           status: string
           is_duplicate: boolean
           submitted_at: string | null
@@ -51,6 +54,9 @@ export interface Database {
           job_form_id?: string
           candidate_name?: string | null
           candidate_email?: string | null
+          candidate_phone?: string | null
+          candidate_age?: number | null
+          experience?: number | null
           status?: string
           is_duplicate?: boolean
           submitted_at?: string | null
@@ -66,6 +72,9 @@ export interface Database {
           job_form_id?: string
           candidate_name?: string | null
           candidate_email?: string | null
+          candidate_phone?: string | null
+          candidate_age?: number | null
+          experience?: number | null
           status?: string
           is_duplicate?: boolean
           submitted_at?: string | null

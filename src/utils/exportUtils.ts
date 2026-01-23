@@ -85,32 +85,7 @@ export const transformCandidateToReviewerData = (candidate: any, assignments: an
   };
 };
 
-export const exportData = <T extends Record<string, any>>(
-  data: T[],
-  filename: string,
-  format: 'csv' | 'xlsx' | 'pdf',
-  headers?: string[]
-) => {
-  if (!data || data.length === 0) {
-    return;
-  }
-
-  switch (format) {
-    case 'csv':
-      exportToCSV(data, `${filename}.csv`, headers);
-      break;
-    case 'xlsx':
-      exportToXLSX(data, `${filename}.xlsx`, headers);
-      break;
-    case 'pdf':
-      exportToPDF(data, `${filename}.pdf`, headers);
-      break;
-    default:
-      console.error('Unsupported export format');
-  }
-};
-
-const exportToCSV = <T extends Record<string, any>>(
+export const exportToCSV = <T extends Record<string, any>>(
   data: T[],
   filename: string,
   headers?: string[]
@@ -128,7 +103,7 @@ const exportToCSV = <T extends Record<string, any>>(
   document.body.removeChild(link);
 };
 
-const exportToXLSX = <T extends Record<string, any>>(
+export const exportToExcel = <T extends Record<string, any>>(
   data: T[],
   filename: string,
   headers?: string[]
@@ -140,7 +115,7 @@ const exportToXLSX = <T extends Record<string, any>>(
   XLSX.writeFile(workbook, filename);
 };
 
-const exportToPDF = <T extends Record<string, any>>(
+export const exportToPDF = <T extends Record<string, any>>(
   data: T[],
   filename: string,
   headers?: string[]
@@ -170,4 +145,29 @@ const exportToPDF = <T extends Record<string, any>>(
   });
 
   doc.save(filename);
+};
+
+export const exportData = <T extends Record<string, any>>(
+  data: T[],
+  filename: string,
+  format: 'csv' | 'xlsx' | 'pdf',
+  headers?: string[]
+) => {
+  if (!data || data.length === 0) {
+    return;
+  }
+
+  switch (format) {
+    case 'csv':
+      exportToCSV(data, `${filename}.csv`, headers);
+      break;
+    case 'xlsx':
+      exportToExcel(data, `${filename}.xlsx`, headers);
+      break;
+    case 'pdf':
+      exportToPDF(data, `${filename}.pdf`, headers);
+      break;
+    default:
+      console.error('Unsupported export format');
+  }
 };

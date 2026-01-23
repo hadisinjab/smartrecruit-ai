@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/admin-card';
 import { Switch } from '@/components/ui/switch'
 import { FormStep, FormField } from '@/types/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { 
   ArrowLeft, 
   Plus, 
@@ -23,7 +24,8 @@ import {
   AlignLeft, 
   Upload, 
   Link as LinkIcon,
-  List
+  List,
+  Hash
 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
@@ -83,9 +85,10 @@ export default function CreateJobPage() {
     hiringManager: '',
     assignment_enabled: false,
     assignment_required: false,
-    assignment_type: 'text_only',
+    assignment_type: 'text_only' as 'text_only' | 'text_and_links' | 'video_upload',
     assignment_description: '',
-    assignment_weight: ''
+    assignment_weight: '',
+    assignment_timing: 'before'
   });
 
   const [formSteps, setFormSteps, clearFormSteps] = useAutoSave<FormStep[]>('create-job-form', [
@@ -96,6 +99,28 @@ export default function CreateJobPage() {
       fields: []
     }
   ]);
+
+  useEffect(() => {
+    console.log('Job data loaded from auto-save:', jobData);
+    const validAssignmentTypes = ['text_only', 'text_and_links', 'video_upload'];
+    
+    // Check if assignment_type needs to be fixed
+    if (jobData.assignment_enabled && jobData.assignment_type) {
+      if ((jobData.assignment_type as any) === 'file_upload') {
+        console.warn('Found file_upload in auto-saved data. Converting to video_upload.');
+        setJobData(prevData => ({
+          ...prevData,
+          assignment_type: 'video_upload'
+        }));
+      } else if (!validAssignmentTypes.includes(jobData.assignment_type)) {
+        console.warn('Invalid assignment_type found in auto-saved data. Resetting to default.');
+        setJobData(prevData => ({
+          ...prevData,
+          assignment_type: 'text_only'
+        }));
+      }
+    }
+  }, []);
 
   if (isReviewer) {
     return null;
@@ -223,8 +248,21 @@ export default function CreateJobPage() {
         assignment_required: !!(jobData as any).assignment_required,
         assignment_type: (jobData as any).assignment_enabled ? (jobData as any).assignment_type : null,
         assignment_description: (jobData as any).assignment_enabled ? (jobData as any).assignment_description : null,
-        assignment_weight: (jobData as any).assignment_enabled && (jobData as any).assignment_weight !== '' ? parseInt((jobData as any).assignment_weight) : null
+        assignment_weight: (jobData as any).assignment_enabled && (jobData as any).assignment_weight !== '' ? parseInt((jobData as any).assignment_weight) : null,
+        assignment_timing: (jobData as any).assignment_enabled ? (jobData as any).assignment_timing : 'before'
       };
+
+      // Fix assignment_type mapping
+      if (formData.assignment_type === 'file_upload') {
+        formData.assignment_type = 'video_upload';
+      }
+
+      console.log('--- Client Debug: formData to be sent ---');
+      console.log('assignment_enabled:', formData.assignment_enabled);
+      console.log('assignment_type (raw from jobData):', (jobData as any).assignment_type);
+      console.log('assignment_type (final in formData):', formData.assignment_type);
+      console.log('assignment_timing:', formData.assignment_timing);
+      console.log('----------------------------------------');
 
       const result = await createJob(formData);
       
@@ -242,6 +280,7 @@ export default function CreateJobPage() {
       router.refresh();
     } catch (error: any) {
       console.error('Error creating job:', error);
+      console.error('Error details:', error.details);
       addToast('error', `Failed to create job: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
@@ -252,6 +291,7 @@ export default function CreateJobPage() {
     switch (type) {
       case 'text': return <AlignLeft className="w-4 h-4" />;
       case 'textarea': return <FileText className="w-4 h-4" />;
+      case 'number': return <Hash className="w-4 h-4" />;
       case 'voice': return <Mic className="w-4 h-4" />;
       case 'file': return <Upload className="w-4 h-4" />;
       case 'url': return <LinkIcon className="w-4 h-4" />;
@@ -416,6 +456,7 @@ export default function CreateJobPage() {
                   <h3 className="text-lg font-semibold text-blue-900">{tCreate('formBuilder')}</h3>
                   <p className="text-sm text-blue-700">{tCreate('formBuilderDesc')}</p>
                 </div>
+
               </div>
 
               <div className="space-y-4 mb-6">
@@ -572,8 +613,11 @@ export default function CreateJobPage() {
                   <AlignLeft className="w-4 h-4 mr-2" /> {tCreate('shortText')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => addQuestion('textarea')}>
-                  <FileText className="w-4 h-4 mr-2" /> {tCreate('longText')}
-                </Button>
+                    <FileText className="w-4 h-4 mr-2" /> {tCreate('textArea')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => addQuestion('number')}>
+                    <Hash className="w-4 h-4 mr-2" /> {tCreate('numberInput')}
+                  </Button>
                 <Button variant="outline" size="sm" onClick={() => addQuestion('voice')} className="border-orange-200 text-orange-700 hover:bg-orange-50">
                   <Mic className="w-4 h-4 mr-2" /> {tCreate('voiceRecording')}
                 </Button>
@@ -651,61 +695,82 @@ export default function CreateJobPage() {
 
             {/* Assignment Configuration */}
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Assignment Configuration</h3>
+              <h3 className="text-lg font-semibold mb-4">{tCreate('assignment.title')}</h3>
 
-              <div className="flex items-center space-x-3 mb-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="assignment-enabled" className="cursor-pointer flex-grow">{tCreate('assignment.enable')}</Label>
                 <Switch
-                  checked={!!(jobData as any).assignment_enabled}
-                  onCheckedChange={(checked) => setJobData({ ...(jobData as any), assignment_enabled: checked })}
+                  id="assignment-enabled"
+                  checked={(jobData as any).assignment_enabled || false}
+                  onCheckedChange={(checked) => setJobData({ ...jobData, assignment_enabled: checked })}
                 />
-                <Label className="cursor-pointer">Enable Assignment for this job</Label>
               </div>
 
-              {!!(jobData as any).assignment_enabled && (
-                <div className="space-y-4">
-                  <div>
-                    <Label>Assignment Task Description</Label>
-                    <Textarea
-                      placeholder="e.g., Build a REST API using Node.js..."
-                      value={(jobData as any).assignment_description}
-                      onChange={(e) => setJobData({ ...(jobData as any), assignment_description: e.target.value })}
-                      rows={4}
+              {jobData.assignment_enabled && (
+                <div className="space-y-4 pt-4 border-t border-gray-200 mt-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="assignment-required" className="cursor-pointer flex-grow">{tCreate('assignment.required')}</Label>
+                    <Switch
+                      id="assignment-required"
+                      checked={(jobData as any).assignment_required || false}
+                      onCheckedChange={(checked) => setJobData({ ...jobData, assignment_required: checked })}
                     />
+                  </div>
+                  
+                  <div>
+                    <Label>{tCreate('assignment.timing')}</Label>
+                    <RadioGroup
+                      value={jobData.assignment_timing}
+                      onValueChange={(value: string) => setJobData({ ...jobData, assignment_timing: value as 'before' | 'after' })}
+                      className="flex gap-4 mt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="before" id="before" />
+                        <Label htmlFor="before">{tCreate('assignment.beforeInterview')}</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="after" id="after" />
+                        <Label htmlFor="after">{tCreate('assignment.afterInterview')}</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
 
                   <div>
-                    <Label>Assignment Type</Label>
+                    <Label>{tCreate('assignment.type')}</Label>
                     <Select
-                      value={(jobData as any).assignment_type}
-                      onValueChange={(value) => setJobData({ ...(jobData as any), assignment_type: value as any })}
+                      value={(jobData as any).assignment_type || 'text_only'}
+                      onValueChange={(value) => setJobData({ ...jobData, assignment_type: value as any })}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder={tCreate('assignment.selectType')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="text_only">Text Only (explanation/code)</SelectItem>
-                        <SelectItem value="text_and_links">Text + Links (GitHub, Video, Demo)</SelectItem>
+                        <SelectItem value="text_only">{tCreate('assignment.textOnly')}</SelectItem>
+                        <SelectItem value="text_and_links">{tCreate('assignment.url')}</SelectItem>
+                        <SelectItem value="video_upload">{tCreate('assignment.video')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="flex items-center space-x-3">
-                    <Switch
-                      checked={!!(jobData as any).assignment_required}
-                      onCheckedChange={(checked) => setJobData({ ...(jobData as any), assignment_required: checked })}
-                    />
-                    <Label className="cursor-pointer">Make assignment required</Label>
-                  </div>
-
                   <div>
-                    <Label>Assignment Weight (optional)</Label>
+                    <Label>{tCreate('assignment.description')}</Label>
+                    <Textarea
+                      value={(jobData as any).assignment_description || ''}
+                      onChange={(e) => setJobData({ ...jobData, assignment_description: e.target.value })}
+                      placeholder={tCreate('assignment.descriptionPlaceholder')}
+                      rows={4}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>{tCreate('assignment.weight')}</Label>
                     <Input
                       type="number"
-                      value={(jobData as any).assignment_weight}
-                      onChange={(e) => setJobData({ ...(jobData as any), assignment_weight: e.target.value })}
-                      placeholder="e.g. 30"
+                      value={(jobData as any).assignment_weight || ''}
+                      onChange={(e) => setJobData({ ...jobData, assignment_weight: e.target.value })}
+                      placeholder="e.g. 25"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Used later for AI scoring.</p>
+                    <p className="text-xs text-gray-500 mt-1">{tCreate('assignment.weightHint')}</p>
                   </div>
                 </div>
               )}

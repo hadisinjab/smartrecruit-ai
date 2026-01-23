@@ -34,7 +34,8 @@ import {
   Star,
   Clock,
   User,
-  Bot
+  Bot,
+  CircleDollarSign
 } from 'lucide-react';
 
 import { createClient } from '@/utils/supabase/client';
@@ -488,6 +489,30 @@ export default function CandidateDetailsPage() {
                     {t('details.appliedDate', { date: new Date(candidate.appliedDate).toLocaleDateString() })}
                   </span>
                 </div>
+                {(candidate as any).age ? (
+                  <div className='flex items-center space-x-3'>
+                    <User className='w-5 h-5 text-gray-400' />
+                    <span className='text-gray-700'>
+                      {(candidate as any).age} years old
+                    </span>
+                  </div>
+                ) : null}
+                {(candidate as any).experience ? (
+                  <div className='flex items-center space-x-3'>
+                    <FileText className='w-5 h-5 text-gray-400' />
+                    <span className='text-gray-700'>
+                      {(candidate as any).experience} years of experience
+                    </span>
+                  </div>
+                ) : null}
+                {!isReviewer && (candidate as any).desired_salary ? (
+                  <div className='flex items-center space-x-3'>
+                    <CircleDollarSign className='w-5 h-5 text-gray-400' />
+                    <span className='text-gray-700'>
+                      {(candidate as any).desired_salary}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               {/* Experience + Skills/Tags removed (not stored in DB) */}
             </Card>
@@ -499,7 +524,7 @@ export default function CandidateDetailsPage() {
                   <p className='text-sm text-gray-600'>{t('details.noAnswers')}</p>
                 ) : (
                   answers
-                    .filter(ans => !(isReviewer && (ans.label === 'Expected Salary' || ans.label === 'الراتب المتوقع')))
+                    .filter(ans => !(isReviewer && (ans.label === 'Desired Salary' || ans.label === 'الراتب المتوقع')))
                     .map((ans) => (
                     <div key={ans.id} className='p-3 border border-gray-200 rounded-lg'>
                       <p className='text-sm font-medium text-gray-900'>{ans.label || ans.questionId}</p>
