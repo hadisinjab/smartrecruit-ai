@@ -27,7 +27,7 @@ interface BasicInfoFieldsProps {
   onChange: (selected: string[]) => void;
 }
 
-export default function BasicInfoFields({ selectedFields, onChange }: BasicInfoFieldsProps) {
+export default function BasicInfoFields({ selectedFields = [], onChange }: BasicInfoFieldsProps) {
   const t = useTranslations('Jobs.create');
 
   const handleCheckboxChange = (field: string, checked: boolean) => {
@@ -48,7 +48,7 @@ export default function BasicInfoFields({ selectedFields, onChange }: BasicInfoF
             <input
               type="checkbox"
               id={`field-${field}`}
-              checked={selectedFields.includes(field)}
+              checked={selectedFields?.includes(field) || false}
               onChange={(e) => handleCheckboxChange(field, e.target.checked)}
               className="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
             />
