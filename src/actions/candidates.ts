@@ -168,6 +168,20 @@ export async function getCandidates(jobId?: string) {
       appliedDate: app.created_at,
       experience: experience, // Extracted from answers or direct column
       age: age, // Extracted from answers or direct column
+      desired_salary: app.desired_salary,
+      gender: app.gender,
+      date_of_birth: app.date_of_birth,
+      nationality: app.nationality,
+      marital_status: app.marital_status,
+      photo: app.photo,
+      country: app.country,
+      city: app.city,
+      education_level: app.education_level,
+      university_name: app.university_name,
+      major: app.major,
+      degree_file: app.degree_file,
+      languages: app.languages,
+      available_start_date: app.available_start_date,
       rating: latestHrEval.hr_score || 0,
       resumeUrl: app.resumes?.[0]?.file_url || '',
       linkedinUrl: app.external_profiles?.find((p: any) => p.type === 'linkedin')?.url || '',
@@ -244,6 +258,7 @@ export async function getCandidateById(id: string) {
         title,
         created_by,
         organization_id,
+        enabled_fields,
         organizations(name),
         creator:users(full_name)
       ),
@@ -412,6 +427,19 @@ export async function getCandidateById(id: string) {
     experience: experience || 0,
     age: age,
     desired_salary: (app as any).desired_salary,
+    gender: (app as any).gender,
+    date_of_birth: (app as any).date_of_birth,
+    nationality: (app as any).nationality,
+    marital_status: (app as any).marital_status,
+    photo: (app as any).photo,
+    country: (app as any).country,
+    city: (app as any).city,
+    education_level: (app as any).education_level,
+    university_name: (app as any).university_name,
+    major: (app as any).major,
+    degree_file: (app as any).degree_file,
+    languages: (app as any).languages,
+    available_start_date: (app as any).available_start_date,
     rating: latestHrEval.hr_score || 0,
     resumeUrl: app.resumes?.[0]?.file_url || '',
     linkedinUrl: app.external_profiles?.find((p: any) => p.type === 'linkedin')?.url || '',
@@ -423,6 +451,27 @@ export async function getCandidateById(id: string) {
     lastProgressAt: lastProgressAt || null,
     lastProgressMeta,
     ai_evaluations: app.ai_evaluations,
+    enabled_fields: (() => {
+      let raw = app.job_form?.enabled_fields;
+      if (typeof raw === 'string') {
+        try {
+          raw = JSON.parse(raw);
+        } catch (e) {
+          return [];
+        }
+      }
+      if (Array.isArray(raw)) {
+        if (raw.length === 0) return [];
+        const first = raw[0];
+        if (typeof first === 'string') {
+          return raw.map((f: string) => ({ field_id: f }));
+        }
+        if (typeof first === 'object' && first !== null && 'field_id' in first) {
+          return raw;
+        }
+      }
+      return [];
+    })(),
     hrFields: {
       priority: 'medium',
       notes: latestHrEval.hr_notes || '',

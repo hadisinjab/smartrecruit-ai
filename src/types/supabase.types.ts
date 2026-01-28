@@ -39,6 +39,20 @@ export interface Database {
           candidate_phone: string | null
           candidate_age: number | null
           experience: number | null
+          desired_salary?: number | null
+          gender?: string | null
+          date_of_birth?: string | null
+          nationality?: string | null
+          marital_status?: string | null
+          photo?: string | null
+          country?: string | null
+          city?: string | null
+          education_level?: string | null
+          university_name?: string | null
+          major?: string | null
+          degree_file?: string | null
+          languages?: string | null
+          available_start_date?: string | null
           status: string
           is_duplicate: boolean
           submitted_at: string | null

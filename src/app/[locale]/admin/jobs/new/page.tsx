@@ -31,6 +31,7 @@ import { useToast } from '@/context/ToastContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useUser } from '@/context/UserContext';
 import { createJob, getOrganizationUsers } from '@/actions/jobs';
+import BasicInfoFields from '@/components/admin/jobs/BasicInfoFields';
 
 export default function CreateJobPage() {
   const t = useTranslations('Jobs');
@@ -88,7 +89,8 @@ export default function CreateJobPage() {
     assignment_type: 'text_only' as 'text_only' | 'text_and_links' | 'video_upload',
     assignment_description: '',
     assignment_weight: '',
-    assignment_timing: 'before'
+    assignment_timing: 'before',
+    enabled_fields: [] as string[]
   });
 
   const [formSteps, setFormSteps, clearFormSteps] = useAutoSave<FormStep[]>('create-job-form', [
@@ -249,7 +251,8 @@ export default function CreateJobPage() {
         assignment_type: (jobData as any).assignment_enabled ? (jobData as any).assignment_type : null,
         assignment_description: (jobData as any).assignment_enabled ? (jobData as any).assignment_description : null,
         assignment_weight: (jobData as any).assignment_enabled && (jobData as any).assignment_weight !== '' ? parseInt((jobData as any).assignment_weight) : null,
-        assignment_timing: (jobData as any).assignment_enabled ? (jobData as any).assignment_timing : 'before'
+        assignment_timing: (jobData as any).assignment_enabled ? (jobData as any).assignment_timing : 'before',
+        enabled_fields: jobData.enabled_fields
       };
 
       // Fix assignment_type mapping
@@ -448,6 +451,11 @@ export default function CreateJobPage() {
                 </div>
               </div>
             </Card>
+
+            <BasicInfoFields 
+              selectedFields={jobData.enabled_fields}
+              onChange={(fields) => setJobData({...jobData, enabled_fields: fields})}
+            />
 
             {/* Form Builder Section */}
             <Card className="p-6 border-blue-200 bg-blue-50/30">

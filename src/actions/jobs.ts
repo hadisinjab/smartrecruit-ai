@@ -233,6 +233,39 @@ export async function getJobs(): Promise<Job[]> {
     postedDate: job.created_at,
     deadline: job.deadline || '',
     applicantsCount: counts[job.id] || 0,
+    enabled_fields: (() => {
+      let raw = job.enabled_fields;
+      
+      // Handle stringified JSON (common in Supabase for JSON/JSONB columns sometimes)
+      if (typeof raw === 'string') {
+        try {
+          raw = JSON.parse(raw);
+        } catch (e) {
+          console.error('Failed to parse enabled_fields:', e);
+          return [];
+        }
+      }
+
+      // Handle Array (either natively from Supabase or parsed from string)
+      if (Array.isArray(raw)) {
+        if (raw.length === 0) return [];
+        
+        // Check first element type
+        const first = raw[0];
+        
+        // Case 1: Array of strings ["candidate_name", "candidate_email"]
+        if (typeof first === 'string') {
+          return raw.map((f: string) => ({ field_id: f }));
+        }
+
+        // Case 2: Already in target format [{ field_id: "..." }]
+        if (typeof first === 'object' && first !== null && 'field_id' in first) {
+          return raw;
+        }
+      }
+      
+      return [];
+    })(),
     hiringManager: (() => {
       const raw = job.hiring_manager_name
       if (!raw) return 'Admin'
@@ -446,6 +479,7 @@ export async function createJob(formData: any) {
     assignment_description: formData.assignment_description || null,
     assignment_weight: formData.assignment_weight ?? null,
     assignment_timing: formData.assignment_timing || 'before',
+    enabled_fields: formData.enabled_fields || [],
     organization_id: userRow.organization_id
   };
 
@@ -600,6 +634,7 @@ export async function updateJob(id: string, formData: any) {
           evaluation_criteria: formData.evaluation_criteria,
           assignment_enabled: !!formData.assignment_enabled,
           assignment_required: !!formData.assignment_required,
+          enabled_fields: formData.enabled_fields || [],
           assignment_type: formData.assignment_type || null,
           assignment_description: formData.assignment_description || null,
           assignment_weight: formData.assignment_weight ?? null,

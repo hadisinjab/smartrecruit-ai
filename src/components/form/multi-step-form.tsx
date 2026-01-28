@@ -95,7 +95,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
           isValid = false;
           return;
         }
-        if ((field.type === 'text' || field.type === 'textarea' || field.type === 'url' || field.type === 'select' || field.type === 'email' || field.type === 'tel' || field.type === 'number')) {
+        if ((field.type === 'text' || field.type === 'textarea' || field.type === 'url' || field.type === 'select' || field.type === 'email' || field.type === 'tel' || field.type === 'number' || field.type === 'date')) {
           const isEmpty = !value || (typeof value === 'string' && value.trim() === '')
           if (isEmpty) {
             newErrors[field.id] = 'This field is required';
@@ -297,74 +297,59 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                   <p className='text-sm text-gray-600'>Please review your information before submitting.</p>
                 </div>
                 <div className='p-6 space-y-6'>
-                  <div className='grid grid-cols-1 gap-4'>
-                    <div className='rounded-lg border bg-gray-50 p-4'>
-                      <h3 className='text-sm font-semibold text-gray-800'>Applicant</h3>
-                      <dl className='mt-3 space-y-2 text-sm'>
-                        <div className='flex items-start justify-between gap-3'>
-                          <dt className='text-gray-500'>Name</dt>
-                          <dd className='text-gray-900 font-medium text-right'>{String(formData['candidate_name'] || '—')}</dd>
-                        </div>
-                        <div className='flex items-start justify-between gap-3'>
-                          <dt className='text-gray-500'>Email</dt>
-                          <dd className='text-gray-900 font-medium text-right break-all'>{String(formData['candidate_email'] || '—')}</dd>
-                        </div>
-                        <div className='flex items-start justify-between gap-3'>
-                          <dt className='text-gray-500'>Phone</dt>
-                          <dd className='text-gray-900 font-medium text-right'>{String(formData['candidate_phone'] || '—')}</dd>
-                        </div>
-                        <div className='flex items-start justify-between gap-3'>
-                          <dt className='text-gray-500'>Age</dt>
-                          <dd className='text-gray-900 font-medium text-right'>{String(formData['candidate_age'] || '—')}</dd>
-                        </div>
-                        <div className='flex items-start justify-between gap-3'>
-                          <dt className='text-gray-500'>Years of Experience</dt>
-                          <dd className='text-gray-900 font-medium text-right'>{String(formData['candidate_experience'] || '—')}</dd>
-                        </div>
-                        <div className='flex items-start justify-between gap-3'>
-                          <dt className='text-gray-500'>Desired Salary</dt>
-                          <dd className='text-gray-900 font-medium text-right'>{String(formData['desired_salary'] || '—')}</dd>
-                        </div>
-                      </dl>
-                    </div>
-                  </div>
-
                   <div className='rounded-xl border bg-white'>
                     <div className='border-b px-4 py-3'>
-                      <h3 className='text-sm font-semibold text-gray-800'>Text Answers</h3>
+                      <h3 className='text-sm font-semibold text-gray-800'>Your Answers</h3>
                     </div>
                     <div className='p-4 space-y-4'>
                       {steps
-                        .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
+                        .filter(s => s.id !== 'job' && s.id !== 'review')
                         .flatMap(s => s.fields)
-                        .filter(f => ['text', 'textarea', 'number', 'select'].includes(f.type))
-                        .map((f) => (
-                          <div key={f.id} className='rounded-lg border bg-gray-50 p-4'>
-                            <p className='text-xs font-medium text-gray-500'>{f.label}</p>
-                            <p className='mt-2 text-sm text-gray-900 whitespace-pre-wrap'>
-                              {formData[f.id] != null && formData[f.id] !== '' ? String(formData[f.id]) : '—'}
-                            </p>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-
-                  <div className='rounded-xl border bg-white'>
-                    <div className='border-b px-4 py-3'>
-                      <h3 className='text-sm font-semibold text-gray-800'>Media, Files & Links</h3>
-                    </div>
-                    <div className='p-4 space-y-4'>
-                      {steps
-                        .filter(s => s.id !== 'job' && s.id !== 'candidate' && s.id !== 'review')
-                        .flatMap(s => s.fields)
-                        .filter(f => ['voice', 'file', 'url'].includes(f.type))
-                        .map((f) => {
+                        .filter(f =>
+                          ['text', 'textarea', 'number', 'select', 'date', 'email', 'tel', 'url'].includes(f.type)
+                        )
+                        .filter(f => formData[f.id] != null && String(formData[f.id]).trim() !== '')
+                        .map(f => {
                           const v = formData[f.id]
-                          const isUrl = typeof v === 'string' && /^https?:\/\//i.test(v)
+                          const isUrl = f.type === 'url' && typeof v === 'string' && /^https?:\/\//i.test(v)
+                          return (
+                            <div key={f.id} className='rounded-lg border bg-gray-50 p-4'>
+                              <p className='text-xs font-medium text-gray-500'>{f.label}</p>
+                              {isUrl ? (
+                                <a
+                                  href={String(v)}
+                                  target='_blank'
+                                  rel='noopener noreferrer'
+                                  className='mt-2 block text-sm text-blue-700 hover:underline break-all'
+                                >
+                                  {String(v)}
+                                </a>
+                              ) : (
+                                <p className='mt-2 text-sm text-gray-900 whitespace-pre-wrap'>{String(v)}</p>
+                              )}
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+
+                  <div className='rounded-xl border bg-white'>
+                    <div className='border-b px-4 py-3'>
+                      <h3 className='text-sm font-semibold text-gray-800'>Media & Files</h3>
+                    </div>
+                    <div className='p-4 space-y-4'>
+                      {steps
+                        .filter(s => s.id !== 'job' && s.id !== 'review')
+                        .flatMap(s => s.fields)
+                        .filter(f => ['voice', 'file'].includes(f.type))
+                        .filter(f => formData[f.id] != null)
+                        .map(f => {
+                          const v = formData[f.id]
                           const voiceUrl =
                             v && typeof v === 'object' ? ((v as any).audio_url || (v as any).url || null) : null
                           const fileUrl = typeof v === 'string' ? v : null
-                          const fileName = v && typeof v === 'object' && 'name' in (v as any) ? String((v as any).name) : null
+                          const fileName =
+                            v && typeof v === 'object' && 'name' in (v as any) ? String((v as any).name) : fileUrl
 
                           return (
                             <div key={f.id} className='rounded-lg border bg-gray-50 p-4'>
@@ -378,21 +363,14 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                                   )
                                 ) : f.type === 'file' ? (
                                   fileUrl ? (
-                                    <a href={fileUrl} target='_blank' rel='noopener noreferrer' className='text-sm text-blue-700 hover:underline break-all'>
-                                      {fileName || fileUrl}
+                                    <a
+                                      href={fileUrl}
+                                      target='_blank'
+                                      rel='noopener noreferrer'
+                                      className='text-sm text-blue-700 hover:underline break-all'
+                                    >
+                                      {fileName}
                                     </a>
-                                  ) : (
-                                    <p className='text-sm text-gray-700'>—</p>
-                                  )
-                                ) : f.type === 'url' ? (
-                                  v ? (
-                                    isUrl ? (
-                                      <a href={String(v)} target='_blank' rel='noopener noreferrer' className='text-sm text-blue-700 hover:underline break-all'>
-                                        {String(v)}
-                                      </a>
-                                    ) : (
-                                      <p className='text-sm text-gray-900 break-all'>{String(v)}</p>
-                                    )
                                   ) : (
                                     <p className='text-sm text-gray-700'>—</p>
                                   )

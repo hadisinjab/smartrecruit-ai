@@ -66,6 +66,7 @@ export async function getJobForApplication(jobId: string): Promise<{
     assignment_description?: string | null
     assignment_timing?: 'before_interview' | 'after_interview' | null
     assignment_weight?: number | null
+    enabled_fields?: string[] | null
   }) | null
   questions: ApplyQuestion[]
   error: string | null
@@ -76,7 +77,7 @@ export async function getJobForApplication(jobId: string): Promise<{
     // Public can only see active jobs due to RLS policy.
     const { data: job, error: jobError } = await supabase
       .from('job_forms')
-      .select('*, assignment_enabled, assignment_timing')
+      .select('*, assignment_enabled, assignment_timing, enabled_fields')
       .eq('id', jobId)
       .single()
 
@@ -140,6 +141,7 @@ export async function getJobForApplication(jobId: string): Promise<{
         assignment_description: job.assignment_description ?? null,
         assignment_timing: job.assignment_timing ?? null,
         assignment_weight: job.assignment_weight ?? null,
+        enabled_fields: job.enabled_fields ?? [],
       },
       questions: mapped,
       error: null,
@@ -151,82 +153,83 @@ export async function getJobForApplication(jobId: string): Promise<{
 
 export async function beginApplication(payload: {
   jobId: string
-  candidateName?: string
-  candidateEmail?: string
-  candidatePhone?: string
-  candidateAge?: number
-  candidateExperience?: number
-  desiredSalary?: number
+  [key: string]: any;
 }): Promise<{ applicationId: string | null; error: string | null }> {
   try {
-    // Use admin client to bypass RLS for application creation
     const supabase = createTypedAdminClient()
-    // Always create a NEW application record.
-    // But if candidateName OR candidateEmail matches a prior application for the same job,
-    // mark it as duplicate so staff can see the repetition.
-    const candidateEmail = String(payload.candidateEmail || '').trim()
-    const candidateName = String(payload.candidateName || '').trim()
-    const candidatePhone = String(payload.candidatePhone || '').trim()
-    const candidateAge = payload.candidateAge || null
-    const candidateExperience = payload.candidateExperience || null
+    const { jobId, ...otherData } = payload;
+    const candidateEmail = String(otherData.candidate_email || '').trim();
+    const candidateName = String(otherData.candidate_name || '').trim();
 
-    const orParts: string[] = []
-    if (candidateEmail) orParts.push(`candidate_email.ilike.${candidateEmail}`)
-    if (candidateName) orParts.push(`candidate_name.ilike.${candidateName}`)
+    const orParts: string[] = [];
+    if (candidateEmail) orParts.push(`candidate_email.ilike.${candidateEmail}`);
+    if (candidateName) orParts.push(`candidate_name.ilike.${candidateName}`);
 
-    let matchedBy: 'email' | 'name' | 'email_or_name' | null = null
-    let matchedApplicationIds: string[] = []
-    let isDuplicate = false
+    let isDuplicate = false;
+    let matchedApplicationIds: string[] = [];
+    let matchedBy: 'email' | 'name' | 'email_or_name' | null = null;
 
     if (orParts.length) {
-      // Use admin client for duplicate checks (public anon client often can't SELECT due to RLS).
-      const admin = createTypedAdminClient()
+      const admin = createTypedAdminClient();
       const { data: existing } = await admin
         .from('applications')
         .select('id,submitted_at,candidate_email,candidate_name,created_at')
-        .eq('job_form_id', payload.jobId)
+        .eq('job_form_id', jobId)
         .or(orParts.join(','))
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(50);
 
-      const rows = existing || []
+      const rows = existing || [];
       if (rows.length) {
-        isDuplicate = true
-        matchedApplicationIds = rows.map((r) => r.id).filter(Boolean).slice(0, 25)
+        isDuplicate = true;
+        matchedApplicationIds = rows.map((r: any) => r.id).filter(Boolean).slice(0, 25);
         const emailMatch = !!rows.find(
-          (r) =>
+          (r: any) =>
             candidateEmail &&
             String(r.candidate_email || '').toLowerCase() === candidateEmail.toLowerCase()
-        )
+        );
         const nameMatch = !!rows.find(
-          (r) =>
+          (r: any) =>
             candidateName &&
             String(r.candidate_name || '').toLowerCase() === candidateName.toLowerCase()
-        )
-        if (emailMatch && nameMatch) matchedBy = 'email_or_name'
-        else if (emailMatch) matchedBy = 'email'
-        else if (nameMatch) matchedBy = 'name'
+        );
+        if (emailMatch && nameMatch) matchedBy = 'email_or_name';
+        else if (emailMatch) matchedBy = 'email';
+        else if (nameMatch) matchedBy = 'name';
       }
     }
 
+    const insertData: { [key: string]: any } = {
+      ...otherData,
+      job_form_id: jobId,
+      is_duplicate: isDuplicate,
+      duplicate_of: matchedApplicationIds,
+    };
+
+    for (const key in insertData) {
+      if (typeof insertData[key] === 'string') {
+        insertData[key] = insertData[key].trim();
+      }
+    }
+
+    if (insertData.candidate_age) insertData.candidate_age = Number(insertData.candidate_age) || null;
+    if (insertData.experience) insertData.experience = Number(insertData.experience) || null;
+    if (insertData.desired_salary) insertData.desired_salary = Number(insertData.desired_salary) || null;
+    if (insertData.languages && typeof insertData.languages === 'string') {
+      insertData.languages = insertData.languages.split(',').map((s: string) => s.trim());
+    }
+
+    console.log('Inserting application data:', JSON.stringify(insertData, null, 2));
+
     const { data: app, error } = await supabase
       .from('applications')
-      .insert({
-        job_form_id: payload.jobId,
-        candidate_name: candidateName,
-        candidate_email: candidateEmail,
-        candidate_phone: candidatePhone,
-        candidate_age: candidateAge,
-        experience: candidateExperience,
-        desired_salary: payload.desiredSalary || null,
-        is_duplicate: isDuplicate,
-        duplicate_of: matchedApplicationIds,
-      })
+      .insert(insertData)
       .select('id')
-      .single()
+      .single();
 
     if (error || !app) {
-      return { applicationId: null, error: error?.message || 'Failed to create application' }
+      console.error('Supabase insert error:', error);
+      return { applicationId: null, error: `Failed to create application: ${error?.message}` };
     }
 
     await recordProgress(app.id, 'candidate', isDuplicate ? 'begin_duplicate' : 'begin', {
@@ -235,13 +238,11 @@ export async function beginApplication(payload: {
       duplicate: isDuplicate,
       matchedBy,
       matchedApplicationIds,
-    }).catch(() => {})
+    }).catch(() => {});
 
-    // NOTE: We intentionally do NOT notify on begin/start; notifications are reserved for final events.
-
-    return { applicationId: app.id, error: null }
+    return { applicationId: app.id, error: null };
   } catch (e: any) {
-    return { applicationId: null, error: e?.message || 'Unexpected error' }
+    return { applicationId: null, error: e?.message || 'Unexpected error' };
   }
 }
 
@@ -308,42 +309,47 @@ export async function saveProgress(payload: {
 }
 
 export async function submitApplication(payload: {
-  applicationId: string
-  assignment?: {
-    text?: string | null
-    links?: string[] | null
-    video_url?: string | null
-  }
+  applicationId: string;
+  [key: string]: any;
 }): Promise<{ success: boolean; error: string | null }> {
   try {
-    const supabase = createTypedAdminClient()
+    const supabase = createTypedAdminClient();
+    const { applicationId, ...otherData } = payload;
 
     const { data: app, error: appErr } = await supabase
       .from('applications')
       .select('*, job_forms(*)')
-      .eq('id', payload.applicationId)
-      .single()
+      .eq('id', applicationId)
+      .single();
 
     if (appErr || !app) {
-      return { success: false, error: 'Application not found' }
+      return { success: false, error: 'Application not found' };
     }
 
     if (app.submitted_at) {
-      return { success: false, error: 'Application has already been submitted' }
+      return { success: false, error: 'Application has already been submitted' };
+    }
+
+    const updateData: { [key: string]: any } = {
+      ...otherData,
+      submitted_at: new Date().toISOString(),
+    };
+
+    // Type conversions and cleaning
+    if (updateData.candidate_age) updateData.candidate_age = Number(updateData.candidate_age) || null;
+    if (updateData.experience) updateData.experience = Number(updateData.experience) || null;
+    if (updateData.desired_salary) updateData.desired_salary = Number(updateData.desired_salary) || null;
+    if (updateData.languages && typeof updateData.languages === 'string') {
+      updateData.languages = updateData.languages.split(',').map((s: string) => s.trim());
     }
 
     const { error } = await supabase
       .from('applications')
-      .update({
-        submitted_at: new Date().toISOString(),
-        assignment_text: payload.assignment?.text,
-        assignment_links: payload.assignment?.links,
-        assignment_video_url: payload.assignment?.video_url,
-      })
-      .eq('id', payload.applicationId)
+      .update(updateData)
+      .eq('id', applicationId);
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: error.message };
     }
 
     await recordProgress(payload.applicationId, 'review', 'submit', {

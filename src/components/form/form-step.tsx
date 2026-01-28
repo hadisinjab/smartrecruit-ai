@@ -55,6 +55,7 @@ export const FormStepComponent: React.FC<FormStepComponentProps> = ({
       case 'text':
       case 'email':
       case 'tel':
+      case 'date':
         return <TextQuestion key={field.id} {...commonProps} />;
       case 'number':
         return <NumberQuestion key={field.id} {...commonProps} />;

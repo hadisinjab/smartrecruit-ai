@@ -33,6 +33,7 @@ import {
 
 export default function CandidatesPage() {
   const t = useTranslations('Candidates');
+  const tJobs = useTranslations('Jobs');
   const tCommon = useTranslations('Common');
   const tTable = useTranslations('Table');
   const tStatus = useTranslations('Status');
@@ -44,21 +45,22 @@ export default function CandidatesPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>([]);
-  const [filterName, setFilterName] = useState('');
-  const [filterAge, setFilterAge] = useState({ min: '', max: '' });
-  const [filterPhone, setFilterPhone] = useState('');
-  const [filterExperience, setFilterExperience] = useState({ min: '', max: '' });
-  const [filterEmail, setFilterEmail] = useState('');
-  // Filters state - using strings to allow empty/inactive state
+  const [selectedField, setSelectedField] = useState<string>('');
+  const [filterValue, setFilterValue] = useState('');
+  const [filterMin, setFilterMin] = useState('');
+  const [filterMax, setFilterMax] = useState('');
+  const [enabledFields, setEnabledFields] = useState<string[]>([]);
   const router = useRouter();
+  const tFilters = useTranslations('BasicInfo');
 
   // Support deep-linking: /admin/candidates?jobId=<id>
   useEffect(() => {
-    const jobIdFromQuery = searchParams?.get('jobId')
+    console.log('useEffect for selectedJobId triggered. ID:', selectedJobId); // New debug log
+    const jobIdFromQuery = searchParams?.get('jobId');
     if (jobIdFromQuery) {
-      setSelectedJobId(jobIdFromQuery)
+      setSelectedJobId(jobIdFromQuery);
     }
-  }, [searchParams])
+  }, [searchParams]);
 
   useEffect(() => {
     async function loadJobs() {
@@ -89,52 +91,105 @@ export default function CandidatesPage() {
     loadCandidates();
   }, [addToast, selectedJobId]);
 
-  // Re-run filters when basic filters change or when search is triggered
+  useEffect(() => {
+    const job = jobs.find(j => j.id === selectedJobId);
+    if (job) {
+      // Exclude file upload fields from the filter list as they cannot be searched by text value
+      const excludedFields = ['photo', 'degree_file'];
+      const fields = (job.enabled_fields || [])
+        .map(f => f.field_id)
+        .filter(f => f && !excludedFields.includes(f)) as string[];
+      setEnabledFields(fields);
+    } else {
+      setEnabledFields([]);
+    }
+    setSelectedField('');
+    setFilterValue('');
+    setFilterMin('');
+    setFilterMax('');
+  }, [selectedJobId, jobs]);
+
   useEffect(() => {
     let filtered = [...candidates];
+    
+    // Define numeric fields that require range filtering
+    const numericFields = ['candidate_age', 'desired_salary', 'experience'];
+    const isNumericField = numericFields.includes(selectedField);
 
-    // Apply specific filters
-    if (filterName) {
-      const lowerName = filterName.toLowerCase().trim();
-      filtered = filtered.filter(candidate =>
-        candidate.firstName.toLowerCase().startsWith(lowerName) ||
-        candidate.lastName.toLowerCase().startsWith(lowerName)
-      );
-    }
+    if (selectedField) {
+      if (isNumericField) {
+        // Range filtering for numeric fields
+        if (filterMin || filterMax) {
+          const min = filterMin ? parseFloat(filterMin) : Number.NEGATIVE_INFINITY;
+          const max = filterMax ? parseFloat(filterMax) : Number.POSITIVE_INFINITY;
 
-    if (filterAge.min || filterAge.max) {
-      const minAge = filterAge.min ? parseInt(filterAge.min, 10) : -Infinity;
-      const maxAge = filterAge.max ? parseInt(filterAge.max, 10) : Infinity;
-      filtered = filtered.filter(candidate => {
-        if (candidate.age === undefined || candidate.age === null) return false;
-        return candidate.age >= minAge && candidate.age <= maxAge;
-      });
-    }
+          filtered = filtered.filter(candidate => {
+            let fieldValue: number | undefined;
 
-    if (filterPhone) {
-      filtered = filtered.filter(candidate =>
-        candidate.phone?.includes(filterPhone)
-      );
-    }
+            // Map field IDs to candidate properties
+            switch (selectedField) {
+              case 'candidate_age':
+                // Check 'age' first (typed), then fallback to dynamic property
+                fieldValue = candidate.age !== undefined ? candidate.age : (candidate as any).candidate_age;
+                break;
+              case 'experience':
+                fieldValue = candidate.experience;
+                break;
+              case 'desired_salary':
+                // 'desired_salary' might be dynamic
+                fieldValue = (candidate as any).desired_salary;
+                break;
+              default:
+                // Try to parse as number if it's another field
+                const val = (candidate as any)[selectedField];
+                fieldValue = val ? parseFloat(val) : undefined;
+            }
 
-    if (filterExperience.min || filterExperience.max) {
-      const minExp = filterExperience.min ? parseInt(filterExperience.min, 10) : -Infinity;
-      const maxExp = filterExperience.max ? parseInt(filterExperience.max, 10) : Infinity;
-      filtered = filtered.filter(candidate => {
-        if (candidate.experience === undefined || candidate.experience === null) return false;
-        return candidate.experience >= minExp && candidate.experience <= maxExp;
-      });
-    }
+            // Ensure we have a valid number to compare
+            if (fieldValue === undefined || isNaN(fieldValue)) return false;
 
-    if (filterEmail) {
-      const lowerEmail = filterEmail.toLowerCase();
-      filtered = filtered.filter(candidate =>
-        candidate.email.toLowerCase().includes(lowerEmail)
-      );
+            return fieldValue >= min && fieldValue <= max;
+          });
+        }
+      } else if (filterValue && filterValue !== 'all_options') {
+        // Text filtering for non-numeric fields
+        const lowerFilterValue = filterValue.toLowerCase().trim();
+        filtered = filtered.filter(candidate => {
+          let fieldValue: any;
+
+          switch (selectedField) {
+            case 'candidate_name':
+              fieldValue = `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim();
+              break;
+            case 'candidate_email':
+              fieldValue = candidate.email;
+              break;
+            case 'candidate_phone':
+              fieldValue = candidate.phone;
+              break;
+            default:
+              fieldValue = (candidate as any)[selectedField];
+          }
+          
+          // Exact match for select fields (optional, but safer)
+          if (FIELD_OPTIONS[selectedField]) {
+             if (fieldValue === undefined || fieldValue === null) return false;
+             return String(fieldValue).toLowerCase() === lowerFilterValue;
+          }
+
+          if (typeof fieldValue === 'string') {
+            return fieldValue.toLowerCase().includes(lowerFilterValue);
+          }
+          if (fieldValue !== undefined && fieldValue !== null) {
+            return String(fieldValue).toLowerCase().includes(lowerFilterValue);
+          }
+          return false;
+        });
+      }
     }
 
     setFilteredCandidates(filtered);
-  }, [candidates, filterName, filterAge, filterPhone, filterExperience, filterEmail]);
+  }, [candidates, selectedField, filterValue, filterMin, filterMax]);
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -148,6 +203,12 @@ export default function CandidatesPage() {
       duplicate: 'bg-orange-100 text-orange-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
+  const FIELD_OPTIONS: Record<string, string[]> = {
+    gender: ['Male', 'Female', 'Other'],
+    marital_status: ['Single', 'Married', 'Divorced', 'Widowed'],
+    education_level: ["High School", "Diploma", "Bachelor's Degree", "Master's Degree", "PhD"]
   };
 
   const getPriorityColor = (priority: string) => {
@@ -286,9 +347,7 @@ export default function CandidatesPage() {
           <div className='flex flex-col lg:flex-row gap-4 items-start justify-between'>
             <div className='flex flex-col sm:flex-row gap-4 w-full lg:flex-1 flex-wrap'>
               <div className="w-full sm:w-[220px] flex-shrink-0">
-                <Select value={selectedJobId} onValueChange={(value) => {
-                  setSelectedJobId(value);
-                }}>
+                <Select value={selectedJobId} onValueChange={(value) => setSelectedJobId(value)}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={t('selectJob')} />
                   </SelectTrigger>
@@ -305,67 +364,68 @@ export default function CandidatesPage() {
                 </Select>
               </div>
 
-              <div className='relative w-full sm:w-[220px] flex-shrink-0'>
-                <input
-                  type='text'
-                  placeholder={t('filterBy.name')}
-                  className='w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={filterName}
-                  onChange={(e) => setFilterName(e.target.value)}
-                />
-              </div>
-              <div className='relative w-full sm:w-[220px] flex-shrink-0 flex items-center gap-2'>
-                <input
-                  type='number'
-                  placeholder={t('filterBy.ageMin')}
-                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={filterAge.min}
-                  onChange={(e) => setFilterAge(prev => ({ ...prev, min: e.target.value }))}
-                />
-                <span className="text-gray-500">-</span>
-                <input
-                  type='number'
-                  placeholder={t('filterBy.ageMax')}
-                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={filterAge.max}
-                  onChange={(e) => setFilterAge(prev => ({ ...prev, max: e.target.value }))}
-                />
-              </div>
-              <div className='relative w-full sm:w-[220px] flex-shrink-0'>
-                <input
-                  type='text'
-                  placeholder={t('filterBy.phone')}
-                  className='w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={filterPhone}
-                  onChange={(e) => setFilterPhone(e.target.value)}
-                />
-              </div>
-              <div className='relative w-full sm:w-[220px] flex-shrink-0 flex items-center gap-2'>
-                <input
-                  type='number'
-                  placeholder={t('filterBy.expMin')}
-                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={filterExperience.min}
-                  onChange={(e) => setFilterExperience(prev => ({ ...prev, min: e.target.value }))}
-                />
-                <span className="text-gray-500">-</span>
-                <input
-                  type='number'
-                  placeholder={t('filterBy.expMax')}
-                  className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={filterExperience.max}
-                  onChange={(e) => setFilterExperience(prev => ({ ...prev, max: e.target.value }))}
-                />
-              </div>
-              <div className='relative w-full sm:w-[220px] flex-shrink-0'>
-                <input
-                  type='email'
-                  placeholder={t('filterBy.email')}
-                  className='w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
-                  value={filterEmail}
-                  onChange={(e) => setFilterEmail(e.target.value)}
-                />
-              </div>
+              {selectedJobId !== 'all' && (
+                <>
+                  <div className="w-full sm:w-[220px] flex-shrink-0">
+                    <Select value={selectedField} onValueChange={setSelectedField} disabled={enabledFields.length === 0}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={t('selectField')} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px] overflow-y-auto w-[220px]">
+                        {enabledFields.map((field) => (
+                          <SelectItem key={field} value={field}>
+                            {tJobs(`create.fields.${field}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className='relative w-full sm:w-[220px] flex-shrink-0'>
+                    {['candidate_age', 'desired_salary', 'experience'].includes(selectedField) ? (
+                      <div className="flex gap-2">
+                        <input
+                          type='number'
+                          placeholder="Min"
+                          className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                          value={filterMin}
+                          onChange={(e) => setFilterMin(e.target.value)}
+                        />
+                        <input
+                          type='number'
+                          placeholder="Max"
+                          className='w-1/2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                          value={filterMax}
+                          onChange={(e) => setFilterMax(e.target.value)}
+                        />
+                      </div>
+                    ) : FIELD_OPTIONS[selectedField] ? (
+                      <Select value={filterValue} onValueChange={setFilterValue}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={t('filterBy.value')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all_options">{tCommon('viewAll') || 'All'}</SelectItem>
+                          {FIELD_OPTIONS[selectedField].map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <input
+                        type='text'
+                        placeholder={t('filterBy.value')}
+                        className='w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm'
+                        value={filterValue}
+                        onChange={(e) => setFilterValue(e.target.value)}
+                        disabled={!selectedField}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             <div className='flex gap-2 flex-wrap'>
               <DropdownMenu>
@@ -392,7 +452,7 @@ export default function CandidatesPage() {
                       addToast('error', 'Failed to export data');
                     }
                   }}>
-                    {t('Common.exportReviewerComplete')}
+                    {tCommon('exportReviewerComplete')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
                      exportData(filteredCandidates, 'candidates', 'csv');

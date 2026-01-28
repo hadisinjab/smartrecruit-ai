@@ -33,6 +33,7 @@ export interface Job {
   hiringManager: string;
   creatorName?: string; // New field for creator's name
   organizationName?: string; // New field for organization name (Super Admin only)
+  enabled_fields?: { field_id: string }[]; // Added enabled_fields
   evaluation_criteria?: {
     id: string;
     type: string;
@@ -60,6 +61,21 @@ export interface Candidate {
   position: string;
   experience: number;
   age?: number; // Added age field
+  desired_salary?: number;
+  gender?: string;
+  date_of_birth?: string;
+  nationality?: string;
+  marital_status?: string;
+  photo?: string;
+  country?: string;
+  city?: string;
+  education_level?: string;
+  university_name?: string;
+  major?: string;
+  degree_file?: string;
+  languages?: string;
+  available_start_date?: string;
+  enabled_fields?: { field_id: string }[]; // Added enabled_fields
   // Note: applications table uses 'new' / 'duplicate' early in the funnel too.
   status: 'new' | 'duplicate' | 'applied' | 'screening' | 'interview' | 'offer' | 'hired' | 'rejected';
   appliedDate: string;

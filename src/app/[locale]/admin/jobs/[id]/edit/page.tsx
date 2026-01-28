@@ -34,6 +34,7 @@ import { useToast } from '@/context/ToastContext';
 import { useUser } from '@/context/UserContext';
 import { getJob, updateJob, getOrganizationUsers } from '@/actions/jobs';
 import { Loader2 } from 'lucide-react';
+import BasicInfoFields from '@/components/admin/jobs/BasicInfoFields';
 
 export default function EditJobPage({ params }: { params: { id: string; locale?: string } }) {
   const t = useTranslations('Jobs');
@@ -79,7 +80,8 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
     assignment_type: 'text_only' as 'text_only' | 'text_and_links' | 'video_upload',
     assignment_description: '',
     assignment_weight: '',
-    assignment_timing: 'before' as 'before' | 'after'
+    assignment_timing: 'before' as 'before' | 'after',
+    enabled_fields: [] as string[]
   });
 
   const [formSteps, setFormSteps] = useState<FormStep[]>([
@@ -156,7 +158,8 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             assignment_type: assignmentType as any,
             assignment_description: String((job as any).assignment_description || ''),
             assignment_weight: String((job as any).assignment_weight ?? ''),
-            assignment_timing: (job as any).assignment_timing || 'before'
+            assignment_timing: (job as any).assignment_timing || 'before',
+            enabled_fields: (job as any).enabled_fields || []
         });
 
         // If there are questions, load them into formSteps
@@ -306,7 +309,8 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
         assignment_type: jobData.assignment_enabled ? jobData.assignment_type : null,
         assignment_description: jobData.assignment_enabled ? jobData.assignment_description : null,
         assignment_weight: jobData.assignment_enabled && jobData.assignment_weight !== '' ? parseInt(jobData.assignment_weight as any) : null,
-        assignment_timing: jobData.assignment_enabled ? jobData.assignment_timing : 'before'
+        assignment_timing: jobData.assignment_enabled ? jobData.assignment_timing : 'before',
+        enabled_fields: jobData.enabled_fields || []
       };
 
       await updateJob(params.id, formData);
@@ -491,6 +495,11 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
               </div>
             </div>
           </Card>
+
+          <BasicInfoFields 
+            selectedFields={jobData.enabled_fields}
+            onChange={(fields) => setJobData({...jobData, enabled_fields: fields})}
+          />
 
           {/* Form Builder Section */}
           <Card className="p-6 border-blue-200 bg-blue-50/30">

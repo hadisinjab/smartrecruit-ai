@@ -81,6 +81,7 @@ export default function CandidateDetailsPage() {
     async function loadCandidate() {
       try {
         const data = await getCandidateById(candidateId);
+        console.log('Fetched candidate data:', data); // DEBUG
         if (data) {
           setCandidate(data as unknown as Candidate);
           const a = (data as any).answers || [];
@@ -425,10 +426,18 @@ export default function CandidateDetailsPage() {
             <Card className='p-6'>
               <div className='flex items-start justify-between mb-6'>
                 <div className='flex items-center space-x-4'>
-                  <div className='w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center'>
-                    <span className='text-white text-xl font-medium'>
-                      {candidate.firstName[0]}{candidate.lastName[0]}
-                    </span>
+                  <div className='w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden relative'>
+                    {candidate.photo ? (
+                      <img 
+                        src={candidate.photo} 
+                        alt={`${candidate.firstName} ${candidate.lastName}`}
+                        className='w-full h-full object-cover'
+                      />
+                    ) : (
+                      <span className='text-white text-xl font-medium'>
+                        {candidate.firstName[0]}{candidate.lastName[0]}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <h1 className='text-2xl font-bold text-gray-900'>
@@ -450,11 +459,14 @@ export default function CandidateDetailsPage() {
                 </span>
               </div>
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-6'>
+                {/* Always show applied date and status info as they are system fields, not user input */}
                 <div className='flex items-center space-x-3'>
-                  <Mail className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>{candidate.email}</span>
+                  <Calendar className='w-5 h-5 text-gray-400' />
+                  <span className='text-gray-700'>
+                    {t('details.appliedDate', { date: new Date(candidate.appliedDate).toLocaleDateString() })}
+                  </span>
                 </div>
-                <div className='flex items-center space-x-3'>
+                 <div className='flex items-center space-x-3'>
                   <Clock className='w-5 h-5 text-gray-400' />
                   <span className='text-gray-700'>
                     {(() => {
@@ -475,44 +487,118 @@ export default function CandidateDetailsPage() {
                     })()}
                   </span>
                 </div>
-                <div className='flex items-center space-x-3'>
-                  <Phone className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>{candidate.phone}</span>
-                </div>
-                <div className='flex items-center space-x-3'>
-                  <MapPin className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>{candidate.location}</span>
-                </div>
-                <div className='flex items-center space-x-3'>
-                  <Calendar className='w-5 h-5 text-gray-400' />
-                  <span className='text-gray-700'>
-                    {t('details.appliedDate', { date: new Date(candidate.appliedDate).toLocaleDateString() })}
-                  </span>
-                </div>
-                {(candidate as any).age ? (
-                  <div className='flex items-center space-x-3'>
-                    <User className='w-5 h-5 text-gray-400' />
-                    <span className='text-gray-700'>
-                      {(candidate as any).age} years old
-                    </span>
-                  </div>
-                ) : null}
-                {(candidate as any).experience ? (
-                  <div className='flex items-center space-x-3'>
-                    <FileText className='w-5 h-5 text-gray-400' />
-                    <span className='text-gray-700'>
-                      {(candidate as any).experience} years of experience
-                    </span>
-                  </div>
-                ) : null}
-                {!isReviewer && (candidate as any).desired_salary ? (
-                  <div className='flex items-center space-x-3'>
-                    <CircleDollarSign className='w-5 h-5 text-gray-400' />
-                    <span className='text-gray-700'>
-                      {(candidate as any).desired_salary}
-                    </span>
-                  </div>
-                ) : null}
+
+                {/* Dynamic Fields - Show only enabled fields if configuration exists */}
+                {(() => {
+                  // Get enabled fields from candidate data
+                  // Note: strict filtering is currently disabled to ensure all data is shown
+                  const enabledFields = candidate.enabled_fields?.map(f => f.field_id.toLowerCase().trim()) || [];
+                  const hasEnabledFieldsConfig = enabledFields.length > 0;
+                  
+                  const getLanguagesValue = (val: any) => {
+                    if (!val) return null;
+                    if (Array.isArray(val)) return val.join(', ');
+                    if (typeof val === 'string') {
+                      val = val.trim();
+                      if (val.startsWith('[') && val.endsWith(']')) {
+                        try {
+                           const parsed = JSON.parse(val);
+                           return Array.isArray(parsed) ? parsed.join(', ') : val;
+                        } catch (e) {
+                           return val;
+                        }
+                      }
+                    }
+                    return val;
+                  };
+
+                  const fieldConfig: Record<string, { icon: any, label: string, value: any }> = {
+                    // Standard keys matching DB columns
+                    candidate_name: { icon: User, label: 'Name', value: `${candidate.firstName} ${candidate.lastName}` },
+                    candidate_email: { icon: Mail, label: 'Email', value: candidate.email },
+                    candidate_phone: { icon: Phone, label: 'Phone', value: candidate.phone },
+                    candidate_age: { icon: User, label: 'Age', value: (candidate as any).age ? `${(candidate as any).age} years` : null },
+                    experience: { icon: FileText, label: 'Experience', value: (candidate as any).experience ? `${(candidate as any).experience} years` : null },
+                    desired_salary: { icon: CircleDollarSign, label: 'Salary', value: (candidate as any).desired_salary },
+                    gender: { icon: User, label: 'Gender', value: (candidate as any).gender },
+                    date_of_birth: { icon: Calendar, label: 'DOB', value: (candidate as any).date_of_birth },
+                    nationality: { icon: Globe, label: 'Nationality', value: (candidate as any).nationality },
+                    marital_status: { icon: User, label: 'Marital Status', value: (candidate as any).marital_status },
+                    country: { icon: MapPin, label: 'Country', value: (candidate as any).country },
+                    city: { icon: MapPin, label: 'City', value: (candidate as any).city },
+                    education_level: { icon: FileText, label: 'Education', value: (candidate as any).education_level },
+                    university_name: { icon: FileText, label: 'University', value: (candidate as any).university_name },
+                    major: { icon: FileText, label: 'Major', value: (candidate as any).major },
+                    languages: { icon: Globe, label: 'Languages', value: getLanguagesValue((candidate as any).languages) },
+                    available_start_date: { icon: Calendar, label: 'Start Date', value: (candidate as any).available_start_date },
+                    location: { icon: MapPin, label: 'Location', value: candidate.location },
+                    degree_file: { 
+                      icon: FileText, 
+                      label: 'Degree File', 
+                      value: (candidate as any).degree_file ? (
+                        <a href={(candidate as any).degree_file} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          {t('details.downloadFile') || 'Download'}
+                        </a>
+                      ) : null 
+                    },
+                    photo: {
+                      icon: User,
+                      label: 'Photo',
+                      value: candidate.photo ? (
+                        <a href={candidate.photo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          {t('details.viewPhoto') || 'View Photo'}
+                        </a>
+                      ) : null
+                    },
+
+                    // Aliases for common variations in enabled_fields
+                    name: { icon: User, label: 'Name', value: `${candidate.firstName} ${candidate.lastName}` },
+                    email: { icon: Mail, label: 'Email', value: candidate.email },
+                    phone: { icon: Phone, label: 'Phone', value: candidate.phone },
+                    age: { icon: User, label: 'Age', value: (candidate as any).age ? `${(candidate as any).age} years` : null },
+                    salary: { icon: CircleDollarSign, label: 'Salary', value: (candidate as any).desired_salary },
+                    dob: { icon: Calendar, label: 'DOB', value: (candidate as any).date_of_birth },
+                    education: { icon: FileText, label: 'Education', value: (candidate as any).education_level },
+                    university: { icon: FileText, label: 'University', value: (candidate as any).university_name },
+                    degree: { icon: FileText, label: 'Degree File', value: (candidate as any).degree_file },
+                    start_date: { icon: Calendar, label: 'Start Date', value: (candidate as any).available_start_date }
+                  };
+
+                  // Use enabled fields from job form configuration if available
+                  const fieldsToShow = hasEnabledFieldsConfig 
+                    ? enabledFields 
+                    : [
+                        'candidate_name', 'candidate_email', 'candidate_phone', 'candidate_age', 
+                        'gender', 'marital_status', 'nationality', 'country', 'city', 'location',
+                        'experience', 'education_level', 'university_name', 'major',
+                        'desired_salary', 'languages', 'available_start_date', 'date_of_birth',
+                        'degree_file'
+                      ];
+
+                  return fieldsToShow.map((fieldId) => {
+                    const config = fieldConfig[fieldId];
+                    // Only render if there is a truthy value (or 0)
+                    if (!config || config.value === null || config.value === undefined || config.value === '') return null;
+
+                    const Icon = config.icon;
+                    
+                    return (
+                      <div key={fieldId} className='flex items-start space-x-3 p-1'>
+                        <div className='mt-1'>
+                          <Icon className='w-5 h-5 text-gray-400' />
+                        </div>
+                        <div className='flex flex-col'>
+                          <span className='text-xs font-medium text-gray-500 uppercase tracking-wide'>
+                            {config.label}
+                          </span>
+                          <span className='text-sm font-medium text-gray-900'>
+                            {config.value}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
               {/* Experience + Skills/Tags removed (not stored in DB) */}
             </Card>

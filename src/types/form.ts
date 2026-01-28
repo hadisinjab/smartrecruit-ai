@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export interface FormField {
   id: string;
-  type: 'text' | 'number' | 'textarea' | 'voice' | 'file' | 'url' | 'select' | 'email' | 'tel';
+  type: 'text' | 'number' | 'textarea' | 'voice' | 'file' | 'url' | 'select' | 'email' | 'tel' | 'date';
   label: string;
   placeholder?: string;
   required?: boolean;

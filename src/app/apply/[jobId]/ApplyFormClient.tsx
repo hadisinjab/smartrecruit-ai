@@ -4,10 +4,11 @@ import React, { useMemo, useState } from 'react'
 import { MultiStepForm } from '@/components/form/multi-step-form'
 import type { FormField, FormStep, FormData } from '@/types/form'
 import type { ApplyQuestion } from '@/actions/applications'
-import { submitApplication, beginApplication } from '@/actions/applications'
+import { submitApplication, beginApplication, saveProgress } from '@/actions/applications'
 import { createAssignment } from '@/actions/assignments'
 import { createClient } from '@/utils/supabase/client'
-import { Card } from '@/components/ui/card'
+import { useToast } from '@/context/ToastContext';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button'
 
 type ApplyJob = {
@@ -68,11 +69,163 @@ async function uploadResume(file: File, jobId: string) {
 
 export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jobId }: Props) {
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const { addToast } = useToast();
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [applicationId, setApplicationId] = useState<string | null>(null)
+  const allPossibleFields: FormField[] = useMemo(() => [
+    {
+      id: 'candidate_name',
+      type: 'text',
+      label: 'Full Name',
+      placeholder: 'Enter your full name',
+      required: true,
+    },
+    {
+      id: 'candidate_email',
+      type: 'text',
+      label: 'Email Address',
+      placeholder: 'you@example.com',
+      required: true,
+      validation: {
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        message: 'Invalid email format',
+      },
+    },
+    {
+      id: 'candidate_phone',
+      type: 'text',
+      label: 'Phone Number',
+      required: true,
+    },
+    {
+      id: 'candidate_age',
+      type: 'number',
+      label: 'What is your age?',
+      required: true,
+    },
+    {
+      id: 'desired_salary',
+      type: 'number',
+      label: 'What is your desired salary?',
+      required: true,
+    },
+    {
+      id: 'experience',
+      type: 'number',
+      label: 'How many years of experience do you have?',
+      required: true,
+    },
+    {
+      id: 'gender',
+      type: 'select',
+      label: 'Gender',
+      options: ['Male', 'Female', 'Other'],
+      required: true,
+    },
+    {
+      id: 'date_of_birth',
+      type: 'date',
+      label: 'Date of Birth',
+      required: true,
+    },
+    {
+      id: 'nationality',
+      type: 'text',
+      label: 'What is your nationality?',
+      required: true,
+    },
+    {
+      id: 'marital_status',
+      type: 'select',
+      label: 'What is your marital status?',
+      options: ['Single', 'Married', 'Divorced', 'Widowed'],
+      required: true,
+    },
+    {
+      id: 'photo',
+      type: 'file',
+      label: 'Please upload your photo',
+      required: true,
+    },
+    {
+      id: 'country',
+      type: 'text',
+      label: 'Country of Residence',
+      required: true,
+    },
+    {
+      id: 'city',
+      type: 'text',
+      label: 'City of Residence',
+      required: true,
+    },
+    {
+      id: 'education_level',
+      type: 'select',
+      label: 'What is your highest education level?',
+      options: ["High School", "Diploma", "Bachelor's Degree", "Master's Degree", "PhD"],
+      required: true,
+    },
+    {
+      id: 'university_name',
+      type: 'text',
+      label: 'What is the name of your university?',
+      required: true,
+    },
+    {
+      id: 'major',
+      type: 'text',
+      label: 'What is your major?',
+      required: true,
+    },
+    {
+      id: 'degree_file',
+      type: 'file',
+      label: 'Please upload your degree/certificate',
+      required: true,
+    },
+    {
+      id: 'languages',
+      type: 'text',
+      label: 'What languages do you speak? (comma-separated)',
+      required: true,
+    },
+    {
+      id: 'available_start_date',
+      type: 'date',
+      label: 'When are you available to start?',
+      required: true,
+    },
+  ], []);
+
+  const processAndUploadFiles = async (data: FormData, jobId: string) => {
+    const processedData = { ...data };
+    const fileFields = allPossibleFields.filter(f => f.type === 'file');
+
+    for (const field of fileFields) {
+      const file = processedData[field.id];
+      if (file instanceof File) {
+        const { url, error } = await uploadResume(file, jobId);
+        if (error) {
+          throw new Error(`Error uploading ${field.label}: ${error}`);
+        }
+        processedData[field.id] = url;
+      }
+    }
+    return processedData;
+  };
 
   const steps: FormStep[] = useMemo(() => {
+
+    const defaultFields = ['candidate_name', 'candidate_email', 'desired_salary'];
+    const enabledFields =
+      (job as any).enabled_fields && (job as any).enabled_fields.length > 0
+        ? (job as any).enabled_fields
+        : defaultFields;
+    const dynamicBaseFields = allPossibleFields.filter(field =>
+      (enabledFields as string[]).includes(field.id)
+    );
 
     const formatMoney = (amount: any, currency: string) => {
       const n = typeof amount === 'number' ? amount : Number(amount)
@@ -192,47 +345,11 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       },
     ]
 
-    const baseFields: FormField[] = [
-      {
-        id: 'candidate_name',
-        type: 'text',
-        label: 'Full name',
-        placeholder: 'Enter your full name',
-        required: true
-      },
-      {
-        id: 'candidate_email',
-        type: 'text',
-        label: 'Email',
-        placeholder: 'you@example.com',
-        required: true,
-        validation: {
-          pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-          message: 'Please enter a valid email address'
-        }
-      },
-      { id: 'candidate_phone', type: 'tel', label: 'Phone Number', required: true },
-      { id: 'candidate_age', type: 'number', label: 'Age', required: true },
-      {
-        id: 'candidate_experience',
-        type: 'number',
-        label: 'Years of Experience',
-        required: true
-      },
-      {
-        id: 'desired_salary',
-        type: 'number',
-        label: 'Desired Salary',
-        placeholder: 'Enter your desired salary',
-        required: false
-      }
-    ]
-
     s.splice(1, 0, {
       id: 'candidate',
       title: 'Your Information',
       description: 'Please provide your contact and basic information.',
-      fields: baseFields
+      fields: dynamicBaseFields
     })
 
     if (textQuestions.length) {
@@ -288,82 +405,41 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     setSubmitError(null)
     setSubmitting(true)
     try {
-      const candidateName = String(data.candidate_name || '').trim()
-      const candidateEmail = String(data.candidate_email || '').trim()
-      const candidatePhone = String(data.candidate_phone || '').trim()
-      const candidateAge = Number(data.candidate_age || 0)
-      const candidateExperience = Number(data.candidate_experience || 0)
-      const desiredSalary = Number(data.desired_salary || 0)
+      const candidateName = String(data.candidate_name || '')
+      const candidateEmail = String(data.candidate_email || '')
 
-      if (!candidateName || !candidateEmail) {
-        setSubmitError('Please provide your name and email.')
-        return
-      }
-      let app_id = applicationId
-      if (!app_id) {
-        const started = await beginApplication({ jobId, candidateName, candidateEmail, candidatePhone, candidateAge, candidateExperience, desiredSalary })
-        if (started.error) {
-          setSubmitError(started.error)
-          return
-        }
-        setApplicationId(started.applicationId)
-        app_id = started.applicationId
+      let appId = applicationId;
+      if (!appId) {
+        setSubmitError('Could not create an application. Please go back and try again.');
+        setSubmitting(false);
+        return;
       }
 
-      if (!app_id) {
-        setSubmitError('Failed to get application ID')
+      if (!appId) {
+        setSubmitError('Failed to create application.')
         return
       }
 
-      // Ensure file-answers have URLs (FileUploadQuestion uploads immediately, but keep a fallback here)
-      const fileUrlByQuestionId: Record<string, string | null> = {}
-      for (const q of allQuestions) {
-        if (q.type !== 'file') continue
-        const v = data[q.id]
-        if (typeof v === 'string' && v) {
-          fileUrlByQuestionId[q.id] = v
-          continue
-        }
-        if (v && typeof v === 'object' && (v as any).uploading) {
-          setSubmitError('Please wait for file uploads to finish before submitting.')
-          return
-        }
-        if (v && typeof v === 'object' && v instanceof File) {
-          const { url, error } = await uploadResume(v, jobId)
-          if (error) {
-            setSubmitError(error)
-            return
-          }
-          fileUrlByQuestionId[q.id] = url
-          continue
-        }
-        fileUrlByQuestionId[q.id] = null
-      }
-
-      // Resume URL: keep using first file question as "resume" for the resumes table (legacy behavior)
-      const firstFileQ = allQuestions.find((q) => q.type === 'file')
-      const resumeUrl = firstFileQ ? (fileUrlByQuestionId[firstFileQ.id] || null) : null
+      const finalData = await processAndUploadFiles(data, jobId);
 
       const answers = allQuestions.map((q) => {
-        const v = data[q.id]
+        const v = finalData[q.id]
         if (q.type === 'voice') {
           // VoiceQuestion stores structured JSON after upload (audio_url, duration, etc.)
-          if (v && typeof v === 'object' && (v as any).uploading) {
-            setSubmitError('Please wait for voice uploads to finish before submitting.')
-            throw new Error('voice_upload_pending')
-          }
           return { questionId: q.id, value: null, voiceData: v || null }
         }
-        if (q.type === 'file') {
-          // Persist each file answer URL to the DB
-          return { questionId: q.id, value: fileUrlByQuestionId[q.id] || null, voiceData: null }
-        }
+        // For file type, the URL is already in finalData
         return { questionId: q.id, value: v == null ? null : String(v), voiceData: null }
       })
 
+      // Save answers
+      await saveProgress({ applicationId: appId, answers });
+
+      // Submit application (final step)
       const res = await submitApplication({
-        applicationId: app_id,
-      })
+        applicationId: appId,
+        ...finalData,
+      });
 
       if (res.error) {
         setSubmitError(res.error)
@@ -395,7 +471,7 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         const hasAny = !!textFields || (Array.isArray(linkFields) && linkFields.length > 0)
         if (hasAny || required) {
           const created = await createAssignment({
-            application_id: app_id,
+            application_id: appId,
             type: assignmentType,
             text_fields: textFields || undefined,
             link_fields: linkFields || undefined,
@@ -456,29 +532,28 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
         }
         onFirstStepComplete={async (data) => {
           try {
-            const name = String(data.candidate_name || '').trim()
-            const email = String(data.candidate_email || '').trim()
-            const phone = String(data.candidate_phone || '').trim()
-            const age = Number(data.candidate_age || 0)
-            const experience = Number(data.candidate_experience || 0)
-            const desiredSalary = Number(data.desired_salary || 0)
+            const name = String(data.candidate_name || '').trim();
+            const email = String(data.candidate_email || '').trim();
 
             if (!applicationId && name && email) {
-              const res = await beginApplication({ 
-                jobId, 
-                candidateName: name, 
-                candidateEmail: email,
-                candidatePhone: phone,
-                candidateAge: age,
-                candidateExperience: experience,
-                desiredSalary
-              })
-              if (!res.error) {
-                setApplicationId(res.applicationId)
-                return res.applicationId
+              const processedData = await processAndUploadFiles(data, jobId);
+              const res = await beginApplication({
+                jobId,
+                ...processedData,
+              });
+
+              if (res.error || !res.applicationId) {
+                setSubmitError(res.error || 'An unknown error occurred and the application could not be created.');
+              } else {
+                setApplicationId(res.applicationId);
+                addToast('success', 'Data saved successfully');
+                return res.applicationId;
               }
             }
-          } catch {}
+          } catch (e: any) {
+            setSubmitting(false);
+            setSubmitError(e.message || 'An unexpected error occurred.');
+          }
         }}
       />
 
