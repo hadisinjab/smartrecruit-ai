@@ -193,8 +193,9 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     },
     {
       id: 'available_start_date',
-      type: 'date',
+      type: 'select',
       label: 'When are you available to start?',
+      options: ['Immediately', 'After 1 week', 'After 2 weeks', 'After 1 month', 'More than 1 month'],
       required: true,
     },
   ], []);

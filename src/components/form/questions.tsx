@@ -27,7 +27,7 @@ export const TextQuestion: React.FC<QuestionComponentProps> = ({
       </Label>
       <Input
         id={field.id}
-        type='text'
+        type={field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
         placeholder={field.placeholder}
         value={value as string || ''}
         onChange={(e) => onChange(e.target.value)}
