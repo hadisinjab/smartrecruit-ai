@@ -178,7 +178,14 @@ export default function CandidatesPage() {
           }
 
           if (typeof fieldValue === 'string') {
-            return fieldValue.toLowerCase().includes(lowerFilterValue);
+            // Case-insensitive check
+            const val = fieldValue.toLowerCase();
+            const filter = lowerFilterValue;
+
+            // Check if all parts of the filter string are present in the value (order-insensitive)
+            // e.g. "syria damascus" should match "Damascus, Syria"
+            const filterParts = filter.split(/\s+/).filter(Boolean);
+            return filterParts.every(part => val.includes(part));
           }
           if (fieldValue !== undefined && fieldValue !== null) {
             return String(fieldValue).toLowerCase().includes(lowerFilterValue);
