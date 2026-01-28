@@ -437,9 +437,18 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       await saveProgress({ applicationId: appId, answers });
 
       // Submit application (final step)
+      // Filter finalData to only include static fields defined in allPossibleFields
+      // This prevents dynamic question IDs (UUIDs) from being sent as columns to the applications table
+      const staticData: Record<string, any> = {};
+      allPossibleFields.forEach(field => {
+        if (finalData[field.id] !== undefined) {
+          staticData[field.id] = finalData[field.id];
+        }
+      });
+      
       const res = await submitApplication({
         applicationId: appId,
-        ...finalData,
+        ...staticData,
       });
 
       if (res.error) {
