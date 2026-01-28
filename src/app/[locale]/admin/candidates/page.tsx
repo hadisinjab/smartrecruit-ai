@@ -15,7 +15,7 @@ import { Candidate, Job } from '@/types/admin';
 import { Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/context/ToastContext';
-import { exportData, transformCandidateToReviewerData } from '@/utils/exportUtils';
+import { exportData, transformCandidateToReviewerData, formatForExport, exportCandidatesListPDF } from '@/utils/exportUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -445,7 +445,8 @@ export default function CandidatesPage() {
                       const ids = filteredCandidates.map(c => c.id);
                       const fullData = await getCandidatesForExport(ids);
                       const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
-                      exportData(transformedData, 'candidates_reviewer_complete', 'xlsx');
+                      const formattedData = formatForExport(transformedData);
+                      exportData(formattedData, 'candidates_reviewer_complete', 'xlsx');
                       addToast('success', 'Reviewer data exported successfully');
                     } catch (error) {
                       console.error('Export failed:', error);
@@ -454,21 +455,50 @@ export default function CandidatesPage() {
                   }}>
                     {tCommon('exportReviewerComplete')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                     exportData(filteredCandidates, 'candidates', 'csv');
-                     addToast('success', 'Candidates exported successfully');
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      addToast('info', 'Preparing filtered data export...');
+                      const ids = filteredCandidates.map(c => c.id);
+                      const fullData = await getCandidatesForExport(ids);
+                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
+                      const formattedData = formatForExport(transformedData);
+                      exportData(formattedData, 'candidates_export_filtered', 'csv');
+                      addToast('success', 'Filtered candidates exported successfully');
+                    } catch (error) {
+                      console.error('Export failed:', error);
+                      addToast('error', 'Failed to export data');
+                    }
                    }}>
                      CSV
                    </DropdownMenuItem>
-                   <DropdownMenuItem onClick={() => {
-                     exportData(filteredCandidates, 'candidates', 'xlsx');
-                     addToast('success', 'Candidates exported successfully');
+                   <DropdownMenuItem onClick={async () => {
+                    try {
+                      addToast('info', 'Preparing filtered data export...');
+                      const ids = filteredCandidates.map(c => c.id);
+                      const fullData = await getCandidatesForExport(ids);
+                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
+                      const formattedData = formatForExport(transformedData);
+                      exportData(formattedData, 'candidates_export_filtered', 'xlsx');
+                      addToast('success', 'Filtered candidates exported successfully');
+                    } catch (error) {
+                      console.error('Export failed:', error);
+                      addToast('error', 'Failed to export data');
+                    }
                    }}>
                      Excel
                    </DropdownMenuItem>
-                   <DropdownMenuItem onClick={() => {
-                     exportData(filteredCandidates, 'candidates', 'pdf');
-                     addToast('success', 'Candidates exported successfully');
+                   <DropdownMenuItem onClick={async () => {
+                    try {
+                      addToast('info', 'Preparing filtered data export...');
+                      const ids = filteredCandidates.map(c => c.id);
+                      const fullData = await getCandidatesForExport(ids);
+                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
+                      exportCandidatesListPDF(transformedData, 'candidates_export_filtered.pdf');
+                      addToast('success', 'Filtered candidates exported successfully');
+                    } catch (error) {
+                      console.error('Export failed:', error);
+                      addToast('error', 'Failed to export data');
+                    }
                    }}>
                      PDF
                    </DropdownMenuItem>

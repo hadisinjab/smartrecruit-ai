@@ -19,7 +19,7 @@ import { useToast } from '@/context/ToastContext';
 import { getAssignmentsByApplication } from '@/actions/assignments';
 import { InterviewsList } from '@/components/admin/interviews/InterviewsList';
 import { InterviewDialog } from '@/components/admin/interviews/InterviewDialog';
-import { transformCandidateToReviewerData, exportData } from '@/utils/exportUtils';
+import { transformCandidateToReviewerData, exportData, exportCandidateReportPDF, exportCandidatesListPDF, formatForExport } from '@/utils/exportUtils';
 import { getSystemSettings } from '@/actions/settings';
 import {
   ArrowLeft,
@@ -362,7 +362,12 @@ export default function CandidateDetailsPage() {
           fullCandidateData.assignments || [],
           fullCandidateData.ai_evaluations?.[0] || null
         );
-        exportData([transformedData], `candidate-${candidate?.firstName}-${candidate?.lastName}`, exportFormat);
+        
+        if (exportFormat === 'pdf') {
+          exportCandidateReportPDF(fullCandidateData, `candidate-${candidate?.firstName}-${candidate?.lastName}.pdf`);
+        } else {
+          exportData([transformedData], `candidate-${candidate?.firstName}-${candidate?.lastName}`, exportFormat);
+        }
       }
     } catch (error) {
       console.error('Failed to export candidate data:', error);
