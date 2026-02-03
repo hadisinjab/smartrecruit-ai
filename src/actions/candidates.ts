@@ -570,8 +570,79 @@ export async function getCandidatesForExport(candidateIds: string[]) {
     // Enrich answers with labels
     const enrichedAnswers = (app.answers || []).map((ans: any) => ({
       ...ans,
-      label: qMap.get(ans.question_id)?.label || ans.question_id
+      label: qMap.get(ans.question_id)?.label || ans.question_id,
+      type: qMap.get(ans.question_id)?.type || ans.type
     }));
+
+    // Extract age and experience from answers or use direct columns
+    let age: number | undefined = app.candidate_age;
+    let experience: number = app.experience || 0;
+    
+    if ((age === undefined || experience === 0) && enrichedAnswers.length > 0) {
+      enrichedAnswers.forEach((answer: any) => {
+        if (answer.value) {
+          const valueStr = String(answer.value).toLowerCase();
+          
+          // Look for age-related patterns
+          if (age === undefined) {
+            const agePatterns = [
+              /i am (\d+) years? old/,
+              /my age is (\d+)/,
+              /age:?(\d+)/,
+              /عمري (\d+)/,
+              /العمر:?(\d+)/,
+              /عمر:?(\d+)/
+            ];
+            
+            for (const pattern of agePatterns) {
+              const match = valueStr.match(pattern);
+              if (match) {
+                age = parseInt(match[1]);
+                break;
+              }
+            }
+            
+            if (age === undefined && (valueStr.includes('age') || valueStr.includes('عمر'))) {
+              const ageMatch = valueStr.match(/\d+/);
+              if (ageMatch) {
+                const num = parseInt(ageMatch[0]);
+                if (num >= 15 && num <= 100) age = num;
+              }
+            }
+          }
+          
+          // Look for experience-related patterns
+          if (experience === 0) {
+            const expPatterns = [
+              /(\d+) years? of experience/,
+              /experience:?(\d+)/,
+              /خبرة (\d+)/,
+              /سنوات الخبرة:?(\d+)/,
+              /(\d+) سنو?ات خبرة/,
+              /(\d+) years? experience/,
+              /(\d+)\s+years?(?!.*old)/,
+              /(\d+)\s+سنو?ات(?!.*عمر)/
+            ];
+            
+            for (const pattern of expPatterns) {
+              const match = valueStr.match(pattern);
+              if (match) {
+                experience = parseInt(match[1]);
+                break;
+              }
+            }
+            
+            if (experience === 0 && (valueStr.includes('experience') || valueStr.includes('خبرة'))) {
+              const expMatch = valueStr.match(/\d+/);
+              if (expMatch) {
+                const num = parseInt(expMatch[0]);
+                if (num >= 0 && num <= 50) experience = num;
+              }
+            }
+          }
+        }
+      });
+    }
 
     return {
       ...app,
@@ -581,7 +652,8 @@ export async function getCandidatesForExport(candidateIds: string[]) {
       position: app.job_form?.title || 'Unknown Position',
       status: app.status || 'applied',
       appliedDate: app.created_at,
-      experience: 0, // Placeholder
+      experience: experience,
+      age: age,
       rating: latestHrEval.hr_score || 0,
       hrFields: {
         priority: 'medium',

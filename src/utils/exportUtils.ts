@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 
 // Interface for reviewer data with complete details
 export interface ReviewerExportData {
+  [key: string]: any;
   candidateName: string;
   candidateEmail: string;
   candidatePhone: string;
@@ -13,6 +14,7 @@ export interface ReviewerExportData {
   experience: number;
   age?: number;
   gender?: string;
+  dateOfBirth?: string;
   nationality?: string;
   maritalStatus?: string;
   educationLevel?: string;
@@ -46,33 +48,36 @@ export interface ReviewerExportData {
   interviewDetails: string;
   organizationName?: string;
   jobOwnerName?: string;
-  answers?: string;
   tags?: string;
   source?: string;
 }
 
-export const FIELD_LABELS: Record<keyof ReviewerExportData, string> = {
+export const FIELD_LABELS: Record<string, string> = {
+  // 1-19 Basic Info Fields
   candidateName: 'Name',
   candidateEmail: 'Email',
   candidatePhone: 'Phone',
-  position: 'Position',
-  status: 'Status',
-  appliedDate: 'Applied Date',
-  experience: 'Experience',
   age: 'Age',
+  experience: 'Experience',
+  desiredSalary: 'Expected Salary',
   gender: 'Gender',
+  dateOfBirth: 'Date of Birth',
   nationality: 'Nationality',
   maritalStatus: 'Marital Status',
+  photoUrl: 'Photo URL',
+  country: 'Country',
+  city: 'City',
   educationLevel: 'Education',
   universityName: 'University',
   major: 'Major',
-  country: 'Country',
-  city: 'City',
-  languages: 'Languages',
-  desiredSalary: 'Expected Salary',
-  availableStartDate: 'Start Date',
-  photoUrl: 'Photo URL',
   degreeFileUrl: 'Degree File URL',
+  languages: 'Languages',
+  availableStartDate: 'Start Date',
+
+  // Other Fields
+  position: 'Position',
+  status: 'Status',
+  appliedDate: 'Applied Date',
   resumeUrl: 'Resume URL',
   voiceRecordingUrl: 'Voice Recording',
   location: 'Location',
@@ -94,7 +99,6 @@ export const FIELD_LABELS: Record<keyof ReviewerExportData, string> = {
   interviewDetails: 'Interview Details',
   organizationName: 'Organization',
   jobOwnerName: 'Job Owner',
-  answers: 'Q&A',
   tags: 'Tags',
   source: 'Source'
 };
@@ -102,12 +106,28 @@ export const FIELD_LABELS: Record<keyof ReviewerExportData, string> = {
 export const formatForExport = (data: ReviewerExportData[]): Record<string, any>[] => {
   return data.map(item => {
     const formatted: Record<string, any> = {};
-    (Object.keys(item) as Array<keyof ReviewerExportData>).forEach(key => {
-      // Use label if available, otherwise keep original key
-      // We only include keys that are present in the item
-      const label = FIELD_LABELS[key] || key;
-      formatted[label] = item[key];
+    
+    // First map standard fields to ensure order
+    Object.keys(FIELD_LABELS).forEach(key => {
+      // For the 19 basic info fields, we want them to appear even if undefined/null
+      const val = item[key];
+      if (val !== undefined && val !== null) {
+        formatted[FIELD_LABELS[key]] = val;
+      } else {
+         // Optionally force empty string for key fields to ensure column existence?
+         // In Excel/CSV, columns are usually derived from the first row or union of all keys.
+         // To ensure order, we should probably set it to '' if it's one of our main fields.
+         formatted[FIELD_LABELS[key]] = '';
+      }
     });
+
+    // Then map any dynamic fields (like custom questions)
+    Object.keys(item).forEach(key => {
+      if (!FIELD_LABELS[key] && item[key] !== undefined && item[key] !== null) {
+        formatted[key] = item[key];
+      }
+    });
+
     return formatted;
   });
 };
@@ -125,16 +145,6 @@ export const transformCandidateToReviewerData = (candidate: any, assignments: an
   const assignmentLinks = assignments.map((a: any) => 
     a.link_fields?.join(', ') || ''
   ).filter(Boolean).join('; ');
-
-  // Process answers
-  const answersText = candidate.answers?.map((ans: any) => {
-    let val = ans.value;
-    // Handle voice/file specially if needed in text
-    if (ans.type === 'voice' || ans.voice_data) val = '[Voice Recording]';
-    if (ans.type === 'file') val = `[File: ${ans.fileName || ans.value}]`;
-    
-    return `${ans.questions?.label || ans.label || ans.question_id}: ${val || 'No answer'}`;
-  }).join('\n');
 
   // Find voice recording
   const voiceAnswer = candidate.answers?.find((a: any) => a.type === 'voice' || a.voice_data);
@@ -159,7 +169,7 @@ export const transformCandidateToReviewerData = (candidate: any, assignments: an
     }
   };
 
-  return {
+  const result: ReviewerExportData = {
     candidateName: `${candidate.first_name || candidate.firstName || candidate.candidate_name || ''}`,
     candidateEmail: candidate.email || candidate.candidate_email || '',
     candidatePhone: candidate.phone || candidate.candidate_phone || 'N/A',
@@ -169,6 +179,7 @@ export const transformCandidateToReviewerData = (candidate: any, assignments: an
     experience: candidate.experience || 0,
     age: candidate.age || candidate.candidate_age,
     gender: candidate.gender,
+    dateOfBirth: candidate.date_of_birth,
     nationality: candidate.nationality,
     maritalStatus: candidate.marital_status,
     educationLevel: candidate.education_level,
@@ -202,10 +213,50 @@ export const transformCandidateToReviewerData = (candidate: any, assignments: an
     interviewDetails: interviewDetails,
     organizationName: candidate.job_form?.organizations?.name,
     jobOwnerName: candidate.job_form?.creator?.full_name,
-    answers: answersText,
     tags: Array.isArray(candidate.tags) ? candidate.tags.join(', ') : candidate.tags || '',
     source: candidate.source || 'N/A'
   };
+
+  // Dynamically add individual answers as top-level fields
+  // We filter to ONLY include File type answers or "Enable File" questions,
+  // as per user request to exclude general Q&A but keep tangible files/fields.
+  if (candidate.answers && Array.isArray(candidate.answers)) {
+    candidate.answers.forEach((ans: any) => {
+      const label = ans.questions?.label || ans.label || ans.question_id;
+      if (!label) return;
+
+      // Normalize label for checking
+      const normalizedLabel = String(label).toLowerCase();
+      
+      // Check if it is a File/Voice question OR explicitly "Enable File"
+      // We also include if the type is explicitly 'file' or 'voice'
+      // AND we exclude if it's just a regular text question (unless it says "Enable File")
+      const isFileOrVoice = ans.type === 'file' || ans.type === 'voice' || 
+                            normalizedLabel.includes('enable file') || 
+                            normalizedLabel.includes('upload') ||
+                            normalizedLabel.includes('resume') ||
+                            normalizedLabel.includes('cv');
+
+      if (!isFileOrVoice) return;
+
+      let value = ans.value;
+      
+      // If it's a file or voice, ensure we provide the URL if available
+      if (ans.type === 'file') {
+        value = ans.value;
+      } else if (ans.type === 'voice') {
+        value = ans.voice_data?.audio_url || ans.value;
+      }
+
+      if (result[label] === undefined) {
+        result[label] = value;
+      } else {
+        result[`${label} (Question)`] = value;
+      }
+    });
+  }
+
+  return result;
 };
 
 export const exportToCSV = <T extends Record<string, any>>(
@@ -213,7 +264,12 @@ export const exportToCSV = <T extends Record<string, any>>(
   filename: string,
   headers?: string[]
 ) => {
-  const csvHeaders = headers || Object.keys(data[0]);
+  // Use provided headers or derive them, but ensure we respect the order if data comes pre-formatted via formatForExport
+  // formatForExport already ensures the order of keys in the object, 
+  // but Set/Object.keys order isn't guaranteed in all environments (though mostly is in modern JS).
+  // For CSV, it's safer to explicitly gather all unique keys if headers aren't provided.
+  const csvHeaders = headers || Array.from(new Set(data.flatMap(d => Object.keys(d))));
+  
   const worksheet = XLSX.utils.json_to_sheet(data, { header: csvHeaders });
   const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
 
@@ -232,11 +288,11 @@ export const exportToExcel = <T extends Record<string, any>>(
   filename: string,
   headers?: string[]
 ) => {
-  const csvHeaders = headers || Object.keys(data[0]);
+  const csvHeaders = headers || Array.from(new Set(data.flatMap(d => Object.keys(d))));
   const worksheet = XLSX.utils.json_to_sheet(data, { header: csvHeaders });
 
   // Columns that contain long text should be wider and wrapped
-  const longTextCols = ['Q&A', 'Assignment Solutions', 'HR Notes', 'AI Summary', 'Missing Skills'];
+  const longTextCols = ['Assignment Solutions', 'HR Notes', 'AI Summary', 'Missing Skills'];
 
   // Auto-size columns with limits and text wrapping
   const colWidths = csvHeaders.map(header => {
@@ -266,7 +322,17 @@ export const exportToExcel = <T extends Record<string, any>>(
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Candidates');
-  XLSX.writeFile(workbook, filename);
+  
+  // Use XLSX.write to get buffer and create Blob manually for consistent download behavior
+  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 export const exportToPDF = <T extends Record<string, any>>(
@@ -284,7 +350,7 @@ export const exportToPDF = <T extends Record<string, any>>(
     format: 'a2'
   });
 
-  const tableHeaders = headers || Object.keys(data[0]);
+  const tableHeaders = headers || Array.from(new Set(data.flatMap(d => Object.keys(d))));
   
   // Transform data for autotable
   const tableData = data.map(row => 
@@ -339,100 +405,93 @@ export const exportToPDF = <T extends Record<string, any>>(
 };
 
 export const exportCandidatesListPDF = (data: ReviewerExportData[], filename: string) => {
-  // Use A3 Landscape for more width
+  // Use A2 Landscape for maximum width
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
-    format: 'a3'
+    format: 'a2'
   });
 
-  const group1Keys: (keyof ReviewerExportData)[] = [
-    'candidateName', 'candidateEmail', 'candidatePhone', 'position', 'status', 
-    'appliedDate', 'location', 'experience', 'educationLevel', 'universityName', 'availableStartDate'
-  ];
-  
-  const group2Keys: (keyof ReviewerExportData)[] = [
-    'candidateName', // Repeat Name for reference
-    'hrScore', 'hrDecision', 'hrNotes', 
-    'aiMatchScore', 'aiQualificationSummary', 'aiMissingSkills',
-    'assignmentSolutions', 'answers'
+  // Explicitly define all 19 fields + Evaluation fields
+  const allKeys: (keyof ReviewerExportData)[] = [
+    'candidateName',
+    'candidateEmail',
+    'candidatePhone',
+    'age',
+    'experience',
+    'desiredSalary',
+    'gender',
+    'dateOfBirth',
+    'nationality',
+    'maritalStatus',
+    'photoUrl',
+    'country',
+    'city',
+    'educationLevel',
+    'universityName',
+    'major',
+    'degreeFileUrl',
+    'languages',
+    'availableStartDate',
+    // Evaluation Fields
+    'hrScore',
+    'hrDecision',
+    'aiMatchScore'
   ];
 
   // Helper to extract rows based on keys
   const getRows = (keys: (keyof ReviewerExportData)[]) => {
     return data.map(row => keys.map(k => {
       const val = row[k];
-      // Handle potential object values if any remain (though ReviewerExportData implies strings/numbers)
       if (typeof val === 'object' && val !== null) return JSON.stringify(val);
-      return val ?? '';
+      return val ?? 'N/A'; // Ensure N/A shows for empty values
     }));
   };
 
-  const headers1 = group1Keys.map(k => FIELD_LABELS[k] || k);
-  const rows1 = getRows(group1Keys);
-  
-  const headers2 = group2Keys.map(k => FIELD_LABELS[k] || k);
-  const rows2 = getRows(group2Keys);
+  const headers = allKeys.map(k => FIELD_LABELS[k] || k);
+  const rows = getRows(allKeys);
 
-  // --- Table 1: Basic Information ---
+  // --- Single Large Table ---
   doc.setFontSize(14);
   doc.setTextColor(41, 128, 185);
-  doc.text('Candidates List - Basic Information', 14, 15);
+  doc.text('Candidates List - Complete Data', 14, 15);
   
   autoTable(doc, {
     startY: 20,
-    head: [headers1],
-    body: rows1,
+    head: [headers],
+    body: rows,
     styles: { 
-      fontSize: 8, 
-      cellPadding: 2, 
+      fontSize: 7, 
+      cellPadding: 1.5, 
       overflow: 'linebreak',
-      halign: 'left'
+      halign: 'left',
+      valign: 'middle'
     },
     headStyles: { 
       fillColor: [41, 128, 185],
       textColor: 255,
       fontStyle: 'bold',
-      halign: 'center'
+      halign: 'center',
+      fontSize: 8
     },
     alternateRowStyles: { fillColor: [245, 247, 250] },
     columnStyles: {
-      0: { fontStyle: 'bold' } // Name bold
+      0: { fontStyle: 'bold', cellWidth: 30 } // Name bold
     },
-    margin: { top: 20 }
-  });
-
-  // --- Table 2: Evaluation Details ---
-  doc.addPage();
-  doc.setFontSize(14);
-  doc.setTextColor(41, 128, 185);
-  doc.text('Candidates List - Evaluation Details', 14, 15);
-
-  autoTable(doc, {
-    startY: 20,
-    head: [headers2],
-    body: rows2,
-    styles: { 
-      fontSize: 8, 
-      cellPadding: 2, 
-      overflow: 'linebreak', // Crucial for long notes/answers
-      halign: 'left'
-    },
-    headStyles: { 
-      fillColor: [39, 174, 96], // Different color for distinction
-      textColor: 255,
-      fontStyle: 'bold',
-      halign: 'center'
-    },
-    alternateRowStyles: { fillColor: [245, 247, 250] },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 40 }, // Name fixed width
-      3: { cellWidth: 50 }, // HR Notes
-      5: { cellWidth: 50 }, // AI Summary
-      7: { cellWidth: 60 }, // Assignments
-      8: { cellWidth: 60 }  // Answers
-    },
-    margin: { top: 20 }
+    margin: { top: 20 },
+    didDrawCell: (data) => {
+      // Add links for Photo and Degree File
+      if (data.section === 'body') {
+        const key = allKeys[data.column.index];
+        if (key === 'photoUrl' || key === 'degreeFileUrl') {
+          const rawValue = data.cell.raw;
+          if (rawValue && rawValue !== 'N/A' && String(rawValue).startsWith('http')) {
+            doc.setTextColor(0, 0, 255);
+            doc.textWithLink('Link', data.cell.x + 2, data.cell.y + data.cell.height / 2 + 1, { url: String(rawValue) });
+          }
+        }
+      }
+    }
   });
 
   // Footer

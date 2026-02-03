@@ -207,19 +207,19 @@ export default function CreateJobPage() {
     if (!jobData.title) missingFields.push('Title');
     if (!jobData.department) missingFields.push('Department');
     if (!jobData.location) missingFields.push('Location');
-    if (!jobData.type) missingFields.push('Type');
-    if (!jobData.description) missingFields.push('Description');
-    if (!jobData.salary.min) missingFields.push('Salary Min');
-    if (!jobData.salary.max) missingFields.push('Salary Max');
-    if (!jobData.deadline) missingFields.push('Deadline');
-    if (!jobData.hiringManager) missingFields.push('Hiring Manager');
+    // if (!jobData.type) missingFields.push('Type');
+    // if (!jobData.description) missingFields.push('Description');
+    // if (!jobData.salary.min) missingFields.push('Salary Min');
+    // if (!jobData.salary.max) missingFields.push('Salary Max');
+    // if (!jobData.deadline) missingFields.push('Deadline');
+    // if (!jobData.hiringManager) missingFields.push('Hiring Manager');
     
     // Check if at least one requirement and benefit is added and not empty
-    const hasRequirements = jobData.requirements.some(r => r.trim() !== '');
-    if (!hasRequirements) missingFields.push('Requirements');
+    // const hasRequirements = jobData.requirements.some(r => r.trim() !== '');
+    // if (!hasRequirements) missingFields.push('Requirements');
 
-    const hasBenefits = jobData.benefits.some(b => b.trim() !== '');
-    if (!hasBenefits) missingFields.push('Benefits');
+    // const hasBenefits = jobData.benefits.some(b => b.trim() !== '');
+    // if (!hasBenefits) missingFields.push('Benefits');
 
     if (missingFields.length > 0) {
       addToast('error', `Please fill in all required fields: ${missingFields.join(', ')}`);

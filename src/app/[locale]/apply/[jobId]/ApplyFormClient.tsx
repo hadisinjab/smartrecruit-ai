@@ -123,10 +123,20 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
     const salaryCurrency = String((job as any)?.salary_currency || 'USD')
     const salaryMinText = formatMoney(salaryMin, salaryCurrency)
     const salaryMaxText = formatMoney(salaryMax, salaryCurrency)
-    const salaryText =
-      salaryMinText && salaryMaxText
-        ? `${salaryMinText} - ${salaryMaxText}`
-        : salaryMinText || salaryMaxText || null
+    
+    let salaryText: string | null = null
+    if (salaryMin || salaryMax) {
+      if (salaryMin && salaryMax) {
+        salaryText = `${salaryMinText} - ${salaryMaxText}`
+      } else {
+        salaryText = salaryMinText || salaryMaxText || null
+      }
+      
+      // If result is "$0" or "$0 - $0", hide it
+      if (salaryText === '$0' || salaryText === '$0 - $0') {
+        salaryText = null
+      }
+    }
 
     const normalizeList = (v: any): string[] => {
       if (!v) return []
