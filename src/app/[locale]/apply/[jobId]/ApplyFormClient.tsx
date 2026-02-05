@@ -118,23 +118,19 @@ export default function ApplyFormClient({ job, textQuestions, mediaQuestions, jo
       }
     }
 
-    const salaryMin = (job as any)?.salary_min ?? null
-    const salaryMax = (job as any)?.salary_max ?? null
+    const salaryMin = (job as any)?.salary_min || 0
+    const salaryMax = (job as any)?.salary_max || 0
     const salaryCurrency = String((job as any)?.salary_currency || 'USD')
     const salaryMinText = formatMoney(salaryMin, salaryCurrency)
     const salaryMaxText = formatMoney(salaryMax, salaryCurrency)
     
     let salaryText: string | null = null
-    if (salaryMin || salaryMax) {
-      if (salaryMin && salaryMax) {
+    // Only show salary if values are positive
+    if (salaryMin > 0 || salaryMax > 0) {
+      if (salaryMin > 0 && salaryMax > 0) {
         salaryText = `${salaryMinText} - ${salaryMaxText}`
       } else {
-        salaryText = salaryMinText || salaryMaxText || null
-      }
-      
-      // If result is "$0" or "$0 - $0", hide it
-      if (salaryText === '$0' || salaryText === '$0 - $0') {
-        salaryText = null
+        salaryText = (salaryMin > 0 ? salaryMinText : salaryMaxText) || null
       }
     }
 

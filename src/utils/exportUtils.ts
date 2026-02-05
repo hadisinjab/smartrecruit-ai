@@ -103,28 +103,58 @@ export const FIELD_LABELS: Record<string, string> = {
   source: 'Source'
 };
 
+export const ORDERED_BASIC_KEYS = [
+  'candidateName',
+  'candidateEmail',
+  'candidatePhone',
+  'age',
+  'experience',
+  'desiredSalary',
+  'gender',
+  'dateOfBirth',
+  'nationality',
+  'maritalStatus',
+  'photoUrl',
+  'country',
+  'city',
+  'educationLevel',
+  'universityName',
+  'major',
+  'degreeFileUrl',
+  'languages',
+  'availableStartDate'
+];
+
 export const formatForExport = (data: ReviewerExportData[]): Record<string, any>[] => {
   return data.map(item => {
     const formatted: Record<string, any> = {};
     
-    // First map standard fields to ensure order
-    Object.keys(FIELD_LABELS).forEach(key => {
-      // For the 19 basic info fields, we want them to appear even if undefined/null
+    // 1. First ensure the 19 basic fields are present and in order
+    ORDERED_BASIC_KEYS.forEach(key => {
+      const label = FIELD_LABELS[key];
       const val = item[key];
-      if (val !== undefined && val !== null) {
-        formatted[FIELD_LABELS[key]] = val;
-      } else {
-         // Optionally force empty string for key fields to ensure column existence?
-         // In Excel/CSV, columns are usually derived from the first row or union of all keys.
-         // To ensure order, we should probably set it to '' if it's one of our main fields.
-         formatted[FIELD_LABELS[key]] = '';
+      // Always include the key, even if empty, to ensure column alignment
+      formatted[label] = val !== undefined && val !== null ? val : '';
+    });
+
+    // 2. Add other defined fields from FIELD_LABELS (excluding the basic ones already added)
+    Object.keys(FIELD_LABELS).forEach(key => {
+      if (!ORDERED_BASIC_KEYS.includes(key)) {
+        const val = item[key];
+        if (val !== undefined && val !== null) {
+          formatted[FIELD_LABELS[key]] = val;
+        }
       }
     });
 
-    // Then map any dynamic fields (like custom questions)
+    // 3. Add any dynamic fields (like "Enable File" questions)
+    // These are keys in 'item' that are NOT in FIELD_LABELS
     Object.keys(item).forEach(key => {
-      if (!FIELD_LABELS[key] && item[key] !== undefined && item[key] !== null) {
-        formatted[key] = item[key];
+      if (!FIELD_LABELS[key]) {
+        const val = item[key];
+        if (val !== undefined && val !== null) {
+          formatted[key] = val;
+        }
       }
     });
 
@@ -132,7 +162,32 @@ export const formatForExport = (data: ReviewerExportData[]): Record<string, any>
   });
 };
 
-// Transform candidate data to reviewer export format
+// Helper to determine header order
+const getOrderedHeaders = <T extends Record<string, any>>(data: T[], providedHeaders?: string[]) => {
+  if (providedHeaders) return providedHeaders;
+  
+  // 1. Map labels to their priority index based on ORDERED_BASIC_KEYS
+  const labelPriority: Record<string, number> = {};
+  ORDERED_BASIC_KEYS.forEach((key, index) => {
+    labelPriority[FIELD_LABELS[key]] = index;
+  });
+
+  // 2. Collect all unique keys from data
+  const allKeys = new Set<string>();
+  data.forEach(d => Object.keys(d).forEach(k => allKeys.add(k)));
+  
+  // 3. Sort keys: Priority keys first (in order), then others
+  return Array.from(allKeys).sort((a, b) => {
+    const indexA = labelPriority[a] !== undefined ? labelPriority[a] : 999;
+    const indexB = labelPriority[b] !== undefined ? labelPriority[b] : 999;
+    
+    if (indexA !== indexB) {
+      return indexA - indexB;
+    }
+    return 0; // Keep relative order for non-priority fields
+  });
+};
+
 export const transformCandidateToReviewerData = (candidate: any, assignments: any[] = [], aiEvaluation: any = null): ReviewerExportData => {
   const latestHrEval = candidate.hr_evaluations?.[0] || {};
   const aiAnalysis = aiEvaluation?.analysis || {};
@@ -264,11 +319,8 @@ export const exportToCSV = <T extends Record<string, any>>(
   filename: string,
   headers?: string[]
 ) => {
-  // Use provided headers or derive them, but ensure we respect the order if data comes pre-formatted via formatForExport
-  // formatForExport already ensures the order of keys in the object, 
-  // but Set/Object.keys order isn't guaranteed in all environments (though mostly is in modern JS).
-  // For CSV, it's safer to explicitly gather all unique keys if headers aren't provided.
-  const csvHeaders = headers || Array.from(new Set(data.flatMap(d => Object.keys(d))));
+  // Use provided headers or derive them using our robust ordering logic
+  const csvHeaders = getOrderedHeaders(data, headers);
   
   const worksheet = XLSX.utils.json_to_sheet(data, { header: csvHeaders });
   const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
@@ -288,7 +340,7 @@ export const exportToExcel = <T extends Record<string, any>>(
   filename: string,
   headers?: string[]
 ) => {
-  const csvHeaders = headers || Array.from(new Set(data.flatMap(d => Object.keys(d))));
+  const csvHeaders = getOrderedHeaders(data, headers);
   const worksheet = XLSX.utils.json_to_sheet(data, { header: csvHeaders });
 
   // Columns that contain long text should be wider and wrapped
@@ -350,7 +402,7 @@ export const exportToPDF = <T extends Record<string, any>>(
     format: 'a2'
   });
 
-  const tableHeaders = headers || Array.from(new Set(data.flatMap(d => Object.keys(d))));
+  const tableHeaders = getOrderedHeaders(data, headers);
   
   // Transform data for autotable
   const tableData = data.map(row => 

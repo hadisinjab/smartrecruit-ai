@@ -18,6 +18,7 @@ import {
   Plus, 
   Trash2, 
   Save, 
+  Loader2,
   GripVertical, 
   Mic, 
   FileText, 
@@ -202,27 +203,30 @@ export default function CreateJobPage() {
   };
 
   const handleSubmit = async () => {
-    // Validate required fields
+    console.log('--- Submitting Create Job Form (v2 - Strict No-Validation) ---');
+    console.log('Current Job Data:', jobData);
+
+    // Validate required fields - ONLY Title, Department, Location, and Essential Candidate Info
     const missingFields = [];
     if (!jobData.title) missingFields.push('Title');
     if (!jobData.department) missingFields.push('Department');
     if (!jobData.location) missingFields.push('Location');
-    // if (!jobData.type) missingFields.push('Type');
-    // if (!jobData.description) missingFields.push('Description');
-    // if (!jobData.salary.min) missingFields.push('Salary Min');
-    // if (!jobData.salary.max) missingFields.push('Salary Max');
-    // if (!jobData.deadline) missingFields.push('Deadline');
-    // if (!jobData.hiringManager) missingFields.push('Hiring Manager');
+
+    // Enforce basic candidate info (Name and Email are required for the system to work)
+    const requiredBasicInfo = ['candidate_name', 'candidate_email'];
+    const missingBasicInfo = requiredBasicInfo.filter(field => !jobData.enabled_fields.includes(field));
     
-    // Check if at least one requirement and benefit is added and not empty
-    // const hasRequirements = jobData.requirements.some(r => r.trim() !== '');
-    // if (!hasRequirements) missingFields.push('Requirements');
-
-    // const hasBenefits = jobData.benefits.some(b => b.trim() !== '');
-    // if (!hasBenefits) missingFields.push('Benefits');
-
+    if (missingBasicInfo.length > 0) {
+      missingFields.push(...missingBasicInfo.map(f => {
+        if (f === 'candidate_name') return 'Candidate Name';
+        if (f === 'candidate_email') return 'Candidate Email';
+        return f;
+      }));
+    }
+    
     if (missingFields.length > 0) {
-      addToast('error', `Please fill in all required fields: ${missingFields.join(', ')}`);
+      console.error('Missing fields:', missingFields);
+      addToast('error', `Please fill in required info: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -237,11 +241,12 @@ export default function CreateJobPage() {
         salary_min: parseInt(jobData.salary.min) || 0,
         salary_max: parseInt(jobData.salary.max) || 0,
         salary_currency: jobData.salary.currency,
-        description: jobData.description,
+        // Send empty string if undefined to prevent potential DB issues
+        description: jobData.description || '',
         requirements: jobData.requirements.filter(r => r.trim() !== ''),
         benefits: jobData.benefits.filter(b => b.trim() !== ''),
-        deadline: toDeadlineTimestamp(jobData.deadline),
-        hiring_manager_name: jobData.hiringManager,
+        deadline: toDeadlineTimestamp(jobData.deadline), // Can be null
+        hiring_manager_name: jobData.hiringManager, // Can be empty string
         // Send questions separately to be inserted into the questions table
         questions: formSteps[0].fields,
         // Keep evaluation_criteria for other potential uses or backward compatibility
@@ -325,8 +330,17 @@ export default function CreateJobPage() {
           <Button variant="outline" onClick={() => router.back()}>
             {tCreate('cancel')}
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? tCreate('creating') : tCreate('createJob')}
+          <Button 
+            onClick={handleSubmit} 
+            disabled={loading}
+            className="flex items-center space-x-2"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>Create Job (Optional Fields)</span>
           </Button>
         </div>
       }
@@ -385,7 +399,7 @@ export default function CreateJobPage() {
                 </div>
 
                 <div>
-                  <Label>{tCreate('description')}</Label>
+                  <Label>{tCreate('description')} (Optional)</Label>
                   <Textarea 
                     value={jobData.description}
                     onChange={(e) => setJobData({...jobData, description: e.target.value})}
@@ -402,7 +416,7 @@ export default function CreateJobPage() {
               <div className="space-y-6">
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <Label>{tCreate('requirements')}</Label>
+                    <Label>{tCreate('requirements')} (Optional)</Label>
                     <Button variant="ghost" size="sm" onClick={addRequirement}>
                       <Plus className="w-4 h-4 mr-1" /> {tCreate('add')}
                     </Button>
@@ -427,7 +441,7 @@ export default function CreateJobPage() {
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <Label>{tCreate('benefits')}</Label>
+                    <Label>{tCreate('benefits')} (Optional)</Label>
                     <Button variant="ghost" size="sm" onClick={addBenefit}>
                       <Plus className="w-4 h-4 mr-1" /> {tCreate('add')}
                     </Button>
@@ -648,11 +662,11 @@ export default function CreateJobPage() {
               <h3 className="text-lg font-semibold mb-4">{tCreate('settings')}</h3>
               <div className="space-y-4">
                 <div>
-                  <Label>{tCreate('employmentType')}</Label>
-                  <Select 
-                    value={jobData.type} 
-                    onValueChange={(val) => setJobData({...jobData, type: val})}
-                  >
+                <Label>{tCreate('employmentType')} (Optional)</Label>
+                <Select 
+                  value={jobData.type} 
+                  onValueChange={(val) => setJobData({...jobData, type: val})}
+                >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -666,7 +680,7 @@ export default function CreateJobPage() {
                 </div>
 
                 <div>
-                  <Label>{tCreate('hiringManager')}</Label>
+                  <Label>{tCreate('hiringManager')} (Optional)</Label>
                   <Select 
                     value={jobData.hiringManager} 
                     onValueChange={(val) => setJobData({...jobData, hiringManager: val})}
@@ -691,7 +705,7 @@ export default function CreateJobPage() {
                 </div>
 
                 <div>
-                  <Label>{tCreate('deadline')}</Label>
+                  <Label>{tCreate('deadline')} (Optional)</Label>
                   <Input 
                     type="date"
                     value={jobData.deadline}

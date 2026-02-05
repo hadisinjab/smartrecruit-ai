@@ -111,6 +111,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
 
   useEffect(() => {
     async function fetchJob() {
+      console.log('--- Edit Job Page Loaded: Version 2.0 (Validation Removed) ---');
       try {
         const job: any = await getJob(params.id);
         if (!job) {
@@ -141,18 +142,18 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             title: job.title,
             department: job.department,
             location: job.location,
-            type: job.type,
+            type: job.type || 'unspecified',
             status: job.status,
             salary: {
-                min: job.salary_min?.toString() || job.salary?.min?.toString() || '',
-                max: job.salary_max?.toString() || job.salary?.max?.toString() || '',
+                min: (job.salary_min && job.salary_min !== 0) ? job.salary_min.toString() : (job.salary?.min && job.salary?.min !== 0 ? job.salary.min.toString() : ''),
+                max: (job.salary_max && job.salary_max !== 0) ? job.salary_max.toString() : (job.salary?.max && job.salary?.max !== 0 ? job.salary.max.toString() : ''),
                 currency: job.salary_currency || job.salary?.currency || 'USD'
             },
             description: job.description || '',
             requirements: job.requirements || [''],
             benefits: job.benefits || [''],
             deadline: toDateInputValue(job.deadline),
-            hiringManager: (job as any).hiring_manager_id || job.hiring_manager_name || '',
+            hiringManager: (job as any).hiring_manager_id || job.hiring_manager_name || 'unassigned',
             assignment_enabled: !!(job as any).assignment_enabled,
             assignment_required: !!(job as any).assignment_required,
             assignment_type: assignmentType as any,
@@ -262,27 +263,32 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
   };
 
   const handleSubmit = async () => {
-    // Validate required fields
+    console.log('--- Submitting Edit Job Form (v3 - Strict No-Validation) ---');
+    console.log('Current Job Data:', jobData);
+
+
+
+    // Validate required fields - ONLY Title, Department, Location, and Essential Candidate Info
     const missingFields = [];
     if (!jobData.title) missingFields.push('Title');
     if (!jobData.department) missingFields.push('Department');
     if (!jobData.location) missingFields.push('Location');
-    if (!jobData.type) missingFields.push('Type');
-    if (!jobData.description) missingFields.push('Description');
-    if (!jobData.salary.min) missingFields.push('Salary Min');
-    if (!jobData.salary.max) missingFields.push('Salary Max');
-    if (!jobData.deadline) missingFields.push('Deadline');
-    if (!jobData.hiringManager) missingFields.push('Hiring Manager');
     
-    // Check if at least one requirement and benefit is added and not empty
-    const hasRequirements = jobData.requirements.some(r => r.trim() !== '');
-    if (!hasRequirements) missingFields.push('Requirements');
-
-    const hasBenefits = jobData.benefits.some(b => b.trim() !== '');
-    if (!hasBenefits) missingFields.push('Benefits');
+    // Enforce basic candidate info (Name and Email are required for the system to work)
+    const requiredBasicInfo = ['candidate_name', 'candidate_email'];
+    const missingBasicInfo = requiredBasicInfo.filter(field => !jobData.enabled_fields.includes(field));
+    
+    if (missingBasicInfo.length > 0) {
+      missingFields.push(...missingBasicInfo.map(f => {
+        if (f === 'candidate_name') return 'Candidate Name';
+        if (f === 'candidate_email') return 'Candidate Email';
+        return f;
+      }));
+    }
 
     if (missingFields.length > 0) {
-      addToast('error', `Please fill in all required fields: ${missingFields.join(', ')}`);
+      console.error('Missing fields:', missingFields);
+      addToast('error', `Please fill in required info: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -292,16 +298,17 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
         title: jobData.title,
         department: jobData.department,
         location: jobData.location,
-        type: jobData.type,
+        type: jobData.type === 'unspecified' ? null : jobData.type,
         status: jobData.status,
         salary_min: parseInt(jobData.salary.min) || 0,
         salary_max: parseInt(jobData.salary.max) || 0,
         salary_currency: jobData.salary.currency,
-        description: jobData.description,
+        // Send empty string if undefined to prevent DB null constraint issues if any (though likely nullable now)
+        description: jobData.description || '', 
         requirements: jobData.requirements.filter(r => r.trim() !== ''),
         benefits: jobData.benefits.filter(b => b.trim() !== ''),
-        deadline: toDeadlineTimestamp(jobData.deadline),
-        hiring_manager_name: jobData.hiringManager,
+        deadline: toDeadlineTimestamp(jobData.deadline), // Can be null
+        hiring_manager_name: jobData.hiringManager === 'unassigned' ? '' : jobData.hiringManager, // Can be empty string
         questions: formSteps[0].fields,
         evaluation_criteria: formSteps,
         assignment_enabled: !!jobData.assignment_enabled,
@@ -371,7 +378,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             ) : (
               <Save className="w-4 h-4" />
             )}
-            <span>Save Changes</span>
+            <span>Update Job (Optional Fields)</span>
           </Button>
         </div>
       }
@@ -429,7 +436,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
               </div>
 
               <div>
-                <Label>{tCreate('description')}</Label>
+                <Label>{tCreate('description')} (Optional)</Label>
                 <Textarea 
                   value={jobData.description}
                   onChange={(e) => setJobData({...jobData, description: e.target.value})}
@@ -446,7 +453,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             <div className="space-y-6">
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <Label>{tCreate('requirements')}</Label>
+                  <Label>{tCreate('requirements')} (Optional)</Label>
                   <Button variant="ghost" size="sm" onClick={addRequirement}>
                     <Plus className="w-4 h-4 mr-1" /> {tCreate('add')}
                   </Button>
@@ -471,7 +478,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
 
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <Label>{tCreate('benefits')}</Label>
+                  <Label>{tCreate('benefits')} (Optional)</Label>
                   <Button variant="ghost" size="sm" onClick={addBenefit}>
                     <Plus className="w-4 h-4 mr-1" /> {tCreate('add')}
                   </Button>
@@ -697,7 +704,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
             <h3 className="text-lg font-semibold mb-4">{tCreate('settings')}</h3>
             <div className="space-y-4">
               <div>
-                <Label>{tCreate('employmentType')}</Label>
+                <Label>{tCreate('employmentType')} (Optional)</Label>
                 <Select 
                   value={jobData.type} 
                   onValueChange={(val) => setJobData({...jobData, type: val})}
@@ -706,16 +713,17 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="full-time">Full Time</SelectItem>
+                      <SelectItem value="unspecified">Unspecified</SelectItem>
+                      <SelectItem value="full-time">Full Time</SelectItem>
                     <SelectItem value="part-time">Part Time</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
                     <SelectItem value="internship">Internship</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
+                
                 <div>
-                  <Label>{tCreate('hiringManager')}</Label>
+                  <Label>{tCreate('hiringManager')} (Optional)</Label>
                   <Select 
                     value={jobData.hiringManager} 
                     onValueChange={(val) => setJobData({...jobData, hiringManager: val})}
@@ -724,6 +732,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                       <SelectValue placeholder={tCreate('selectManager')} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="unassigned">No Hiring Manager</SelectItem>
                       {usersLoading ? (
                         <div className="px-2 py-1.5 text-sm text-gray-500">Loading users...</div>
                       ) : organizationUsers.length > 0 ? (
@@ -740,7 +749,7 @@ export default function EditJobPage({ params }: { params: { id: string; locale?:
                 </div>
 
               <div>
-                <Label>{tCreate('deadline')}</Label>
+                <Label>{tCreate('deadline')} (Optional)</Label>
                 <Input 
                   type="date"
                   value={jobData.deadline}
