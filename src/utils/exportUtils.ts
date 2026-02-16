@@ -1,6 +1,56 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import pdfMake from 'pdfmake/build/pdfmake';
+
+// Initialize pdfMake with fonts dynamically
+let fontsInitialized = false;
+
+const initializePdfMakeFonts = () => {
+  if (fontsInitialized) return;
+  
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfFonts = require('pdfmake/build/vfs_fonts');
+    
+    // Debug: log the structure to understand it
+    // console.log('pdfFonts structure:', Object.keys(pdfFonts));
+    
+    // pdfmake vfs_fonts can have different structures:
+    // 1. { pdfMake: { vfs: {...} } }
+    // 2. { vfs: {...} }
+    // 3. Direct export of vfs object
+    
+    let vfs: any = null;
+    
+    if (pdfFonts?.pdfMake?.vfs) {
+      vfs = pdfFonts.pdfMake.vfs;
+    } else if (pdfFonts?.vfs) {
+      vfs = pdfFonts.vfs;
+    } else if (pdfFonts?.default?.pdfMake?.vfs) {
+      vfs = pdfFonts.default.pdfMake.vfs;
+    } else if (pdfFonts?.default?.vfs) {
+      vfs = pdfFonts.default.vfs;
+    } else if (typeof pdfFonts === 'object' && !pdfFonts.pdfMake && Object.keys(pdfFonts).length > 0) {
+      // Might be direct vfs object
+      vfs = pdfFonts;
+    }
+    
+    if (vfs && typeof vfs === 'object') {
+      (pdfMake as any).vfs = vfs;
+      fontsInitialized = true;
+    } else {
+      console.warn('Could not find vfs in pdfFonts, using empty vfs');
+      (pdfMake as any).vfs = {};
+      fontsInitialized = true;
+    }
+  } catch (error) {
+    console.error('Failed to initialize pdfMake fonts:', error);
+    // Fallback: use empty vfs (fonts may not work but PDF will still generate)
+    (pdfMake as any).vfs = {};
+    fontsInitialized = true;
+  }
+};
 
 // Interface for reviewer data with complete details
 export interface ReviewerExportData {
@@ -150,7 +200,8 @@ export const formatForExport = (data: ReviewerExportData[]): Record<string, any>
     // 3. Add any dynamic fields (like "Enable File" questions)
     // These are keys in 'item' that are NOT in FIELD_LABELS
     Object.keys(item).forEach(key => {
-      if (!FIELD_LABELS[key]) {
+      // Skip internal/meta keys (used for PDF-only structures like Q&A)
+      if (!FIELD_LABELS[key] && !key.startsWith('__')) {
         const val = item[key];
         if (val !== undefined && val !== null) {
           formatted[key] = val;
@@ -272,41 +323,37 @@ export const transformCandidateToReviewerData = (candidate: any, assignments: an
     source: candidate.source || 'N/A'
   };
 
-  // Dynamically add individual answers as top-level fields
-  // We filter to ONLY include File type answers or "Enable File" questions,
-  // as per user request to exclude general Q&A but keep tangible files/fields.
+  // Dynamically add ALL answers as top-level fields so that
+  // each question becomes its own column in exports (CSV / Excel / PDF).
   if (candidate.answers && Array.isArray(candidate.answers)) {
     candidate.answers.forEach((ans: any) => {
       const label = ans.questions?.label || ans.label || ans.question_id;
       if (!label) return;
 
-      // Normalize label for checking
-      const normalizedLabel = String(label).toLowerCase();
-      
-      // Check if it is a File/Voice question OR explicitly "Enable File"
-      // We also include if the type is explicitly 'file' or 'voice'
-      // AND we exclude if it's just a regular text question (unless it says "Enable File")
-      const isFileOrVoice = ans.type === 'file' || ans.type === 'voice' || 
-                            normalizedLabel.includes('enable file') || 
-                            normalizedLabel.includes('upload') ||
-                            normalizedLabel.includes('resume') ||
-                            normalizedLabel.includes('cv');
+      let value: any = ans.value;
 
-      if (!isFileOrVoice) return;
-
-      let value = ans.value;
-      
-      // If it's a file or voice, ensure we provide the URL if available
-      if (ans.type === 'file') {
+      // Normalize value for different answer types
+      if (ans.type === 'voice' || ans.voice_data) {
+        // Prefer a clickable URL if available
+        value = ans.voice_data?.audio_url || ans.value || '[Voice Recording]';
+      } else if (ans.type === 'file') {
+        // Use file URL so it can be opened from the export
         value = ans.value;
-      } else if (ans.type === 'voice') {
-        value = ans.voice_data?.audio_url || ans.value;
+      } else if (ans.type === 'url' || ans.isUrl) {
+        value = ans.value;
       }
 
       if (result[label] === undefined) {
         result[label] = value;
       } else {
-        result[`${label} (Question)`] = value;
+        // In case of duplicate labels, add a suffix to avoid overwriting
+        let suffix = 2;
+        let key = `${label} (${suffix})`;
+        while (result[key] !== undefined) {
+          suffix += 1;
+          key = `${label} (${suffix})`;
+        }
+        result[key] = value;
       }
     });
   }
@@ -456,14 +503,51 @@ export const exportToPDF = <T extends Record<string, any>>(
   doc.save(filename);
 };
 
-export const exportCandidatesListPDF = (data: ReviewerExportData[], filename: string) => {
-  // Use A2 Landscape for maximum width
-  const doc = new jsPDF({
-    orientation: 'landscape',
-    unit: 'mm',
-    format: 'a2'
-  });
+// Helper function to sanitize text for PDF (handles Arabic and special characters)
+const sanitizeTextForPDF = (text: any): string => {
+  if (text === null || text === undefined) return '';
+  if (typeof text === 'object') {
+    try {
+      return JSON.stringify(text);
+    } catch {
+      return String(text);
+    }
+  }
+  const str = String(text);
+  
+  // For Arabic text, we need to handle it properly
+  // jsPDF doesn't support Arabic fonts by default, so we'll use a workaround
+  // Convert Arabic characters to a format that can be displayed
+  // Note: This is a temporary solution - ideally we should add Arabic font support
+  
+  // Check if string contains Arabic characters
+  const arabicRegex = /[\u0600-\u06FF]/;
+  if (arabicRegex.test(str)) {
+    // For now, return the string as-is and let jsPDF try to handle it
+    // In production, you should add Arabic font support to jsPDF
+    return str;
+  }
+  
+  return str;
+};
 
+// Helper function to format text for pdfmake (preserves Arabic and all Unicode)
+const formatTextForPdfMake = (text: any): string => {
+  if (text === null || text === undefined) return '';
+  if (typeof text === 'object') {
+    try {
+      return JSON.stringify(text);
+    } catch {
+      return String(text);
+    }
+  }
+  return String(text);
+};
+
+export const exportCandidatesListPDF = (data: ReviewerExportData[], filename: string) => {
+  // Initialize fonts before using pdfMake
+  initializePdfMakeFonts();
+  
   // Explicitly define all 19 fields + Evaluation fields
   const allKeys: (keyof ReviewerExportData)[] = [
     'candidateName',
@@ -495,69 +579,197 @@ export const exportCandidatesListPDF = (data: ReviewerExportData[], filename: st
   const getRows = (keys: (keyof ReviewerExportData)[]) => {
     return data.map(row => keys.map(k => {
       const val = row[k];
-      if (typeof val === 'object' && val !== null) return JSON.stringify(val);
-      return val ?? 'N/A'; // Ensure N/A shows for empty values
+      return formatTextForPdfMake(val ?? 'N/A');
     }));
   };
 
-  const headers = allKeys.map(k => FIELD_LABELS[k] || k);
+  const headers = allKeys.map(k => formatTextForPdfMake(FIELD_LABELS[k] || k));
   const rows = getRows(allKeys);
 
-  // --- Single Large Table ---
-  doc.setFontSize(14);
-  doc.setTextColor(41, 128, 185);
-  doc.text('Candidates List - Complete Data', 14, 15);
+  // Calculate equal width for each column
+  // A2 landscape width is approximately 594mm, with margins ~40mm each side = ~514mm usable
+  // Convert to points: 1mm = 2.83465 points, so ~514mm = ~1457 points
+  // But pdfmake uses points directly, A2 landscape is ~1190 points wide
+  // With margins, usable width is ~1100 points
+  const numColumns = headers.length;
+  const equalColumnWidth = '*'; // Use '*' for equal distribution
   
-  autoTable(doc, {
-    startY: 20,
-    head: [headers],
-    body: rows,
-    styles: { 
-      fontSize: 7, 
-      cellPadding: 1.5, 
-      overflow: 'linebreak',
-      halign: 'left',
-      valign: 'middle'
-    },
-    headStyles: { 
+  // Build table body for pdfmake
+  const tableBody = [
+    // Header row
+    headers.map((h, idx) => ({
+      text: h,
+      style: 'tableHeader',
+      bold: true,
       fillColor: [41, 128, 185],
-      textColor: 255,
-      fontStyle: 'bold',
-      halign: 'center',
-      fontSize: 8
-    },
-    alternateRowStyles: { fillColor: [245, 247, 250] },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 30 } // Name bold
-    },
-    margin: { top: 20 },
-    didDrawCell: (data) => {
-      // Add links for Photo and Degree File
-      if (data.section === 'body') {
-        const key = allKeys[data.column.index];
-        if (key === 'photoUrl' || key === 'degreeFileUrl') {
-          const rawValue = data.cell.raw;
-          if (rawValue && rawValue !== 'N/A' && String(rawValue).startsWith('http')) {
-            doc.setTextColor(0, 0, 255);
-            doc.textWithLink('Link', data.cell.x + 2, data.cell.y + data.cell.height / 2 + 1, { url: String(rawValue) });
-          }
-        }
+      color: '#FFFFFF',
+      alignment: idx === 0 ? 'left' : 'center'
+    })),
+    // Data rows
+    ...rows.map((row, rowIdx) => 
+      row.map((cell, colIdx) => {
+        const cellValue = cell;
+        const isUrl = typeof cellValue === 'string' && cellValue.startsWith('http');
+        
+        return {
+          text: isUrl ? 'Link' : cellValue,
+          style: 'tableCell',
+          bold: colIdx === 0, // Bold first column (name)
+          fillColor: rowIdx % 2 === 0 ? '#FFFFFF' : '#F5F7FA',
+          ...(isUrl ? { link: cellValue, color: '#0066CC' } : {}),
+          noWrap: false // Allow text wrapping
+        };
+      })
+    )
+  ];
+
+  // --- Unified Questions & Answers table for ALL candidates ---
+  const baseKeys = new Set<string>(Object.keys(FIELD_LABELS));
+  baseKeys.add('candidateName');
+  baseKeys.add('__qa');
+
+  const questionKeysSet = new Set<string>();
+  (data as any[]).forEach(row => {
+    Object.keys(row).forEach(k => {
+      if (!baseKeys.has(k) && !k.startsWith('__')) {
+        questionKeysSet.add(k);
       }
-    }
+    });
   });
 
-  // Footer
-  const pageCount = doc.internal.pages.length - 1;
-  const pageWidth = doc.internal.pageSize.width;
-  for(let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 20, doc.internal.pageSize.height - 10, { align: 'right' });
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
+  const questionKeys = Array.from(questionKeysSet).sort();
+
+  // Build Q&A table body
+  let qaTableBody: any[] = [];
+  let qaNumColumns = 0;
+  if (questionKeys.length > 0) {
+    const qaHeaders = ['Candidate', ...questionKeys.map(k => formatTextForPdfMake(k))];
+    qaNumColumns = qaHeaders.length;
+    
+    qaTableBody = [
+      // Header row
+      qaHeaders.map((h, idx) => ({
+        text: h,
+        style: 'tableHeader',
+        bold: true,
+        fillColor: [52, 73, 94],
+        color: '#FFFFFF',
+        alignment: idx === 0 ? 'left' : 'center'
+      })),
+      // Data rows
+      ...(data as any[]).map((row, rowIdx) => {
+        const name = formatTextForPdfMake(row.candidateName || '');
+        const answers = questionKeys.map(key => {
+          const val = row[key];
+          return formatTextForPdfMake(val);
+        });
+        return [name, ...answers].map((cell, colIdx) => {
+          const cellValue = cell;
+          const isUrl = typeof cellValue === 'string' && cellValue.startsWith('http');
+          
+          return {
+            text: isUrl ? 'Link' : cellValue,
+            style: 'tableCell',
+            bold: colIdx === 0,
+            fillColor: rowIdx % 2 === 0 ? '#FFFFFF' : '#F5F7FA',
+            ...(isUrl ? { link: cellValue, color: '#0066CC' } : {}),
+            noWrap: false // Allow text wrapping
+          };
+        });
+      })
+    ];
   }
 
-  doc.save(filename);
+  // Create PDF document definition
+  const docDefinition: any = {
+    pageSize: 'A2',
+    pageOrientation: 'landscape',
+    content: [
+      {
+        text: 'Candidates List - Complete Data',
+        style: 'header',
+        margin: [0, 0, 0, 10]
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: Array(numColumns).fill('*'), // Equal width for all columns
+          body: tableBody
+        },
+        layout: {
+          fillColor: (rowIndex: number) => {
+            return rowIndex === 0 ? [41, 128, 185] : null;
+          },
+          hLineWidth: () => 0.1,
+          vLineWidth: () => 0.1,
+          hLineColor: () => '#C8C8C8',
+          vLineColor: () => '#C8C8C8'
+        },
+        margin: [0, 0, 0, 20]
+      }
+    ],
+    styles: {
+      header: {
+        fontSize: 14,
+        bold: true,
+        color: '#2980B9',
+        margin: [0, 0, 0, 10]
+      },
+      tableHeader: {
+        fontSize: 7,
+        bold: true,
+        color: '#FFFFFF',
+        fillColor: [41, 128, 185]
+      },
+      tableCell: {
+        fontSize: 6,
+        margin: [2, 1],
+        lineHeight: 1.2
+      }
+    },
+    defaultStyle: {
+      font: 'Roboto',
+      fontSize: 10
+    },
+    footer: (currentPage: number, pageCount: number) => ({
+      text: `Page ${currentPage} of ${pageCount} - Generated on: ${new Date().toLocaleString()}`,
+      fontSize: 8,
+      color: '#999999',
+      alignment: 'center',
+      margin: [0, 10, 0, 0]
+    })
+  };
+
+  // Add Q&A table if exists
+  if (qaTableBody.length > 0) {
+    docDefinition.content.push(
+      {
+        text: 'Candidates Questions & Answers',
+        style: 'header',
+        margin: [0, 20, 0, 10],
+        pageBreak: 'before'
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: Array(qaNumColumns).fill('*'), // Equal width for all columns
+          body: qaTableBody
+        },
+        layout: {
+          fillColor: (rowIndex: number) => {
+            return rowIndex === 0 ? [52, 73, 94] : null;
+          },
+          hLineWidth: () => 0.1,
+          vLineWidth: () => 0.1,
+          hLineColor: () => '#C8C8C8',
+          vLineColor: () => '#C8C8C8'
+        }
+      }
+    );
+  }
+
+  // Generate and download PDF
+  pdfMake.createPdf(docDefinition).download(filename);
 };
 
 export const exportCandidateReportPDF = (candidate: any, filename: string) => {

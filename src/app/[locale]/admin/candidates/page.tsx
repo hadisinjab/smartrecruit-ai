@@ -499,7 +499,10 @@ export default function CandidatesPage() {
                       addToast('info', 'Preparing filtered data export...');
                       const ids = filteredCandidates.map(c => c.id);
                       const fullData = await getCandidatesForExport(ids);
-                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
+                      const transformedData = fullData.map(c =>
+                        transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0])
+                      );
+                      // Summary + second table with questions/answers for all candidates
                       exportCandidatesListPDF(transformedData, 'candidates_export_filtered.pdf');
                       addToast('success', 'Filtered candidates exported successfully');
                     } catch (error) {
