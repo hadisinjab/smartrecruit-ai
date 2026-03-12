@@ -15,7 +15,7 @@ import { Candidate, Job } from '@/types/admin';
 import { Plus, Search } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/context/ToastContext';
-import { exportData, transformCandidateToReviewerData, formatForExport, exportCandidatesListPDF } from '@/utils/exportUtils';
+import { exportCandidatesListPDF, buildCandidatesListExportPayload, exportCandidatesListExcel, exportCandidatesListCSV } from '@/utils/exportUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -250,10 +250,12 @@ export default function CandidatesPage() {
     {
       key: 'position',
       title: tTable('position'),
-      render: (position) => (
+      render: (position, record) => (
         <div>
           <p className='font-medium text-gray-900'>{position}</p>
-          <p className='text-sm text-gray-500'>{candidates.find(c => c.position === position)?.experience} {tTable('yearsExp')}</p>
+          <p className='text-sm text-gray-500'>
+            {record.experience !== undefined ? record.experience : '-'} {tTable('yearsExp')}
+          </p>
         </div>
       )
     },
@@ -451,9 +453,8 @@ export default function CandidatesPage() {
                       addToast('info', 'Preparing complete reviewer data export...');
                       const ids = filteredCandidates.map(c => c.id);
                       const fullData = await getCandidatesForExport(ids);
-                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
-                      const formattedData = formatForExport(transformedData);
-                      exportData(formattedData, 'candidates_reviewer_complete', 'xlsx');
+                      const payload = buildCandidatesListExportPayload(fullData);
+                      exportCandidatesListExcel(payload, 'candidates_reviewer_complete');
                       addToast('success', 'Reviewer data exported successfully');
                     } catch (error) {
                       console.error('Export failed:', error);
@@ -467,9 +468,8 @@ export default function CandidatesPage() {
                       addToast('info', 'Preparing filtered data export...');
                       const ids = filteredCandidates.map(c => c.id);
                       const fullData = await getCandidatesForExport(ids);
-                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
-                      const formattedData = formatForExport(transformedData);
-                      exportData(formattedData, 'candidates_export_filtered', 'csv');
+                      const payload = buildCandidatesListExportPayload(fullData);
+                      exportCandidatesListCSV(payload, 'candidates_export_filtered');
                       addToast('success', 'Filtered candidates exported successfully');
                     } catch (error) {
                       console.error('Export failed:', error);
@@ -483,9 +483,8 @@ export default function CandidatesPage() {
                       addToast('info', 'Preparing filtered data export...');
                       const ids = filteredCandidates.map(c => c.id);
                       const fullData = await getCandidatesForExport(ids);
-                      const transformedData = fullData.map(c => transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0]));
-                      const formattedData = formatForExport(transformedData);
-                      exportData(formattedData, 'candidates_export_filtered', 'xlsx');
+                      const payload = buildCandidatesListExportPayload(fullData);
+                      exportCandidatesListExcel(payload, 'candidates_export_filtered');
                       addToast('success', 'Filtered candidates exported successfully');
                     } catch (error) {
                       console.error('Export failed:', error);
@@ -499,11 +498,7 @@ export default function CandidatesPage() {
                       addToast('info', 'Preparing filtered data export...');
                       const ids = filteredCandidates.map(c => c.id);
                       const fullData = await getCandidatesForExport(ids);
-                      const transformedData = fullData.map(c =>
-                        transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0])
-                      );
-                      // Summary + second table with questions/answers for all candidates
-                      exportCandidatesListPDF(transformedData, 'candidates_export_filtered.pdf');
+                      await exportCandidatesListPDF(fullData, 'candidates_export_filtered.pdf');
                       addToast('success', 'Filtered candidates exported successfully');
                     } catch (error) {
                       console.error('Export failed:', error);

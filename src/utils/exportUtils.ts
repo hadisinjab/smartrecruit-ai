@@ -1,54 +1,112 @@
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import pdfMake from 'pdfmake/build/pdfmake';
 
-// Initialize pdfMake with fonts dynamically
-let fontsInitialized = false;
+let arabicFontBase64: string | null = null;
+let arabicFontName: string | null = null;
+let arabicFontFileName: string | null = null;
+let pdfMakeExportQueue: Promise<void> = Promise.resolve();
 
-const initializePdfMakeFonts = () => {
-  if (fontsInitialized) return;
-  
+const ARABIC_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+const ARABIC_FONT_SOURCES = [
+  {
+    name: 'Amiri',
+    fileName: 'Amiri-Regular.ttf',
+    urls: [
+      '/fonts/Amiri-Regular.ttf',
+      'https://raw.githubusercontent.com/google/fonts/main/ofl/amiri/Amiri-Regular.ttf'
+    ]
+  }
+];
+
+const resolveFontUrl = (url: string) => {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return new URL(url, window.location.origin).toString();
+  }
+  return url;
+};
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  if (typeof btoa === 'function') {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(binary);
+  }
+  return Buffer.from(buffer).toString('base64');
+};
+
+const initializePdfMakeFonts = async (): Promise<boolean> => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pdfFonts = require('pdfmake/build/vfs_fonts');
-    
-    // Debug: log the structure to understand it
-    // console.log('pdfFonts structure:', Object.keys(pdfFonts));
-    
-    // pdfmake vfs_fonts can have different structures:
-    // 1. { pdfMake: { vfs: {...} } }
-    // 2. { vfs: {...} }
-    // 3. Direct export of vfs object
-    
-    let vfs: any = null;
-    
-    if (pdfFonts?.pdfMake?.vfs) {
-      vfs = pdfFonts.pdfMake.vfs;
-    } else if (pdfFonts?.vfs) {
-      vfs = pdfFonts.vfs;
-    } else if (pdfFonts?.default?.pdfMake?.vfs) {
-      vfs = pdfFonts.default.pdfMake.vfs;
-    } else if (pdfFonts?.default?.vfs) {
-      vfs = pdfFonts.default.vfs;
-    } else if (typeof pdfFonts === 'object' && !pdfFonts.pdfMake && Object.keys(pdfFonts).length > 0) {
-      // Might be direct vfs object
-      vfs = pdfFonts;
+    const vfs =
+      pdfFonts?.pdfMake?.vfs ??
+      pdfFonts?.vfs ??
+      pdfFonts?.default?.pdfMake?.vfs ??
+      pdfFonts?.default?.vfs ??
+      {};
+    const existingVfs = (pdfMake as any).vfs ?? {};
+    (pdfMake as any).vfs = { ...vfs, ...existingVfs };
+  } catch {
+    (pdfMake as any).vfs = (pdfMake as any).vfs ?? {};
+  }
+
+  (pdfMake as any).fonts = {
+    Roboto: {
+      normal: 'Roboto-Regular.ttf',
+      bold: 'Roboto-Medium.ttf',
+      italics: 'Roboto-Italic.ttf',
+      bolditalics: 'Roboto-MediumItalic.ttf'
     }
-    
-    if (vfs && typeof vfs === 'object') {
-      (pdfMake as any).vfs = vfs;
-      fontsInitialized = true;
-    } else {
-      console.warn('Could not find vfs in pdfFonts, using empty vfs');
-      (pdfMake as any).vfs = {};
-      fontsInitialized = true;
+  };
+
+  try {
+    if (!arabicFontBase64 || !arabicFontName || !arabicFontFileName) {
+      let loaded = false;
+      for (const source of ARABIC_FONT_SOURCES) {
+        for (const url of source.urls) {
+          try {
+            const response = await fetch(resolveFontUrl(url), { cache: 'no-store' });
+            if (!response.ok) continue;
+            const contentType = response.headers.get('content-type') || '';
+            const buffer = await response.arrayBuffer();
+            if (contentType.includes('text/html') || buffer.byteLength < 10000) {
+              continue;
+            }
+            arabicFontBase64 = arrayBufferToBase64(buffer);
+            arabicFontName = source.name;
+            arabicFontFileName = source.fileName;
+            loaded = true;
+            break;
+          } catch {
+            continue;
+          }
+        }
+        if (loaded) break;
+      }
+      if (!loaded) throw new Error('font fetch failed');
     }
-  } catch (error) {
-    console.error('Failed to initialize pdfMake fonts:', error);
-    // Fallback: use empty vfs (fonts may not work but PDF will still generate)
-    (pdfMake as any).vfs = {};
-    fontsInitialized = true;
+
+    if (!arabicFontBase64 || !arabicFontName || !arabicFontFileName) {
+      throw new Error('font base64 empty');
+    }
+
+    (pdfMake as any).vfs[arabicFontFileName] = arabicFontBase64;
+    (pdfMake as any).fonts[arabicFontName] = {
+      normal: arabicFontFileName,
+      bold: arabicFontFileName,
+      italics: arabicFontFileName,
+      bolditalics: arabicFontFileName
+    };
+
+    return true;
+  } catch {
+    if (arabicFontName && (pdfMake as any).fonts?.[arabicFontName]) {
+      delete (pdfMake as any).fonts[arabicFontName];
+    }
+    return false;
   }
 };
 
@@ -434,101 +492,169 @@ export const exportToExcel = <T extends Record<string, any>>(
   document.body.removeChild(link);
 };
 
-export const exportToPDF = <T extends Record<string, any>>(
+const downloadCsv = (rows: Record<string, any>[], headers: string[], filename: string) => {
+  const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+  const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+  const blob = new Blob(['\uFEFF' + csvOutput], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const exportCandidatesListExcel = (payload: CandidatesListExportPayload, filename: string) => {
+  const workbook = XLSX.utils.book_new();
+
+  const basicSheet = XLSX.utils.json_to_sheet(payload.basic.rows, { header: payload.basic.headers });
+  XLSX.utils.book_append_sheet(workbook, basicSheet, 'Basic Info');
+
+  const qaSheet = XLSX.utils.json_to_sheet(payload.qa.rows, { header: payload.qa.headers });
+  XLSX.utils.book_append_sheet(workbook, qaSheet, 'Q&A');
+
+  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.setAttribute('download', `${filename}.xlsx`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const exportCandidatesListCSV = (payload: CandidatesListExportPayload, filename: string) => {
+  downloadCsv(payload.basic.rows, payload.basic.headers, `${filename}_basic.csv`);
+  downloadCsv(payload.qa.rows, payload.qa.headers, `${filename}_qa.csv`);
+};
+
+export const exportToPDF = async <T extends Record<string, any>>(
   data: T[],
   filename: string,
   headers?: string[]
 ) => {
   if (!data || data.length === 0) return;
 
-  // Use A2 Landscape to fit many columns. 
-  // A2 is 420 x 594 mm.
-  const doc = new jsPDF({
-    orientation: 'landscape',
-    unit: 'mm',
-    format: 'a2'
-  });
+  pdfMakeExportQueue = pdfMakeExportQueue.then(async () => {
+    await initializePdfMakeFonts();
+    const vfsSnapshot = { ...(pdfMake as any).vfs };
+    const fontsSnapshot = { ...(pdfMake as any).fonts };
+    const buildDocDefinition = (allowArabic: boolean) => {
+      (pdfMake as any).vfs = vfsSnapshot;
+      (pdfMake as any).fonts = fontsSnapshot;
+      const buildCell = (text: any, options?: Parameters<typeof buildPdfMakeCell>[1]) =>
+        buildPdfMakeCell(text, { ...options, allowArabic });
+      const tableHeaders = getOrderedHeaders(data, headers);
+      const headerRow = tableHeaders.map(header =>
+        buildCell(header, {
+          bold: true,
+          fillColor: [41, 128, 185],
+          color: '#FFFFFF',
+          alignment: 'center'
+        })
+      );
+      const bodyRows = data.map(row =>
+        tableHeaders.map(header => {
+          const val = row[header];
+          if (typeof val === 'object' && val !== null) {
+            return buildCell(JSON.stringify(val), { alignment: 'left', noWrap: false });
+          }
+          return buildCell(val ?? '', { alignment: 'left', noWrap: false });
+        })
+      );
 
-  const tableHeaders = getOrderedHeaders(data, headers);
-  
-  // Transform data for autotable
-  const tableData = data.map(row => 
-    tableHeaders.map(header => {
-      const val = row[header];
-      if (typeof val === 'object' && val !== null) {
-        return JSON.stringify(val);
-      }
-      return val ?? '';
-    })
-  );
+      return {
+        pageSize: 'A2',
+        pageOrientation: 'landscape',
+        content: [
+          {
+            text: filename.replace(/\.pdf$/i, ''),
+            style: 'pageTitle',
+            margin: [0, 0, 0, 8]
+          },
+          {
+            table: {
+              headerRows: 1,
+              widths: Array(tableHeaders.length).fill('*'),
+              body: [headerRow, ...bodyRows]
+            },
+            layout: {
+              hLineWidth: () => 0.3,
+              vLineWidth: () => 0.3,
+              hLineColor: () => '#C8C8C8',
+              vLineColor: () => '#C8C8C8'
+            }
+          }
+        ],
+        styles: {
+          pageTitle: {
+            fontSize: 12,
+            bold: true,
+            color: '#2980B9'
+          }
+        },
+        defaultStyle: {
+          font: 'Roboto',
+          fontSize: 8
+        },
+        footer: (currentPage: number, pageCount: number) => ({
+          text: `Page ${currentPage} of ${pageCount} - Generated on: ${new Date().toLocaleString()}`,
+          fontSize: 8,
+          color: '#999999',
+          alignment: 'center',
+          margin: [0, 10, 0, 0]
+        })
+      };
+    };
 
-  autoTable(doc, {
-    head: [tableHeaders],
-    body: tableData,
-    styles: { 
-      fontSize: 7, 
-      cellPadding: 1.5,
-      overflow: 'linebreak', // Wrap text
-      halign: 'left',
-      valign: 'top',
-      lineWidth: 0.1,
-      lineColor: [200, 200, 200]
-    },
-    headStyles: {
-      fillColor: [41, 128, 185], // Blue header
-      textColor: 255,
-      fontSize: 8,
-      fontStyle: 'bold',
-      halign: 'center',
-      valign: 'middle'
-    },
-    alternateRowStyles: {
-      fillColor: [245, 247, 250]
-    },
-    // Specific column styles can be added here if we knew the index
-    // Since columns are dynamic, we rely on auto-sizing
-    columnStyles: {
-      // potentially set 'cellWidth' for very long text columns if we can identify them
-    },
-    margin: { top: 15, right: 10, bottom: 10, left: 10 },
-    didDrawPage: (data) => {
-      // Add Header
-      doc.setFontSize(14);
-      doc.text('Candidates Export', data.settings.margin.left, 10);
-      doc.setFontSize(8);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, data.settings.margin.left, 13);
-    }
-  });
+    const createBlob = async (docDefinition: any) => {
+      const pdfDoc: any = pdfMake.createPdf(docDefinition);
+      return await new Promise<Blob>((resolve, reject) => {
+        try {
+          const result = pdfDoc.getBlob?.((b: Blob) => resolve(b));
+          if (result && typeof result.then === 'function') {
+            result.then(resolve).catch(reject);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+    };
 
-  doc.save(filename);
-};
+    const arabicAllowed = Boolean(
+      arabicFontFileName &&
+        arabicFontName &&
+        vfsSnapshot[arabicFontFileName] &&
+        (fontsSnapshot as any)?.[arabicFontName]
+    );
 
-// Helper function to sanitize text for PDF (handles Arabic and special characters)
-const sanitizeTextForPDF = (text: any): string => {
-  if (text === null || text === undefined) return '';
-  if (typeof text === 'object') {
+    let docDefinition = buildDocDefinition(arabicAllowed);
+    let blob: Blob;
     try {
-      return JSON.stringify(text);
-    } catch {
-      return String(text);
+      blob = await createBlob(docDefinition);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (arabicFontFileName && message.includes(arabicFontFileName)) {
+        delete vfsSnapshot[arabicFontFileName];
+        if (arabicFontName && (fontsSnapshot as any)?.[arabicFontName]) {
+          delete (fontsSnapshot as any)[arabicFontName];
+        }
+        docDefinition = buildDocDefinition(false);
+        blob = await createBlob(docDefinition);
+      } else {
+        throw error;
+      }
     }
-  }
-  const str = String(text);
-  
-  // For Arabic text, we need to handle it properly
-  // jsPDF doesn't support Arabic fonts by default, so we'll use a workaround
-  // Convert Arabic characters to a format that can be displayed
-  // Note: This is a temporary solution - ideally we should add Arabic font support
-  
-  // Check if string contains Arabic characters
-  const arabicRegex = /[\u0600-\u06FF]/;
-  if (arabicRegex.test(str)) {
-    // For now, return the string as-is and let jsPDF try to handle it
-    // In production, you should add Arabic font support to jsPDF
-    return str;
-  }
-  
-  return str;
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+  await pdfMakeExportQueue;
 };
 
 // Helper function to format text for pdfmake (preserves Arabic and all Unicode)
@@ -544,535 +670,653 @@ const formatTextForPdfMake = (text: any): string => {
   return String(text);
 };
 
-export const exportCandidatesListPDF = (data: ReviewerExportData[], filename: string) => {
-  // Initialize fonts before using pdfMake
-  initializePdfMakeFonts();
-  
-  // Explicitly define all 19 fields + Evaluation fields
-  const allKeys: (keyof ReviewerExportData)[] = [
-    'candidateName',
-    'candidateEmail',
-    'candidatePhone',
-    'age',
-    'experience',
-    'desiredSalary',
-    'gender',
-    'dateOfBirth',
-    'nationality',
-    'maritalStatus',
-    'photoUrl',
-    'country',
-    'city',
-    'educationLevel',
-    'universityName',
-    'major',
-    'degreeFileUrl',
-    'languages',
-    'availableStartDate',
-    // Evaluation Fields
-    'hrScore',
-    'hrDecision',
-    'aiMatchScore'
-  ];
+const CANDIDATES_LIST_KEYS = ORDERED_BASIC_KEYS as (keyof ReviewerExportData)[];
 
-  // Helper to extract rows based on keys
-  const getRows = (keys: (keyof ReviewerExportData)[]) => {
-    return data.map(row => keys.map(k => {
-      const val = row[k];
-      return formatTextForPdfMake(val ?? 'N/A');
-    }));
-  };
+export interface CandidatesListExportPayload {
+  basic: { headers: string[]; rows: Record<string, any>[] };
+  qa: { headers: string[]; rows: Record<string, any>[] };
+}
 
-  const headers = allKeys.map(k => formatTextForPdfMake(FIELD_LABELS[k] || k));
-  const rows = getRows(allKeys);
+export const buildCandidatesListExportPayload = (candidates: any[]): CandidatesListExportPayload => {
+  const transformedData = candidates.map(c =>
+    transformCandidateToReviewerData(c, c.assignments || [], c.ai_evaluations?.[0])
+  );
 
-  // Calculate equal width for each column
-  // A2 landscape width is approximately 594mm, with margins ~40mm each side = ~514mm usable
-  // Convert to points: 1mm = 2.83465 points, so ~514mm = ~1457 points
-  // But pdfmake uses points directly, A2 landscape is ~1190 points wide
-  // With margins, usable width is ~1100 points
-  const numColumns = headers.length;
-  const equalColumnWidth = '*'; // Use '*' for equal distribution
-  
-  // Build table body for pdfmake
-  const tableBody = [
-    // Header row
-    headers.map((h, idx) => ({
-      text: h,
-      style: 'tableHeader',
-      bold: true,
-      fillColor: [41, 128, 185],
-      color: '#FFFFFF',
-      alignment: idx === 0 ? 'left' : 'center'
-    })),
-    // Data rows
-    ...rows.map((row, rowIdx) => 
-      row.map((cell, colIdx) => {
-        const cellValue = cell;
-        const isUrl = typeof cellValue === 'string' && cellValue.startsWith('http');
-        
-        return {
-          text: isUrl ? 'Link' : cellValue,
-          style: 'tableCell',
-          bold: colIdx === 0, // Bold first column (name)
-          fillColor: rowIdx % 2 === 0 ? '#FFFFFF' : '#F5F7FA',
-          ...(isUrl ? { link: cellValue, color: '#0066CC' } : {}),
-          noWrap: false // Allow text wrapping
-        };
-      })
-    )
-  ];
+  const basicHeaders = ORDERED_BASIC_KEYS.map(k => FIELD_LABELS[k] || String(k));
+  const basicRows = transformedData.map(row => {
+    const result: Record<string, any> = {};
+    ORDERED_BASIC_KEYS.forEach(k => {
+      const label = FIELD_LABELS[k] || String(k);
+      result[label] = row[k] ?? '';
+    });
+    return result;
+  });
 
-  // --- Unified Questions & Answers table for ALL candidates ---
-  const baseKeys = new Set<string>(Object.keys(FIELD_LABELS));
-  baseKeys.add('candidateName');
-  baseKeys.add('__qa');
+  const qaHeaders = ['Candidate', 'Question', 'Answer', 'Answer Link', 'Voice Link', 'Resume Link'];
+  const qaRows: Record<string, any>[] = [];
 
-  const questionKeysSet = new Set<string>();
-  (data as any[]).forEach(row => {
-    Object.keys(row).forEach(k => {
-      if (!baseKeys.has(k) && !k.startsWith('__')) {
-        questionKeysSet.add(k);
+  candidates.forEach((candidate, idx) => {
+    const candidateName = transformedData[idx]?.candidateName || '';
+    const resumeUrl = candidate.resumes?.[0]?.file_url || candidate.resumeUrl || '';
+    const answers = Array.isArray(candidate.answers) ? candidate.answers : [];
+
+    answers.forEach((ans: any) => {
+      const question = ans.questions?.label || ans.label || ans.question_id || 'Question';
+      let answerText = ans.value || '';
+      let answerLink = '';
+      let voiceLink = '';
+
+      if (ans.type === 'voice' || ans.voice_data) {
+        answerText = '[Voice Recording]';
+        voiceLink = ans.voice_data?.audio_url || (ans.type === 'voice' ? ans.value : '');
+      } else if (ans.type === 'file') {
+        answerText = `[File: ${ans.fileName || 'Download'}]`;
+        answerLink = ans.value || '';
+      } else if (ans.type === 'url' || ans.isUrl) {
+        answerLink = ans.value || '';
       }
+
+      qaRows.push({
+        Candidate: candidateName,
+        Question: question,
+        Answer: answerText,
+        'Answer Link': answerLink,
+        'Voice Link': voiceLink,
+        'Resume Link': resumeUrl
+      });
     });
   });
 
-  const questionKeys = Array.from(questionKeysSet).sort();
-
-  // Build Q&A table body
-  let qaTableBody: any[] = [];
-  let qaNumColumns = 0;
-  if (questionKeys.length > 0) {
-    const qaHeaders = ['Candidate', ...questionKeys.map(k => formatTextForPdfMake(k))];
-    qaNumColumns = qaHeaders.length;
-    
-    qaTableBody = [
-      // Header row
-      qaHeaders.map((h, idx) => ({
-        text: h,
-        style: 'tableHeader',
-        bold: true,
-        fillColor: [52, 73, 94],
-        color: '#FFFFFF',
-        alignment: idx === 0 ? 'left' : 'center'
-      })),
-      // Data rows
-      ...(data as any[]).map((row, rowIdx) => {
-        const name = formatTextForPdfMake(row.candidateName || '');
-        const answers = questionKeys.map(key => {
-          const val = row[key];
-          return formatTextForPdfMake(val);
-        });
-        return [name, ...answers].map((cell, colIdx) => {
-          const cellValue = cell;
-          const isUrl = typeof cellValue === 'string' && cellValue.startsWith('http');
-          
-          return {
-            text: isUrl ? 'Link' : cellValue,
-            style: 'tableCell',
-            bold: colIdx === 0,
-            fillColor: rowIdx % 2 === 0 ? '#FFFFFF' : '#F5F7FA',
-            ...(isUrl ? { link: cellValue, color: '#0066CC' } : {}),
-            noWrap: false // Allow text wrapping
-          };
-        });
-      })
-    ];
-  }
-
-  // Create PDF document definition
-  const docDefinition: any = {
-    pageSize: 'A2',
-    pageOrientation: 'landscape',
-    content: [
-      {
-        text: 'Candidates List - Complete Data',
-        style: 'header',
-        margin: [0, 0, 0, 10]
-      },
-      {
-        table: {
-          headerRows: 1,
-          widths: Array(numColumns).fill('*'), // Equal width for all columns
-          body: tableBody
-        },
-        layout: {
-          fillColor: (rowIndex: number) => {
-            return rowIndex === 0 ? [41, 128, 185] : null;
-          },
-          hLineWidth: () => 0.1,
-          vLineWidth: () => 0.1,
-          hLineColor: () => '#C8C8C8',
-          vLineColor: () => '#C8C8C8'
-        },
-        margin: [0, 0, 0, 20]
-      }
-    ],
-    styles: {
-      header: {
-        fontSize: 14,
-        bold: true,
-        color: '#2980B9',
-        margin: [0, 0, 0, 10]
-      },
-      tableHeader: {
-        fontSize: 7,
-        bold: true,
-        color: '#FFFFFF',
-        fillColor: [41, 128, 185]
-      },
-      tableCell: {
-        fontSize: 6,
-        margin: [2, 1],
-        lineHeight: 1.2
-      }
-    },
-    defaultStyle: {
-      font: 'Roboto',
-      fontSize: 10
-    },
-    footer: (currentPage: number, pageCount: number) => ({
-      text: `Page ${currentPage} of ${pageCount} - Generated on: ${new Date().toLocaleString()}`,
-      fontSize: 8,
-      color: '#999999',
-      alignment: 'center',
-      margin: [0, 10, 0, 0]
-    })
+  return {
+    basic: { headers: basicHeaders, rows: basicRows },
+    qa: { headers: qaHeaders, rows: qaRows }
   };
-
-  // Add Q&A table if exists
-  if (qaTableBody.length > 0) {
-    docDefinition.content.push(
-      {
-        text: 'Candidates Questions & Answers',
-        style: 'header',
-        margin: [0, 20, 0, 10],
-        pageBreak: 'before'
-      },
-      {
-        table: {
-          headerRows: 1,
-          widths: Array(qaNumColumns).fill('*'), // Equal width for all columns
-          body: qaTableBody
-        },
-        layout: {
-          fillColor: (rowIndex: number) => {
-            return rowIndex === 0 ? [52, 73, 94] : null;
-          },
-          hLineWidth: () => 0.1,
-          vLineWidth: () => 0.1,
-          hLineColor: () => '#C8C8C8',
-          vLineColor: () => '#C8C8C8'
-        }
-      }
-    );
-  }
-
-  // Generate and download PDF
-  pdfMake.createPdf(docDefinition).download(filename);
 };
 
-export const exportCandidateReportPDF = (candidate: any, filename: string) => {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.width;
-  
-  // Helper for section headers
-  const addSectionHeader = (text: string, y: number) => {
-    doc.setFillColor(41, 128, 185);
-    doc.rect(14, y, pageWidth - 28, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(text, 16, y + 5.5);
-    doc.setTextColor(0, 0, 0);
-    return y + 12;
+const buildPdfMakeCell = (
+  text: any,
+  options?: {
+    bold?: boolean;
+    fillColor?: string | number[];
+    color?: string;
+    alignment?: 'left' | 'center' | 'right';
+    link?: string;
+    noWrap?: boolean;
+    allowArabic?: boolean;
+  }
+) => {
+  const value = formatTextForPdfMake(text ?? '');
+  const isArabic = ARABIC_REGEX.test(value);
+  const alignment = isArabic ? 'right' : options?.alignment || 'left';
+  const arabicFontInVFS = !!(arabicFontFileName && (pdfMake as any).vfs?.[arabicFontFileName]);
+  const arabicFontInFonts = !!(arabicFontName && (pdfMake as any).fonts?.[arabicFontName]);
+  const allowArabic = options?.allowArabic ?? (arabicFontInVFS && arabicFontInFonts);
+  const useArabic = isArabic && allowArabic;
+  const base: any = {
+    text: options?.link ? 'Link' : value,
+    font: useArabic && arabicFontName ? arabicFontName : 'Roboto',
+    alignment,
+    bold: options?.bold,
+    fillColor: options?.fillColor,
+    color: options?.color,
+    noWrap: options?.noWrap ?? false
   };
+  if (options?.link) {
+    base.link = options.link;
+    base.color = '#0066CC';
+  }
+  return base;
+};
 
-  // Helper to format array/json
-  const formatVal = (val: any) => {
-    if (!val) return 'N/A';
-    if (Array.isArray(val)) return val.join(', ');
-    if (typeof val === 'object') return JSON.stringify(val);
-    return String(val);
-  };
+export const exportCandidatesListPDF = async (candidates: any[], filename: string) => {
+  pdfMakeExportQueue = pdfMakeExportQueue.then(async () => {
+    await initializePdfMakeFonts();
+    const vfsSnapshot = { ...(pdfMake as any).vfs };
+    const fontsSnapshot = { ...(pdfMake as any).fonts };
+    const buildDocDefinition = (allowArabic: boolean) => {
+      (pdfMake as any).vfs = vfsSnapshot;
+      (pdfMake as any).fonts = fontsSnapshot;
+      const buildCell = (text: any, options?: Parameters<typeof buildPdfMakeCell>[1]) =>
+        buildPdfMakeCell(text, { ...options, allowArabic });
 
-  let yPos = 15;
+      const payload = buildCandidatesListExportPayload(candidates);
+      const fieldLabels = payload.basic.headers;
+      const rows = payload.basic.rows;
+      const candidatesPerPage = 10;
 
-  // 1. Header Section
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${candidate.candidate_name || 'Candidate Report'}`, 14, yPos);
-  
-  yPos += 8;
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100);
-  doc.text(`${candidate.job_form?.title || 'Unknown Position'}`, 14, yPos);
-  
-  // Status Badge-like text
-  doc.setFontSize(10);
-  const statusText = `Status: ${candidate.status?.toUpperCase() || 'APPLIED'}`;
-  const statusWidth = doc.getTextWidth(statusText);
-  doc.text(statusText, pageWidth - 14 - statusWidth, yPos);
-  doc.setTextColor(0);
+      const chunks: typeof rows[] = [];
+      for (let i = 0; i < rows.length; i += candidatesPerPage) {
+        chunks.push(rows.slice(i, i + candidatesPerPage));
+      }
 
-  yPos += 15;
+      const nameLabel = FIELD_LABELS.candidateName || 'Name';
 
-  // 2. Personal Information
-  const personalInfo = [
-    ['Email', candidate.candidate_email || candidate.email || 'N/A', 'Phone', candidate.candidate_phone || candidate.phone || 'N/A'],
-    ['Age', candidate.candidate_age ? `${candidate.candidate_age}` : 'N/A', 'Gender', candidate.gender || 'N/A'],
-    ['Nationality', candidate.nationality || 'N/A', 'Marital Status', candidate.marital_status || 'N/A'],
-    ['Location', candidate.location || 'N/A', 'Experience', `${candidate.experience || 0} Years`],
-    ['Education', candidate.education_level || 'N/A', 'University', candidate.university_name || 'N/A'],
-    ['Major', candidate.major || 'N/A', 'Languages', formatVal(candidate.languages)],
-    ['Expected Salary', candidate.desired_salary || 'N/A', 'Start Date', candidate.available_start_date || 'N/A'],
-    ['Applied Date', candidate.created_at ? new Date(candidate.created_at).toLocaleDateString() : 'N/A', 'Source', candidate.source || 'N/A'],
-    ['CV/Resume', candidate.resumes?.[0]?.file_url ? '[Attached]' : 'N/A', 'Voice Recording', candidate.answers?.some((a: any) => a.type === 'voice' || a.voice_data) ? 'Yes' : 'No']
-  ];
+      const buildChunkTable = (chunk: typeof rows, chunkIndex: number) => {
+        const headerRow = [
+          buildCell('Field', {
+            bold: true,
+            fillColor: [41, 128, 185],
+            color: '#FFFFFF',
+            alignment: 'center'
+          }),
+          ...chunk.map((row, idx) =>
+            buildCell(String(row[nameLabel] || `#${chunkIndex * candidatesPerPage + idx + 1}`), {
+              bold: true,
+              fillColor: [41, 128, 185],
+              color: '#FFFFFF',
+              alignment: 'center'
+            })
+          )
+        ];
 
-  if (candidate.photo) personalInfo.push(['Photo', '[Link]', '', '']);
-   if (candidate.degree_file) personalInfo.push(['Degree File', '[Link]', '', '']);
- 
-   // Find voice url
-   const voiceAns = candidate.answers?.find((a: any) => a.type === 'voice' || a.voice_data);
-   const voiceUrl = voiceAns?.voice_data?.audio_url || (voiceAns?.type === 'voice' ? voiceAns?.value : undefined);
+        const dataRows = fieldLabels.map((label, rowIdx) => {
+          const rowBg = rowIdx % 2 === 0 ? '#FFFFFF' : '#F5F7FA';
+          return [
+            buildCell(label, {
+              bold: true,
+              fillColor: [230, 240, 255],
+              alignment: 'left'
+            }),
+            ...chunk.map(candidateRow => {
+              const val = candidateRow[label] ?? '';
+              const isUrl = typeof val === 'string' && val.startsWith('http');
+              return buildCell(val, {
+                fillColor: rowBg,
+                link: isUrl ? val : undefined,
+                alignment: 'left'
+              });
+            })
+          ];
+        });
 
-   yPos = addSectionHeader('Personal Information', yPos);
-   
-   autoTable(doc, {
-    startY: yPos,
-    head: [],
-    body: personalInfo,
-    theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 2 },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [245, 245, 245], cellWidth: 30 },
-      1: { cellWidth: 60 },
-      2: { fontStyle: 'bold', fillColor: [245, 245, 245], cellWidth: 30 },
-      3: { cellWidth: 'auto' }
-    },
-    margin: { left: 14, right: 14 },
-    didDrawCell: (data) => {
-        if (data.section === 'body') {
-            const rawRow = data.row.raw as string[];
-            // CV/Resume Link (Column 1)
-            if (data.column.index === 1 && rawRow[0] === 'CV/Resume' && candidate.resumes?.[0]?.file_url) {
-                 doc.setTextColor(0, 0, 255);
-                 doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: candidate.resumes[0].file_url });
-            }
-            // Photo Link (Column 1)
-            if (data.column.index === 1 && rawRow[0] === 'Photo' && candidate.photo) {
-                doc.setTextColor(0, 0, 255);
-                doc.textWithLink('[Link]', data.cell.x + 2, data.cell.y + data.cell.height / 2 + 1, { url: candidate.photo });
-            }
-            // Degree File Link (Column 1)
-            if (data.column.index === 1 && rawRow[0] === 'Degree File' && candidate.degree_file) {
-                doc.setTextColor(0, 0, 255);
-                doc.textWithLink('[Link]', data.cell.x + 2, data.cell.y + data.cell.height / 2 + 1, { url: candidate.degree_file });
-            }
-            // Voice Recording Link (Column 3)
-            if (data.column.index === 3 && rawRow[2] === 'Voice Recording' && voiceUrl) {
-                 doc.setTextColor(0, 0, 255);
-                 doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: voiceUrl });
-            }
+        return {
+          table: {
+            headerRows: 1,
+            widths: [70, ...Array(chunk.length).fill('*')],
+            body: [headerRow, ...dataRows]
+          },
+          layout: {
+            hLineWidth: () => 0.3,
+            vLineWidth: () => 0.3,
+            hLineColor: () => '#C8C8C8',
+            vLineColor: () => '#C8C8C8'
+          }
+        };
+      };
+
+      let qaTableBody: any[] = [];
+      let qaNumColumns = 0;
+      if (payload.qa.rows.length > 0) {
+        const qaHeaders = payload.qa.headers.map(k => formatTextForPdfMake(k));
+        qaNumColumns = qaHeaders.length;
+
+        qaTableBody = [
+          qaHeaders.map((h, idx) =>
+            buildCell(h, {
+              bold: true,
+              fillColor: [52, 73, 94],
+              color: '#FFFFFF',
+              alignment: idx === 0 ? 'left' : 'center'
+            })
+          ),
+          ...payload.qa.rows.map((row, rowIdx) => {
+            return qaHeaders.map((header, colIdx) => {
+              const cell = row[header] ?? '';
+              const isUrl = typeof cell === 'string' && cell.startsWith('http');
+              return buildCell(cell, {
+                bold: colIdx === 0,
+                fillColor: rowIdx % 2 === 0 ? '#FFFFFF' : '#F5F7FA',
+                link: isUrl ? cell : undefined,
+                noWrap: false
+              });
+            });
+          })
+        ];
+      }
+
+      const content: any[] = [];
+
+      chunks.forEach((chunk, idx) => {
+        if (idx > 0) {
+          content.push({ text: '', pageBreak: 'before' });
         }
+        const from = idx * candidatesPerPage + 1;
+        const to = Math.min(from + chunk.length - 1, rows.length);
+        content.push({
+          text: `Candidates List (${from}–${to} of ${rows.length})`,
+          style: 'pageTitle',
+          margin: [0, 0, 0, 8]
+        });
+        content.push(buildChunkTable(chunk, idx));
+      });
+
+      const docDefinition: any = {
+        pageSize: 'A2',
+        pageOrientation: 'landscape',
+        content,
+        styles: {
+          header: {
+            fontSize: 14,
+            bold: true,
+            color: '#2980B9',
+            margin: [0, 0, 0, 10]
+          },
+          pageTitle: {
+            fontSize: 12,
+            bold: true,
+            color: '#2980B9'
+          },
+          tableHeader: {
+            fontSize: 7,
+            bold: true,
+            color: '#FFFFFF',
+            fillColor: [41, 128, 185]
+          },
+          tableCell: {
+            fontSize: 6,
+            margin: [2, 1],
+            lineHeight: 1.2
+          }
+        },
+        defaultStyle: {
+          font: 'Roboto',
+          fontSize: 10
+        },
+        footer: (currentPage: number, pageCount: number) => ({
+          text: `Page ${currentPage} of ${pageCount} - Generated on: ${new Date().toLocaleString()}`,
+          fontSize: 8,
+          color: '#999999',
+          alignment: 'center',
+          margin: [0, 10, 0, 0]
+        })
+      };
+
+      if (qaTableBody.length > 0) {
+        docDefinition.content.push(
+          {
+            text: 'Questions & Answers',
+            style: 'pageTitle',
+            margin: [0, 20, 0, 10],
+            pageBreak: 'before'
+          },
+          {
+            table: {
+              headerRows: 1,
+              widths: Array(qaNumColumns).fill('*'),
+              body: qaTableBody
+            },
+            layout: {
+              fillColor: (rowIndex: number) => {
+                return rowIndex === 0 ? [52, 73, 94] : null;
+              },
+              hLineWidth: () => 0.1,
+              vLineWidth: () => 0.1,
+              hLineColor: () => '#C8C8C8',
+              vLineColor: () => '#C8C8C8'
+            }
+          }
+        );
+      }
+
+      return docDefinition;
+    };
+
+    const createBlob = async (docDefinition: any) => {
+      const pdfDoc: any = pdfMake.createPdf(docDefinition);
+      return await new Promise<Blob>((resolve, reject) => {
+        try {
+          const result = pdfDoc.getBlob?.((b: Blob) => resolve(b));
+          if (result && typeof result.then === 'function') {
+            result.then(resolve).catch(reject);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+    };
+
+    const arabicAllowed = Boolean(
+      arabicFontFileName &&
+        arabicFontName &&
+        vfsSnapshot[arabicFontFileName] &&
+        (fontsSnapshot as any)?.[arabicFontName]
+    );
+
+    let docDefinition = buildDocDefinition(arabicAllowed);
+    let blob: Blob;
+    try {
+      blob = await createBlob(docDefinition);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (arabicFontFileName && message.includes(arabicFontFileName)) {
+        delete vfsSnapshot[arabicFontFileName];
+        if (arabicFontName && (fontsSnapshot as any)?.[arabicFontName]) {
+          delete (fontsSnapshot as any)[arabicFontName];
+        }
+        docDefinition = buildDocDefinition(false);
+        blob = await createBlob(docDefinition);
+      } else {
+        throw error;
+      }
     }
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   });
+  await pdfMakeExportQueue;
+};
 
-  yPos = (doc as any).lastAutoTable.finalY + 10;
+export const exportCandidateReportPDF = async (candidate: any, filename: string) => {
+  pdfMakeExportQueue = pdfMakeExportQueue.then(async () => {
+    await initializePdfMakeFonts();
+    const vfsSnapshot = { ...(pdfMake as any).vfs };
+    const fontsSnapshot = { ...(pdfMake as any).fonts };
+    const buildDocDefinition = (allowArabic: boolean) => {
+      (pdfMake as any).vfs = vfsSnapshot;
+      (pdfMake as any).fonts = fontsSnapshot;
+      const buildCell = (text: any, options?: Parameters<typeof buildPdfMakeCell>[1]) =>
+        buildPdfMakeCell(text, { ...options, allowArabic });
+      const buildKeyCell = (text: any) =>
+        buildCell(text, { bold: true, fillColor: [245, 245, 245], alignment: 'left' });
+      const buildValueCell = (text: any, link?: string) =>
+        buildCell(text, { alignment: 'left', noWrap: false, link });
+      const sectionTitle = (text: string) => ({
+        text,
+        style: 'sectionTitle',
+        margin: [0, 12, 0, 6]
+      });
+      const formatVal = (val: any) => {
+        if (!val) return 'N/A';
+        if (Array.isArray(val)) return val.join(', ');
+        if (typeof val === 'object') return JSON.stringify(val);
+        return String(val);
+      };
 
-  // 3. AI Evaluation
-  const aiEval = candidate.ai_evaluations?.[0];
-  if (aiEval) {
-    yPos = addSectionHeader('AI Evaluation', yPos);
-    
-    let parsedAnalysis = aiEval.analysis || {};
-    if (typeof parsedAnalysis === 'string') {
-        try { parsedAnalysis = JSON.parse(parsedAnalysis); } catch {}
+      const voiceAns = candidate.answers?.find((a: any) => a.type === 'voice' || a.voice_data);
+      const voiceUrl = voiceAns?.voice_data?.audio_url || (voiceAns?.type === 'voice' ? voiceAns?.value : '');
+      const resumeUrl = candidate.resumes?.[0]?.file_url || '';
+
+      const personalInfoRows = [
+        [buildKeyCell('Email'), buildValueCell(candidate.candidate_email || candidate.email || 'N/A'), buildKeyCell('Phone'), buildValueCell(candidate.candidate_phone || candidate.phone || 'N/A')],
+        [buildKeyCell('Age'), buildValueCell(candidate.candidate_age ? `${candidate.candidate_age}` : 'N/A'), buildKeyCell('Gender'), buildValueCell(candidate.gender || 'N/A')],
+        [buildKeyCell('Nationality'), buildValueCell(candidate.nationality || 'N/A'), buildKeyCell('Marital Status'), buildValueCell(candidate.marital_status || 'N/A')],
+        [buildKeyCell('Location'), buildValueCell(candidate.location || 'N/A'), buildKeyCell('Experience'), buildValueCell(`${candidate.experience || 0} Years`)],
+        [buildKeyCell('Education'), buildValueCell(candidate.education_level || 'N/A'), buildKeyCell('University'), buildValueCell(candidate.university_name || 'N/A')],
+        [buildKeyCell('Major'), buildValueCell(candidate.major || 'N/A'), buildKeyCell('Languages'), buildValueCell(formatVal(candidate.languages))],
+        [buildKeyCell('Expected Salary'), buildValueCell(candidate.desired_salary || 'N/A'), buildKeyCell('Start Date'), buildValueCell(candidate.available_start_date || 'N/A')],
+        [buildKeyCell('Applied Date'), buildValueCell(candidate.created_at ? new Date(candidate.created_at).toLocaleDateString() : 'N/A'), buildKeyCell('Source'), buildValueCell(candidate.source || 'N/A')],
+        [buildKeyCell('CV/Resume'), buildValueCell(resumeUrl ? '[Attached]' : 'N/A', resumeUrl || undefined), buildKeyCell('Voice Recording'), buildValueCell(voiceUrl ? 'Yes' : 'No', voiceUrl || undefined)]
+      ];
+
+      if (candidate.photo) {
+        personalInfoRows.push([buildKeyCell('Photo'), buildValueCell('[Link]', candidate.photo), buildKeyCell(''), buildValueCell('')]);
+      }
+      if (candidate.degree_file) {
+        personalInfoRows.push([buildKeyCell('Degree File'), buildValueCell('[Link]', candidate.degree_file), buildKeyCell(''), buildValueCell('')]);
+      }
+
+      const content: any[] = [
+        {
+          text: candidate.candidate_name || 'Candidate Report',
+          style: 'reportTitle'
+        },
+        {
+          text: candidate.job_form?.title || 'Unknown Position',
+          style: 'reportSubtitle',
+          margin: [0, 2, 0, 0]
+        },
+        {
+          text: `Status: ${candidate.status?.toUpperCase() || 'APPLIED'}`,
+          style: 'statusText',
+          margin: [0, 2, 0, 10]
+        },
+        sectionTitle('Personal Information'),
+        {
+          table: {
+            widths: [90, '*', 90, '*'],
+            body: personalInfoRows
+          },
+          layout: {
+            hLineWidth: () => 0.3,
+            vLineWidth: () => 0.3,
+            hLineColor: () => '#C8C8C8',
+            vLineColor: () => '#C8C8C8'
+          }
+        }
+      ];
+
+      const aiEval = candidate.ai_evaluations?.[0];
+      if (aiEval) {
+        let parsedAnalysis: any = aiEval.analysis || {};
+        if (typeof parsedAnalysis === 'string') {
+          try {
+            parsedAnalysis = JSON.parse(parsedAnalysis);
+          } catch {}
+        }
+        const aiRows = [
+          [buildKeyCell('Match Score'), buildValueCell(`${parsedAnalysis.match_score || 0}%`)],
+          [buildKeyCell('Qualification'), buildValueCell(parsedAnalysis.qualification_summary || 'N/A')],
+          [buildKeyCell('Strengths'), buildValueCell(Array.isArray(parsedAnalysis.strengths) ? parsedAnalysis.strengths.join(', ') : (parsedAnalysis.strengths || 'N/A'))],
+          [buildKeyCell('Missing Skills'), buildValueCell(Array.isArray(parsedAnalysis.missing_critical_skills) ? parsedAnalysis.missing_critical_skills.join(', ') : (parsedAnalysis.missing_critical_skills || 'N/A'))],
+          [buildKeyCell('Experience Relevance'), buildValueCell(parsedAnalysis.experience_relevance || 'N/A')]
+        ];
+        content.push(
+          sectionTitle('AI Evaluation'),
+          {
+            table: {
+              widths: [120, '*'],
+              body: aiRows
+            },
+            layout: {
+              hLineWidth: () => 0.3,
+              vLineWidth: () => 0.3,
+              hLineColor: () => '#C8C8C8',
+              vLineColor: () => '#C8C8C8'
+            }
+          }
+        );
+      }
+
+      const hrEval = candidate.hr_evaluations?.[0];
+      if (hrEval) {
+        const hrRows = [
+          [buildKeyCell('Score'), buildValueCell(`${hrEval.hr_score || 0}/100`)],
+          [buildKeyCell('Decision'), buildValueCell(hrEval.hr_decision || 'Pending')],
+          [buildKeyCell('Next Action Date'), buildValueCell(hrEval.next_action_date ? new Date(hrEval.next_action_date).toLocaleDateString() : 'N/A')],
+          [buildKeyCell('Notes'), buildValueCell(hrEval.hr_notes || 'No notes')]
+        ];
+        content.push(
+          sectionTitle('HR Evaluation'),
+          {
+            table: {
+              widths: [120, '*'],
+              body: hrRows
+            },
+            layout: {
+              hLineWidth: () => 0.3,
+              vLineWidth: () => 0.3,
+              hLineColor: () => '#C8C8C8',
+              vLineColor: () => '#C8C8C8'
+            }
+          }
+        );
+      }
+
+      if (candidate.answers && candidate.answers.length > 0) {
+        const qaHeaderRow = [
+          buildCell('Question', { bold: true, fillColor: [52, 73, 94], color: '#FFFFFF', alignment: 'left' }),
+          buildCell('Answer', { bold: true, fillColor: [52, 73, 94], color: '#FFFFFF', alignment: 'left' })
+        ];
+        const qaRows = candidate.answers.map((ans: any) => {
+          const question = ans.questions?.label || ans.label || ans.question_id || 'Question';
+          let answer = ans.value || 'No Answer';
+          let link = '';
+          if (ans.type === 'voice' || ans.voice_data) {
+            answer = '[Voice Recording Link]';
+            link = ans.voice_data?.audio_url || (ans.type === 'voice' ? ans.value : '');
+          } else if (ans.type === 'file') {
+            answer = `[File: ${ans.fileName || 'Download'}]`;
+            link = ans.value || '';
+          } else if (ans.type === 'url' || ans.isUrl) {
+            link = ans.value || '';
+          }
+          return [buildCell(question, { alignment: 'left', noWrap: false }), buildCell(answer, { alignment: 'left', noWrap: false, link: link || undefined })];
+        });
+        content.push(
+          sectionTitle('Interview Questions'),
+          {
+            table: {
+              headerRows: 1,
+              widths: [160, '*'],
+              body: [qaHeaderRow, ...qaRows]
+            },
+            layout: {
+              hLineWidth: () => 0.3,
+              vLineWidth: () => 0.3,
+              hLineColor: () => '#C8C8C8',
+              vLineColor: () => '#C8C8C8'
+            }
+          }
+        );
+      }
+
+      if (candidate.assignments && candidate.assignments.length > 0) {
+        const assignHeaderRow = [
+          buildCell('Assignment', { bold: true, fillColor: [52, 73, 94], color: '#FFFFFF', alignment: 'left' }),
+          buildCell('Details', { bold: true, fillColor: [52, 73, 94], color: '#FFFFFF', alignment: 'left' })
+        ];
+        const assignRows = candidate.assignments.map((a: any, idx: number) => {
+          const links = Array.isArray(a.link_fields) ? a.link_fields.join(', ') : '';
+          const text = a.text_fields || '';
+          const type = a.type || 'text';
+          let contentText = text;
+          if (type === 'video_upload' || type === 'file_upload') {
+            contentText = '[File/Video Uploaded]';
+          }
+          const details = `${contentText}${links ? `\nLinks: ${links}` : ''}`;
+          return [buildCell(`Assignment ${idx + 1}`, { alignment: 'left', noWrap: false }), buildCell(details, { alignment: 'left', noWrap: false })];
+        });
+        content.push(
+          sectionTitle('Assignments'),
+          {
+            table: {
+              headerRows: 1,
+              widths: [140, '*'],
+              body: [assignHeaderRow, ...assignRows]
+            },
+            layout: {
+              hLineWidth: () => 0.3,
+              vLineWidth: () => 0.3,
+              hLineColor: () => '#C8C8C8',
+              vLineColor: () => '#C8C8C8'
+            }
+          }
+        );
+      }
+
+      if (candidate.interviews && candidate.interviews.length > 0) {
+        const interviewHeaderRow = [
+          buildCell('Date', { bold: true, fillColor: [52, 73, 94], color: '#FFFFFF', alignment: 'left' }),
+          buildCell('Details', { bold: true, fillColor: [52, 73, 94], color: '#FFFFFF', alignment: 'left' })
+        ];
+        const interviewRows = candidate.interviews.map((i: any) => {
+          const date = i.start_time ? new Date(i.start_time).toLocaleString() : 'N/A';
+          const details = `Type: ${i.interview_type || 'N/A'}\nStatus: ${i.status || 'Scheduled'}\nNotes: ${i.notes || ''}`;
+          return [buildCell(date, { alignment: 'left', noWrap: false }), buildCell(details, { alignment: 'left', noWrap: false })];
+        });
+        content.push(
+          sectionTitle('Scheduled Interviews'),
+          {
+            table: {
+              headerRows: 1,
+              widths: [160, '*'],
+              body: [interviewHeaderRow, ...interviewRows]
+            },
+            layout: {
+              hLineWidth: () => 0.3,
+              vLineWidth: () => 0.3,
+              hLineColor: () => '#C8C8C8',
+              vLineColor: () => '#C8C8C8'
+            }
+          }
+        );
+      }
+
+      return {
+        pageSize: 'A4',
+        pageOrientation: 'portrait',
+        content,
+        styles: {
+          reportTitle: { fontSize: 18, bold: true },
+          reportSubtitle: { fontSize: 12, color: '#666666' },
+          statusText: { fontSize: 10, color: '#333333' },
+          sectionTitle: { fontSize: 12, bold: true, color: '#2980B9' }
+        },
+        defaultStyle: {
+          font: 'Roboto',
+          fontSize: 9
+        },
+        footer: (currentPage: number, pageCount: number) => ({
+          text: `Page ${currentPage} of ${pageCount} - Generated by SmartRecruit AI`,
+          fontSize: 8,
+          color: '#999999',
+          alignment: 'center',
+          margin: [0, 10, 0, 0]
+        })
+      };
+    };
+
+    const createBlob = async (docDefinition: any) => {
+      const pdfDoc: any = pdfMake.createPdf(docDefinition);
+      return await new Promise<Blob>((resolve, reject) => {
+        try {
+          const result = pdfDoc.getBlob?.((b: Blob) => resolve(b));
+          if (result && typeof result.then === 'function') {
+            result.then(resolve).catch(reject);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+    };
+
+    const arabicAllowed = Boolean(
+      arabicFontFileName &&
+        arabicFontName &&
+        vfsSnapshot[arabicFontFileName] &&
+        (fontsSnapshot as any)?.[arabicFontName]
+    );
+
+    let docDefinition = buildDocDefinition(arabicAllowed);
+    let blob: Blob;
+    try {
+      blob = await createBlob(docDefinition);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (arabicFontFileName && message.includes(arabicFontFileName)) {
+        delete vfsSnapshot[arabicFontFileName];
+        if (arabicFontName && (fontsSnapshot as any)?.[arabicFontName]) {
+          delete (fontsSnapshot as any)[arabicFontName];
+        }
+        docDefinition = buildDocDefinition(false);
+        blob = await createBlob(docDefinition);
+      } else {
+        throw error;
+      }
     }
 
-    const aiData = [
-      ['Match Score', `${parsedAnalysis.match_score || 0}%`],
-      ['Qualification', parsedAnalysis.qualification_summary || 'N/A'],
-      ['Strengths', Array.isArray(parsedAnalysis.strengths) ? parsedAnalysis.strengths.join(', ') : (parsedAnalysis.strengths || 'N/A')],
-      ['Missing Skills', Array.isArray(parsedAnalysis.missing_critical_skills) ? parsedAnalysis.missing_critical_skills.join(', ') : (parsedAnalysis.missing_critical_skills || 'N/A')],
-      ['Experience Relevance', parsedAnalysis.experience_relevance || 'N/A']
-    ];
-
-    autoTable(doc, {
-      startY: yPos,
-      body: aiData,
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 2 },
-      columnStyles: {
-        0: { fontStyle: 'bold', fillColor: [245, 245, 245], cellWidth: 40 },
-        1: { cellWidth: 'auto' }
-      },
-      margin: { left: 14, right: 14 }
-    });
-
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // 4. HR Evaluation
-  const hrEval = candidate.hr_evaluations?.[0];
-  if (hrEval) {
-    if (yPos > 250) { doc.addPage(); yPos = 15; }
-    
-    yPos = addSectionHeader('HR Evaluation', yPos);
-    
-    const hrData = [
-      ['Score', `${hrEval.hr_score || 0}/100`, 'Decision', hrEval.hr_decision || 'Pending'],
-      ['Next Action Date', hrEval.next_action_date ? new Date(hrEval.next_action_date).toLocaleDateString() : 'N/A', '', ''],
-      ['Notes', hrEval.hr_notes || 'No notes']
-    ];
-    
-    autoTable(doc, {
-      startY: yPos,
-      body: hrData,
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 2 },
-      columnStyles: {
-        0: { fontStyle: 'bold', fillColor: [245, 245, 245], cellWidth: 30 },
-        1: { cellWidth: 'auto' }
-      },
-      margin: { left: 14, right: 14 },
-      didParseCell: function(data) {
-        if (data.row.index === 2 && data.column.index === 1) {
-          data.cell.colSpan = 3;
-        }
-      }
-    });
-    
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // 5. Questions & Answers
-  if (candidate.answers && candidate.answers.length > 0) {
-    if (yPos > 250) { doc.addPage(); yPos = 15; }
-    
-    yPos = addSectionHeader('Interview Questions', yPos);
-    
-    const qaRows = candidate.answers.map((ans: any) => {
-      const question = ans.questions?.label || ans.label || ans.question_id || 'Question';
-      let answer = ans.value || 'No Answer';
-      let link = '';
-      
-      if (ans.type === 'voice' || (ans.voice_data)) {
-         answer = '[Voice Recording Link]';
-         link = ans.voice_data?.audio_url || (ans.type === 'voice' ? ans.value : '');
-      }
-      if (ans.type === 'file') {
-         answer = `[File: ${ans.fileName || 'Download'}]`;
-         link = ans.value;
-      }
-      if (ans.type === 'url' || ans.isUrl) {
-         link = ans.value;
-      }
-      
-      return { question, answer, link };
-    });
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [['Question', 'Answer']],
-      body: qaRows.map((r: any) => [r.question, r.answer]),
-      theme: 'striped',
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [52, 73, 94] },
-      columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 80 },
-        1: { cellWidth: 'auto' }
-      },
-      margin: { left: 14, right: 14 },
-      didDrawCell: (data) => {
-        if (data.section === 'body' && data.column.index === 1) {
-             const rowIndex = data.row.index;
-             const link = qaRows[rowIndex]?.link;
-             if (link) {
-                 doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: link });
-             }
-        }
-      }
-    });
-    
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // 6. Assignments
-  if (candidate.assignments && candidate.assignments.length > 0) {
-    if (yPos > 240) { doc.addPage(); yPos = 15; }
-    
-    yPos = addSectionHeader('Assignments', yPos);
-    
-    const assignRows = candidate.assignments.map((a: any, idx: number) => {
-       const links = Array.isArray(a.link_fields) ? a.link_fields.join(', ') : '';
-       const text = a.text_fields || '';
-       const type = a.type || 'text';
-       
-       let content = text;
-       if (type === 'video_upload' || type === 'file_upload') {
-          content = `[File/Video Uploaded]`;
-       }
-       
-       return [`Assignment ${idx + 1}`, `${content}\n${links ? `Links: ${links}` : ''}`];
-    });
-
-    autoTable(doc, {
-      startY: yPos,
-      body: assignRows,
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 3 },
-      columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 40 },
-        1: { cellWidth: 'auto' }
-      },
-      margin: { left: 14, right: 14 }
-    });
-
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-  }
-  
-  // 7. Interviews
-  if (candidate.interviews && candidate.interviews.length > 0) {
-    if (yPos > 240) { doc.addPage(); yPos = 15; }
-    
-    yPos = addSectionHeader('Scheduled Interviews', yPos);
-    
-    const interviewRows = candidate.interviews.map((i: any) => {
-      const date = i.start_time ? new Date(i.start_time).toLocaleString() : 'N/A';
-      return [
-        `Date: ${date}`, 
-        `Type: ${i.interview_type || 'N/A'}\nStatus: ${i.status || 'Scheduled'}\nNotes: ${i.notes || ''}`
-      ];
-    });
-
-    autoTable(doc, {
-      startY: yPos,
-      body: interviewRows,
-      theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 3 },
-      columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 50 },
-        1: { cellWidth: 'auto' }
-      },
-      margin: { left: 14, right: 14 }
-    });
-    
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-  }
-  
-  // Footer
-  const pageCount = doc.getNumberOfPages();
-  for(let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(`Page ${i} of ${pageCount} - Generated by SmartRecruit AI`, pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
-  }
-
-  doc.save(filename);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+  await pdfMakeExportQueue;
 };
 
 export const exportData = <T extends Record<string, any>>(

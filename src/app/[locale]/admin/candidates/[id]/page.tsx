@@ -19,7 +19,7 @@ import { useToast } from '@/context/ToastContext';
 import { getAssignmentsByApplication } from '@/actions/assignments';
 import { InterviewsList } from '@/components/admin/interviews/InterviewsList';
 import { InterviewDialog } from '@/components/admin/interviews/InterviewDialog';
-import { transformCandidateToReviewerData, exportData, exportCandidateReportPDF, exportCandidatesListPDF, formatForExport } from '@/utils/exportUtils';
+import { transformCandidateToReviewerData, exportData, exportCandidateReportPDF, formatForExport } from '@/utils/exportUtils';
 import { getSystemSettings } from '@/actions/settings';
 import {
   ArrowLeft,
